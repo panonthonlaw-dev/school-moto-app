@@ -63,6 +63,16 @@ def upload_to_drive(file_obj, filename):
 # --- หน้าเว็บ ---
 # ตรงนี้ใส่ชื่อไฟล์โลโก้ของคุณ (ควรมีนามสกุลไฟล์ด้วย เช่น .png, .jpg)
 st.set_page_config(page_title="patwit moto.", page_icon="logo")
+# --- ซ่อนเมนูและไอคอน GitHub ---
+hide_menu_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display:none;}
+    </style>
+"""
+st.markdown(hide_menu_style, unsafe_allow_html=True)
 
 # --- ส่วนหัวข้อแบบมีโลโก้ (แก้ใหม่ตรงนี้) ---
 # แบ่งเป็น 2 คอลัมน์: [ช่องเล็กสำหรับรูป, ช่องใหญ่สำหรับข้อความ]
