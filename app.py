@@ -176,40 +176,28 @@ elif menu == "👮 ครูตรวจสอบ":
         if 'df' in st.session_state:
             df = st.session_state['df']
             
-            # --- 📊 ส่วน Dashboard (เพิ่มใหม่ตรงนี้) ---
+            # --- 📊 ส่วน Dashboard ---
             st.markdown("### 📊 สรุปภาพรวม")
-            
             total_cars = len(df)
             
-            # การคำนวณ (ใช้การกรองหาคำว่า 'มี' หรือ 'ครบ')
-            # พยายามหาจากชื่อคอลัมน์ก่อน ถ้าไม่มีให้ใช้ index
+            # คำนวณสถิติ
             try:
-                if 'ใบขับขี่' in df.columns:
-                    has_license = df[df['ใบขับขี่'].astype(str).str.contains("มี", na=False)].shape[0]
-                else:
-                    # ถ้าชื่อคอลัมน์ไม่ตรง ให้เดาว่าเป็นคอลัมน์ที่ 8 (Index 7)
-                    has_license = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
-
-                if 'พรบ_ภาษี' in df.columns:
-                    has_tax = df[df['พรบ_ภาษี'].astype(str).str.contains("ครบ|ปกติ", na=False)].shape[0]
-                else:
-                    # ถ้าชื่อคอลัมน์ไม่ตรง ให้เดาว่าเป็นคอลัมน์ที่ 9 (Index 8)
-                    has_tax = df[df.iloc[:, 8].astype(str).str.contains("ครบ|ปกติ", na=False)].shape[0]
+                # พยายามหาคอลัมน์ใบขับขี่ (index 7) และ พรบ (index 8)
+                has_license = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
+                has_tax = df[df.iloc[:, 8].astype(str).str.contains("ครบ|ปกติ", na=False)].shape[0]
             except:
                 has_license = 0
                 has_tax = 0
 
-            # แสดงผลเป็นกล่องตัวเลขสวยๆ (Metric)
             m1, m2, m3 = st.columns(3)
-            m1.metric("🏍️ ลงทะเบียนทั้งหมด", f"{total_cars} คัน")
+            m1.metric("🏍️ ทั้งหมด", f"{total_cars} คัน")
             m2.metric("🪪 มีใบขับขี่", f"{has_license} คน", f"{(has_license/total_cars*100):.1f}%" if total_cars else "0%")
-            m3.metric("📝 พรบ./ภาษี ครบ", f"{has_tax} คัน", f"{(has_tax/total_cars*100):.1f}%" if total_cars else "0%")
+            m3.metric("📝 พรบ./ภาษี", f"{has_tax} คัน", f"{(has_tax/total_cars*100):.1f}%" if total_cars else "0%")
             
             st.markdown("---")
-            # ----------------------------------------
-
-            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน/ชั้น)")
             
+            # --- ส่วนค้นหา ---
+            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน/ชั้น)")
             if search:
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
@@ -231,18 +219,13 @@ elif menu == "👮 ครูตรวจสอบ":
                     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
                 return url
 
-            # วนลูปแสดงผล
+            # --- วนลูปแสดงข้อมูล (สำคัญ: ย่อหน้าต้องตรงกัน) ---
             for i, row in df.iterrows():
                 vals = row.tolist()
                 
-                # ดึงข้อมูล
+                # ดึงข้อมูล (เช็คความยาวเพื่อป้องกัน Error)
                 name_txt = str(vals[1]) if len(vals) > 1 else "-"
                 std_id_txt = str(vals[2]) if len(vals) > 2 else "-"
                 level_txt = str(vals[3]) if len(vals) > 3 else "-"
                 brand_txt = str(vals[4]) if len(vals) > 4 else "-"
-                color_txt = str(vals[5]) if len(vals) > 5 else "-"
-                plate_txt = str(vals[6]) if len(vals) > 6 else "-"
-                
-                # ดึงลิงก์รูป
-                raw_link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
-                raw_link2
+                color_txt = str
