@@ -15,13 +15,10 @@ ADMIN_PASSWORD = "Patwit064180"
 
 # --- เชื่อมต่อ Google ---
 def get_creds():
-    # 🔧 แก้ไขจุดที่ Error: เพิ่ม strict=False เพื่อให้โปรแกรมไม่งอแงเรื่องตัวอักษร
     key_content = st.secrets["textkey"]["json_content"]
-    # ป้องกันปัญหาเรื่องตัวเว้นบรรทัด (Newlines) ที่มักจะ Error
     try:
         key_dict = json.loads(key_content, strict=False)
     except json.JSONDecodeError:
-        # ถ้ายัง Error ให้ลองล้างค่าตัวอักษรพิเศษ
         clean_content = key_content.replace('\n', '\\n')
         key_dict = json.loads(clean_content, strict=False)
         
@@ -60,25 +57,37 @@ if menu == "📝 นักเรียนลงทะเบียน":
         brand = st.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
         plate = st.text_input("ทะเบียน พร้อมจังหวัด(ตัวอย่าง กก1234 ร้อยเอ็ด)")
         color = st.text_input("สีรถ")
-        st.markdown("### 📸 ถ่ายรูปรถเห็นทะเบียน")
-        photo = st.file_uploader("เลือกรูป", type=['jpg','png','jpeg'])
+        
+        st.markdown("### 📸 ถ่ายรูปรถ (2 มุม)")
+        col_img1, col_img2 = st.columns(2)
+        # --- จุดที่แก้ 1: เพิ่มช่องรับไฟล์เป็น 2 ช่อง ---
+        photo1 = col_img1.file_uploader("1. รูปด้านหน้า (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
+        photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
         
         if st.form_submit_button("ส่งข้อมูล"):
-            if name and plate and photo:
+            # ต้องมีอย่างน้อย 1 รูปถึงจะยอมให้ส่ง (หรือจะแก้เป็น and photo2 เพื่อบังคับ 2 รูปก็ได้)
+            if name and plate and photo1: 
                 try:
                     with st.spinner("กำลังอัปโหลด..."):
                         # สร้างชื่อไฟล์ไม่ให้ซ้ำ
                         clean_plate = plate.replace(" ", "")
-                        file_name = f"{std_id}_{clean_plate}.jpg"
                         
-                        link = upload_to_drive(photo, file_name)
+                        # --- จุดที่แก้ 2: อัปโหลดทีละรูป ---
+                        link1 = upload_to_drive(photo1, f"{std_id}_{clean_plate}_FRONT.jpg")
+                        
+                        link2 = ""
+                        if photo2: # ถ้ามีรูปที่ 2 ก็ให้อัปโหลดด้วย
+                             link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
+
                         sheet = connect_gsheet()
-                        sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, link])
+                        # --- จุดที่แก้ 3: บันทึก link1 และ link2 ลง Sheet ---
+                        sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, link1, link2])
+                    
                     st.success("✅ บันทึกข้อมูลเรียบร้อย!")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
             else:
-                st.warning("กรุณากรอกข้อมูลให้ครบทุกช่อง")
+                st.warning("กรุณากรอกข้อมูลและแนบรูปอย่างน้อย 1 รูป")
 
 elif menu == "👮 ครูตรวจสอบ":
     pwd = st.text_input("รหัสผ่านเจ้าหน้าที่", type="password")
@@ -104,13 +113,32 @@ elif menu == "👮 ครูตรวจสอบ":
             st.write(f"พบข้อมูล {len(df)} รายการ")
             
             for i, row in df.iterrows():
-                with st.expander(f"{row.get('ทะเบียน','-')} : {row.get('ชื่อ-นามสกุล','-')}"):
-                    c_img, c_text = st.columns([1,2])
+                # ดึงข้อมูลออกแบบปลอดภัย (ใช้ .get กัน Error กรณีเปลี่ยนชื่อหัวตาราง)
+                # หมายเหตุ: ต้องแก้ชื่อ key ให้ตรงกับหัวตารางใน Google Sheet จริงๆ ของคุณ
+                # สมมติว่าหัวตารางช่องสุดท้ายคือ 'รูปภาพ1' และ 'รูปภาพ2'
+                # ถ้า Sheet คุณยังเป็นชื่อเก่า โค้ดจะพยายามดึงจาก index แทน
+                
+                plate_txt = row.get('ทะเบียน', list(row.values())[6]) 
+                name_txt = row.get('ชื่อ-นามสกุล', list(row.values())[1])
+
+                with st.expander(f"{plate_txt} : {name_txt}"):
+                    c_img, c_text = st.columns([2,1]) # แบ่งพื้นที่ รูป 2 ส่วน : ข้อความ 1 ส่วน
+                    
                     with c_img:
-                        if str(row.get('รูปภาพ','')).startswith('http'):
-                            st.image(row['รูปภาพ'], use_column_width=True)
-                        else: st.write("ไม่มีรูป")
+                        # --- จุดที่แก้ 4: แสดงผล 2 รูป ---
+                        # พยายามดึงลิงก์จากชื่อหัวตาราง หรือลำดับคอลัมน์ (Index)
+                        vals = list(row.values())
+                        link1 = str(vals[7]) if len(vals) > 7 else ""
+                        link2 = str(vals[8]) if len(vals) > 8 else ""
+
+                        cols = st.columns(2)
+                        if link1.startswith('http'):
+                            cols[0].image(link1, caption="ด้านหน้า", use_column_width=True)
+                        if link2.startswith('http'):
+                            cols[1].image(link2, caption="ด้านข้าง", use_column_width=True)
+                            
                     with c_text:
-                        st.write(f"**ชั้น:** {row.get('ชั้น','-')}")
-                        st.write(f"**รถ:** {row.get('ยี่ห้อ','-')} สี {row.get('สี','-')}")
-                        st.write(f"**วันเวลา:** {row.get('Timestamp','-')}")
+                        st.write(f"**ชั้น:** {row.get('ชั้น', vals[3])}")
+                        st.write(f"**ยี่ห้อ:** {row.get('ยี่ห้อ', vals[4])}")
+                        st.write(f"**สี:** {row.get('สี', vals[5])}")
+                        st.write(f"**เวลา:** {row.get('Timestamp', vals[0])}")
