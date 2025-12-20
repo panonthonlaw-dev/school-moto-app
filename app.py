@@ -82,31 +82,44 @@ menu = st.sidebar.radio("เมนู", ["📝 นักเรียนลงท
 if menu == "📝 นักเรียนลงทะเบียน":
     st.info("กรุณากรอกข้อมูลและแนบรูปรถ")
     with st.form("reg_form"):
-        # แถว 1
+        # --- แถว 1: แก้ไขตรงนี้ (เพิ่มคำนำหน้า) ---
         c1, c2 = st.columns(2)
-        name = c1.text_input("ชื่อ-นามสกุล")
+        
+        # แบ่งช่อง c1 ออกเป็น 2 ส่วน (คำนำหน้า 35% : ชื่อ 65%)
+        with c1:
+            sub_c1, sub_c2 = st.columns([1.2, 2]) 
+            prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ว่าที่ร้อยตรี", "ครู", "อื่นๆ"])
+            
+            # ถ้าเลือกอื่นๆ ให้พิมพ์เองได้ (แต่ต้องซ่อนไว้ก่อนถ้าไม่ได้เลือก)
+            if prefix == "อื่นๆ":
+                prefix = sub_c1.text_input("ระบุคำนำหน้า", key="other_prefix")
+                
+            fname = sub_c2.text_input("ชื่อ-นามสกุล (ไม่ต้องใส่คำนำหน้า)")
+            
+            # รวมคำนำหน้ากับชื่อเข้าด้วยกัน เพื่อส่งไปเก็บในตัวแปร name เดิม
+            name = f"{prefix}{fname}" if fname else ""
+
         std_id = c2.text_input("รหัสนักเรียน")
         
-        # แถว 2
+        # --- แถว 2 ---
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","บุคลากร","ผู้ประกอบการ"])
         room = c4.text_input("ห้อง")
         
         st.markdown("---")
         
-        # แถว 3
+        # --- แถว 3 ---
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
         color = c6.text_input("สีรถ")
         
         plate = st.text_input("ทะเบียน พร้อมจังหวัด(ตัวอย่าง กก1234 ร้อยเอ็ด)")
         
-        # --- (ส่วนที่เพิ่มใหม่) ---
+        # --- ข้อมูลเอกสาร ---
         st.markdown("##### 📄 ข้อมูลเอกสาร")
         doc_col1, doc_col2 = st.columns(2)
         license_status = doc_col1.radio("ใบขับขี่", ["✅ มีใบขับขี่", "❌ ไม่มี"], horizontal=True)
         tax_status = doc_col2.radio("พรบ. และ ภาษี", ["✅ ต่อครบถ้วน", "❌ ขาด/ไม่แน่ใจ"], horizontal=True)
-        # ------------------------
         
         st.markdown("### 📸 ถ่ายรูปรถ (2 มุม)")
         col_img1, col_img2 = st.columns(2)
@@ -114,7 +127,7 @@ if menu == "📝 นักเรียนลงทะเบียน":
         photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
         
         if st.form_submit_button("ส่งข้อมูล"):
-            if name and plate and photo1: 
+            if fname and plate and photo1: # เช็คว่ากรอกชื่อ (fname) แล้ว
                 try:
                     with st.spinner("กำลังอัปโหลด..."):
                         clean_plate = plate.replace(" ", "")
@@ -127,21 +140,20 @@ if menu == "📝 นักเรียนลงทะเบียน":
 
                         if link1: 
                             sheet = connect_gsheet()
-                            # บันทึกข้อมูลเพิ่ม (license_status, tax_status)
                             sheet.append_row([
                                 str(datetime.now()), 
-                                name, 
+                                name, # ตรงนี้จะส่งไปเป็น "คำนำหน้า+ชื่อ" อัตโนมัติ
                                 std_id, 
                                 f"{level}/{room}", 
                                 brand, 
                                 color, 
                                 plate,
-                                license_status, # เพิ่มตรงนี้
-                                tax_status,     # เพิ่มตรงนี้
+                                license_status,
+                                tax_status,
                                 link1, 
                                 link2
                             ])
-                            st.success("✅ บันทึกข้อมูลเรียบร้อย!")
+                            st.success(f"✅ บันทึกข้อมูล {name} เรียบร้อย!")
                         
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
