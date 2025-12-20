@@ -10,7 +10,7 @@ import json
 # --- ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 # 🔴🔴 (สำคัญ) อย่าลืมใส่ ID โฟลเดอร์รูปภาพของครูตรงนี้นะครับ 🔴🔴
-DRIVE_FOLDER_ID = "1xxxxxxxxxxxxxxxxxxxxxxxxx" 
+DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
 ADMIN_PASSWORD = "schoolpolice"
 
 # --- เชื่อมต่อ Google ---
@@ -36,7 +36,7 @@ def connect_gsheet():
 def upload_to_drive(file_obj, filename):
     creds = get_creds()
     service = build('drive', 'v3', credentials=creds)
-    file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID]="1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA"}
+    file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID]}
     media = MediaIoBaseUpload(file_obj, mimetype=file_obj.type, resumable=True)
     file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
     return file.get('webViewLink')
