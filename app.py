@@ -21,8 +21,8 @@ from reportlab.lib import colors
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
-ADMIN_PASSWORD = "Patwit1150"
-SECRET_RESTORE_CODE = "POLICE2025" 
+ADMIN_PASSWORD = "Patwit1150" # รหัสเข้าหน้าเจ้าหน้าที่
+SECRET_RESTORE_CODE = "POLICE2025" # รหัสฟื้นฟูคะแนน
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 
 # --- 2. Setup หน้าเว็บ ---
@@ -101,10 +101,9 @@ def update_point(std_id, action):
             updated_history = old_history + "\n" + log_msg if old_history else log_msg
             sheet.update_cell(row_num, 12, new_score)
             sheet.update_cell(row_num, 13, updated_history)
-            return True, new_score, "บันทึกข้อมูลสำเร็จ"
-        return False, 0, "ไม่พบรหัสนักเรียน"
-    except Exception as e:
-        return False, 0, f"Error: {str(e)}"
+            return True, new_score, "สำเร็จ"
+        return False, 0, "ไม่พบข้อมูล"
+    except Exception as e: return False, 0, f"Error: {e}"
 
 def upload_to_drive(file_obj, filename):
     if "script.google.com" not in GAS_APP_URL:
@@ -204,101 +203,3 @@ def create_pdf(vals, img_url1, img_url2):
             c.drawString(80, curr_y, log)
             curr_y -= 18
     y_sign = 85
-    c.setFont(font_name, 16)
-    c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
-    c.drawString(100, y_sign - 20, f"({name})")
-    c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
-    c.drawString(330, y_sign - 20, "(.......................................................)")
-    c.setFont(font_name, 10)
-    c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    c.save()
-    buffer.seek(0)
-    return buffer
-
-# --- 4. Main App UI ---
-c_logo, c_title = st.columns([1, 8])
-with c_logo:
-    try: st.image("logo", width=90)
-    except: st.write("🏍️")
-with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
-st.markdown("---")
-
-if st.session_state['page'] == 'student':
-    st.info("📝 กรุณากรอกข้อมูลและแนบรูปรถ")
-    with st.form("reg_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            sub_c1, sub_c2 = st.columns([1.2, 2])
-            prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
-            fname = sub_c2.text_input("ชื่อ-นามสกุล")
-            name = f"{prefix}{fname}"
-        std_id = c2.text_input("รหัสนักเรียน")
-        c3, c4 = st.columns(2)
-        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู","แม่ค้า"])
-        room = c4.text_input("ห้อง")
-        c5, c6 = st.columns(2)
-        brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","อื่นๆ"])
-        color = c6.text_input("สีรถ")
-        plate = st.text_input("ทะเบียน")
-        license_status = st.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = st.radio("ภาษี", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
-        photo1 = st.file_uploader("รูปด้านหลัง", type=['jpg','png','jpeg'])
-        photo2 = st.file_uploader("รูปด้านข้าง", type=['jpg','png','jpeg'])
-        if st.form_submit_button("ส่งข้อมูล", use_container_width=True):
-            if fname and std_id and plate and photo1:
-                try:
-                    sheet = connect_gsheet()
-                    if std_id in sheet.col_values(3): st.error("รหัสนี้สมัครไปแล้ว!")
-                    else:
-                        with st.spinner("อัปโหลด..."):
-                            l1 = upload_to_drive(photo1, f"{std_id}_F.jpg")
-                            l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
-                            sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, license_status, tax_status, l1, l2, 100, ""])
-                            st.success("บันทึกเรียบร้อย!")
-                except Exception as e: st.error(f"Error: {e}")
-    if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
-        go_to_teacher()
-        st.rerun()
-
-elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าหลัก"): go_to_student(); st.rerun()
-    if not st.session_state.get('logged_in'):
-        pwd = st.text_input("รหัสผ่าน", type="password")
-        if st.button("เข้าสู่ระบบ"):
-            if pwd == ADMIN_PASSWORD: st.session_state.logged_in = True; st.rerun()
-            else: st.error("รหัสผิด")
-    else:
-        if st.button("🔄 โหลดข้อมูล"):
-            st.session_state.df = pd.DataFrame(connect_gsheet().get_all_records())
-        if 'df' in st.session_state:
-            q = st.text_input("ค้นหาชื่อ/ทะเบียน")
-            if q:
-                fdf = st.session_state.df[st.session_state.df.astype(str).apply(lambda x: x.str.contains(q, case=False)).any(axis=1)]
-                for i, row in fdf.iterrows():
-                    v = row.tolist()
-                    std_id, std_name = str(v[2]), str(v[1])
-                    score = int(v[11]) if (len(v)>11 and str(v[11]).isdigit()) else 100
-                    with st.expander(f"{v[6]} | {std_name}"):
-                        c_img, c_ctrl = st.columns([1,1])
-                        with c_img:
-                            i1, i2 = get_img_link(v[9]), get_img_link(v[10])
-                            if i1: st.image(i1)
-                            if st.button("📄 PDF", key=f"pdf_{i}"):
-                                b = create_pdf(v, i1, i2)
-                                st.download_button("โหลด PDF", b, f"{v[6]}.pdf", "application/pdf", key=f"dl_{i}")
-                        with c_ctrl:
-                            st.metric("คะแนน", score)
-                            act = st.radio("ความผิด:", ["ไม่สวมหมวก", "จอดผิดที่", "ขับรถเร็ว"], key=f"act_{i}", horizontal=True)
-                            if st.button("หักคะแนน", key=f"cut_{i}"): st.session_state[f"conf_{i}"] = True
-                            if st.session_state.get(f"conf_{i}"):
-                                if st.button("✅ ยืนยันหัก 5 คะแนน", key=f"ok_{i}"):
-                                    m = {"ไม่สวมหมวก":"no_helmet","จอดผิดที่":"wrong_parking","ขับรถเร็ว":"driving_fast"}
-                                    res, ns, msg = update_point(std_id, m[act])
-                                    if res: st.success(f"เหลือ {ns}"); st.session_state[f"conf_{i}"]=False; time.sleep(1); st.rerun()
-                            with st.expander("ฟื้นฟู"):
-                                rc = st.text_input("รหัสลับ", type="password", key=f"rc_{i}")
-                                if st.button("ฟื้นฟู 100", key=f"rb_{i}"):
-                                    if rc == SECRET_RESTORE_CODE:
-                                        res, ns, msg = update_point(std_id, "restore")
-                                        if res: st.success("สำเร็จ!"); time.sleep(1); st.rerun()
-                                    else: st.error("รหัสผิด")
