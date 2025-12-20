@@ -36,7 +36,7 @@ def connect_gsheet():
 def upload_to_drive(file_obj, filename):
     creds = get_creds()
     service = build('drive', 'v3', credentials=creds)
-    file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID]}
+    file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID]="1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA"}
     media = MediaIoBaseUpload(file_obj, mimetype=file_obj.type, resumable=True)
     file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
     return file.get('webViewLink')
@@ -54,11 +54,11 @@ if menu == "📝 นักเรียนลงทะเบียน":
         c1, c2 = st.columns(2)
         name = c1.text_input("ชื่อ-นามสกุล")
         std_id = c2.text_input("รหัสนักเรียน")
-        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ปวช."])
+        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","คุณครู","ผู้ประกอบการ"])
         room = c2.text_input("ห้อง")
         st.markdown("---")
         brand = st.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
-        plate = st.text_input("ทะเบียน (พร้อมจังหวัด)")
+        plate = st.text_input("ทะเบียน พร้อมจังหวัด(ตัวอย่าง กก1234 ร้อยเอ็ด)")
         color = st.text_input("สีรถ")
         st.markdown("### 📸 ถ่ายรูปรถ")
         photo = st.file_uploader("เลือกรูป", type=['jpg','png','jpeg'])
