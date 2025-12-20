@@ -4,16 +4,15 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import json
-import requests  # ใช้ส่งข้อมูลไป Apps Script
-import base64    # ใช้แปลงไฟล์รูป
+import requests
+import base64
 
 # --- ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
 ADMIN_PASSWORD = "Patwit064180"
 
-# 🔴🔴 เอา URL จาก Google Apps Script (Web App) มาใส่ตรงนี้ 🔴🔴
-# URL จะหน้าตาประมาณ: https://script.google.com/macros/s/AKfycbx.../exec
+# 🔴🔴 อย่าลืมเอา URL ของ Google Apps Script มาใส่ตรงนี้เหมือนเดิมนะครับ 🔴🔴
 GAS_APP_URL = "https://script.google.com/home/projects/1-biJGY6pZ0ecdYetrsR1iDiAXprRzEJ18TmjGyhe4CdAfko6E0MSDv-w/edit" 
 
 # --- เชื่อมต่อ Google Sheets ---
@@ -33,14 +32,13 @@ def connect_gsheet():
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
-# --- ฟังก์ชันอัปโหลดแบบใหม่ (ส่งไปให้ Apps Script ช่วย) ---
+# --- ฟังก์ชันอัปโหลด ---
 def upload_to_drive(file_obj, filename):
-    if GAS_APP_URL == "วาง_URL_ของคุณที่ได้จากขั้นตอน_Deploy_ตรงนี้":
+    if "script.google.com" not in GAS_APP_URL:
         st.error("🚨 กรุณาใส่ URL ของ Web App ในโค้ดบรรทัดที่ 16 ก่อนครับ")
         return None
 
     try:
-        # อ่านไฟล์และแปลงเป็น Base64
         file_content = file_obj.getvalue()
         base64_str = base64.b64encode(file_content).decode('utf-8')
         
@@ -51,7 +49,6 @@ def upload_to_drive(file_obj, filename):
             "mimeType": file_obj.type
         }
         
-        # ส่งข้อมูล
         response = requests.post(GAS_APP_URL, json=payload)
         result = response.json()
         
@@ -61,27 +58,42 @@ def upload_to_drive(file_obj, filename):
             raise Exception(f"Upload failed: {result.get('message')}")
             
     except Exception as e:
-        raise Exception(f"เกิดข้อผิดพลาดในการเชื่อมต่อ: {e}")
+        raise Exception(f"เชื่อมต่อไม่ได้: {e}")
 
 # --- หน้าเว็บ ---
 st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="🛵")
 st.title("🛵 ระบบลงทะเบียนรถจักรยานยนต์พัฒวิทย์")
 
-# สร้างเมนู
 menu = st.sidebar.radio("เมนู", ["📝 นักเรียนลงทะเบียน", "👮 ครูตรวจสอบ"])
 
 if menu == "📝 นักเรียนลงทะเบียน":
     st.info("กรุณากรอกข้อมูลและแนบรูปรถ")
     with st.form("reg_form"):
+        # แถว 1
         c1, c2 = st.columns(2)
         name = c1.text_input("ชื่อ-นามสกุล")
         std_id = c2.text_input("รหัสนักเรียน")
-        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","บุคลากร","ผู้ประกอบการ"])
-        room = c2.text_input("ห้อง")
+        
+        # แถว 2
+        c3, c4 = st.columns(2)
+        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","บุคลากร","ผู้ประกอบการ"])
+        room = c4.text_input("ห้อง")
+        
         st.markdown("---")
-        brand = st.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
+        
+        # แถว 3
+        c5, c6 = st.columns(2)
+        brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
+        color = c6.text_input("สีรถ")
+        
         plate = st.text_input("ทะเบียน พร้อมจังหวัด(ตัวอย่าง กก1234 ร้อยเอ็ด)")
-        color = st.text_input("สีรถ")
+        
+        # --- (ส่วนที่เพิ่มใหม่) ---
+        st.markdown("##### 📄 ข้อมูลเอกสาร")
+        doc_col1, doc_col2 = st.columns(2)
+        license_status = doc_col1.radio("ใบขับขี่", ["✅ มีใบขับขี่", "❌ ไม่มี"], horizontal=True)
+        tax_status = doc_col2.radio("พรบ. และ ภาษี", ["✅ ต่อครบถ้วน", "❌ ขาด/ไม่แน่ใจ"], horizontal=True)
+        # ------------------------
         
         st.markdown("### 📸 ถ่ายรูปรถ (2 มุม)")
         col_img1, col_img2 = st.columns(2)
@@ -94,17 +106,28 @@ if menu == "📝 นักเรียนลงทะเบียน":
                     with st.spinner("กำลังอัปโหลด..."):
                         clean_plate = plate.replace(" ", "")
                         
-                        # อัปโหลดรูปที่ 1
                         link1 = upload_to_drive(photo1, f"{std_id}_{clean_plate}_FRONT.jpg")
                         
-                        # อัปโหลดรูปที่ 2 (ถ้ามี)
                         link2 = ""
                         if photo2:
                              link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
 
-                        if link1: # ถ้าอัปโหลดสำเร็จ
+                        if link1: 
                             sheet = connect_gsheet()
-                            sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, link1, link2])
+                            # บันทึกข้อมูลเพิ่ม (license_status, tax_status)
+                            sheet.append_row([
+                                str(datetime.now()), 
+                                name, 
+                                std_id, 
+                                f"{level}/{room}", 
+                                brand, 
+                                color, 
+                                plate,
+                                license_status, # เพิ่มตรงนี้
+                                tax_status,     # เพิ่มตรงนี้
+                                link1, 
+                                link2
+                            ])
                             st.success("✅ บันทึกข้อมูลเรียบร้อย!")
                         
                 except Exception as e:
@@ -135,25 +158,32 @@ elif menu == "👮 ครูตรวจสอบ":
             st.write(f"พบข้อมูล {len(df)} รายการ")
             
             for i, row in df.iterrows():
-                plate_txt = row.get('ทะเบียน', list(row.values())[6]) 
-                name_txt = row.get('ชื่อ-นามสกุล', list(row.values())[1])
+                # หมายเหตุ: ใช้ .get('ชื่อหัวตาราง') จะแม่นยำที่สุด
+                plate_txt = row.get('ทะเบียน', '-')
+                name_txt = row.get('ชื่อ-นามสกุล', '-')
 
                 with st.expander(f"{plate_txt} : {name_txt}"):
                     c_img, c_text = st.columns([2,1])
                     
                     with c_img:
+                        # พยายามดึงลิงก์ (เผื่อชื่อหัวตารางไม่ตรง)
                         vals = list(row.values())
-                        link1 = str(vals[7]) if len(vals) > 7 else ""
-                        link2 = str(vals[8]) if len(vals) > 8 else ""
+                        # link อยู่ 2 ช่องสุดท้าย
+                        link1 = str(vals[-2]) if len(vals) >= 2 else ""
+                        link2 = str(vals[-1]) if len(vals) >= 1 else ""
 
                         cols = st.columns(2)
-                        if link1.startswith('http'):
+                        if "http" in link1:
                             cols[0].image(link1, caption="ด้านหน้า", use_column_width=True)
-                        if link2.startswith('http'):
+                        if "http" in link2:
                             cols[1].image(link2, caption="ด้านข้าง", use_column_width=True)
                             
                     with c_text:
-                        st.write(f"**ชั้น:** {row.get('ชั้น', vals[3])}")
-                        st.write(f"**ยี่ห้อ:** {row.get('ยี่ห้อ', vals[4])}")
-                        st.write(f"**สี:** {row.get('สี', vals[5])}")
-                        st.write(f"**เวลา:** {row.get('Timestamp', vals[0])}")
+                        st.write(f"**ชั้น:** {row.get('ชั้น', '-')}")
+                        st.write(f"**ยี่ห้อ:** {row.get('ยี่ห้อ', '-')}")
+                        st.write(f"**สี:** {row.get('สีรถ', row.get('สี', '-'))}")
+                        
+                        # แสดงข้อมูลที่เพิ่มใหม่
+                        st.markdown("---")
+                        st.write(f"**ใบขับขี่:** {row.get('ใบขับขี่', '-')}")
+                        st.write(f"**พรบ./ภาษี:** {row.get('พรบ_ภาษี', '-')}")
