@@ -45,7 +45,7 @@ if menu == "📝 นักเรียนลงทะเบียน":
         c1, c2 = st.columns(2)
         name = c1.text_input("ชื่อ-นามสกุล")
         std_id = c2.text_input("รหัสนักเรียน")
-        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ปวช."])
+        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6",])
         room = c2.text_input("ห้อง")
         st.markdown("---")
         brand = st.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
