@@ -121,7 +121,7 @@ def upload_to_drive(file_obj, filename):
             raise Exception(f"Upload failed: {result.get('message')}")
     except Exception as e:
         raise Exception(f"เชื่อมต่อไม่ได้: {e}")
-        # ==========================================
+      # ==========================================
 # ส่วนหัวเว็บ
 # ==========================================
 c_logo, c_title = st.columns([1, 8])
@@ -173,8 +173,10 @@ if st.session_state['page'] == 'student':
         col_img1, col_img2 = st.columns(2)
         photo1 = col_img1.file_uploader("1. รูปด้านหลัง (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
         photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
+        
         submitted = st.form_submit_button("ส่งข้อมูล", use_container_width=True)
-if submitted:
+
+        if submitted:
             if fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
@@ -199,6 +201,7 @@ if submitted:
             else:
                 st.warning("กรุณากรอกข้อมูลให้ครบ")
 
+    # ส่วนนี้ออกมานอก Form แล้ว (Indentation ถอยกลับมาเท่ากับ if ด้านบน)
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("---")
     c_staff_btn = st.columns([1, 2, 1])
