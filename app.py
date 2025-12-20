@@ -253,26 +253,36 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
-            # (Part 3.2 วางต่อจาก Dashboard)
+          # (Part 3.2 วางต่อจาก Dashboard)
             
-            # --- ส่วนค้นหา ---
-            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
+            # --- ส่วนค้นหาแบบมีปุ่มกด ---
+            st.markdown("##### 🔍 ค้นหาข้อมูล") # หัวข้อค้นหา
             
-            # 🔴 LOGIC ใหม่: ถ้าช่องค้นหาว่างเปล่า ให้หยุดทำงานตรงนี้ ไม่แสดงข้อมูล
-            if not search:
-                st.info("👆 กรุณาพิมพ์ **ชื่อ** หรือ **เลขทะเบียน** เพื่อเรียกดูข้อมูล")
+            c_input, c_btn = st.columns([4, 1]) # แบ่งสัดส่วน ช่องพิมพ์ 4 ส่วน : ปุ่ม 1 ส่วน
             
-            # 🟢 ถ้ามีการพิมพ์ค้นหา ค่อยทำงานต่อ
+            with c_input:
+                # search_query คือตัวแปรรับข้อความ
+                search_query = st.text_input("ช่องค้นหา", label_visibility="collapsed", placeholder="พิมพ์ชื่อ หรือ เลขทะเบียน...")
+            
+            with c_btn:
+                # ปุ่มกดค้นหา (กดแล้วจะ Reload หน้าเว็บ 1 ที ทำให้โค้ดข้างล่างทำงาน)
+                btn_search = st.button("🔎 ค้นหา", use_container_width=True)
+
+            # --- LOGIC การแสดงผล ---
+            # จะทำงานเมื่อ (มีข้อความในช่อง) AND (กดปุ่มค้นหา หรือ กด Enter)
+            if not search_query:
+                st.info("👆 กรุณาพิมพ์ข้อมูล และกดปุ่ม **'ค้นหา'**")
+            
             else:
                 # กรองข้อมูล
-                filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
+                filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
                 
                 if len(filtered_df) == 0:
-                    st.warning("❌ ไม่พบข้อมูลที่ค้นหาหรือเป็นรถไม่ลงทะเบียน")
+                    st.warning(f"❌ ไม่พบข้อมูล: '{search_query}'")
                 else:
                     st.success(f"✅ พบข้อมูล {len(filtered_df)} รายการ")
                     
-                    # ฟังก์ชันแปลงลิงก์รูป (Def ไว้ข้างในเพื่อให้เรียกใช้ได้เฉพาะตอนค้นหา)
+                    # ฟังก์ชันแปลงลิงก์รูป
                     def get_img(url):
                         url = str(url).strip()
                         if not url: return None
@@ -287,7 +297,7 @@ elif st.session_state['page'] == 'teacher':
                             return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
                         return url
 
-                    # วนลูปแสดงผล (ใช้ filtered_df แทน df ปกติ)
+                    # วนลูปแสดงผล
                     for i, row in filtered_df.iterrows():
                         vals = row.tolist()
                         name_t = str(vals[1]) if len(vals)>1 else "-"
@@ -308,12 +318,12 @@ elif st.session_state['page'] == 'teacher':
                                 st.write(f"**ชั้น:** {str(vals[3]) if len(vals)>3 else '-'}")
                                 st.write(f"**รุ่น/สี:** {str(vals[4])} {str(vals[5])}")
 
-            # --- ส่วนเลื่อนชั้นปี (แยกออกมาไว้นอก Loop ค้นหา เพื่อให้กดใช้ได้เสมอ) ---
+            # --- ส่วนเลื่อนชั้นปี ---
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
                 st.error("⚠️ คำเตือน: ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
                 
-                spwd = st.text_input("รหัสลับ (เจ้าหน้าที่ระดับสูง)", type="password")
+                spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
                 
                 if st.button("ยืนยันเลื่อนชั้น"):
                     if spwd == "Patwitnext":
