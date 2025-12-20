@@ -177,10 +177,10 @@ if st.session_state['page'] == 'student':
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/ กรณีครูบุคลากรพ่อค้าแม่ค้ากรอกวันเดือนปีเกิด เช่น 09122550")
+        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = c4.text_input("ห้อง/กรณีครูบุคลากรพ่อค้าแม่ค้ากรอก 0")
+        room = c4.text_input("ห้อง/เบอร์โทร")
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = c6.text_input("สีรถ")
@@ -236,18 +236,23 @@ elif st.session_state['page'] == 'teacher':
         if 'df' in st.session_state:
             df = st.session_state.df
             total = len(df)
+            
+            # --- ปรับปรุงจุดนี้: การคำนวณสถิติที่ถูกต้อง ---
             try:
-                lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
-                tax = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅", na=False)].shape[0]
-                helmet = df[df.iloc[:, 9].astype(str).str.contains("มี", na=False)].shape[0]
-                lic_p, tax_p, hel_p = (lic/total)*100, (tax/total)*100, (helmet/total)*100
-            except: lic, tax, helmet, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
+                lic_count = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                tax_count = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
+                hel_count = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                
+                lic_p = (lic_count/total)*100 if total > 0 else 0
+                tax_p = (tax_count/total)*100 if total > 0 else 0
+                hel_p = (hel_count/total)*100 if total > 0 else 0
+            except: lic_count, tax_count, hel_count, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
             
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic} คน", f"{lic_p:.1f}%")
-            c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_p:.1f}%")
-            c4.metric("⛑️ หมวกกันน็อค", f"{helmet} คน", f"{hel_p:.1f}%")
+            c2.metric("🪪 มีใบขับขี่", f"{lic_count} คน", f"{lic_p:.1f}%")
+            c3.metric("📝 ภาษีปกติ", f"{tax_count} คัน", f"{tax_p:.1f}%")
+            c4.metric("⛑️ หมวกกันน็อค", f"{hel_count} คน", f"{hel_p:.1f}%")
 
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", key="search_query")
             if st.button("เริ่มการค้นหา") and q:
@@ -256,10 +261,9 @@ elif st.session_state['page'] == 'teacher':
                 else:
                     for i, row in fdf.iterrows():
                         v = row.tolist()
-                        with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
+                        with st.expander(f"📍 {v[6]} | {v[1]}"):
                             c_img, c_info = st.columns([2, 1])
                             with c_img:
-                                # แก้ไขจุดนี้: ดึงรูปจากตำแหน่ง 10 และ 11 ให้ถูกต้อง
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
                                 sub_img1, sub_img2 = st.columns(2)
                                 if i1: sub_img1.image(i1, caption="รูปหลังรถ")
@@ -267,7 +271,8 @@ elif st.session_state['page'] == 'teacher':
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ยี่ห้อ:** {v[4]} | **สี:** {v[5]}")
-                                st.write(f"**เอกสาร:** {v[7]} / {v[8]} / {v[9]}")
+                                st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
+                                st.write(f"**หมวกกันน็อค:** {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
             
