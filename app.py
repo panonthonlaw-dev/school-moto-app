@@ -259,7 +259,7 @@ elif st.session_state['page'] == 'teacher':
                     st.warning("ยังไม่มีข้อมูล")
             except Exception as e: 
                 st.error(f"ดึงข้อมูลไม่ได้: {e}")
-                # ---------------------------------------
+             # ---------------------------------------
 # 👮 หน้าเจ้าหน้าที่ตรวจสอบ
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
@@ -309,10 +309,11 @@ elif st.session_state['page'] == 'teacher':
                     st.warning("ยังไม่มีข้อมูล")
             except Exception as e: 
                 st.error(f"ดึงข้อมูลไม่ได้: {e}")
-                if 'df' in st.session_state:
+        
+        # --- ส่วนแสดงผลข้อมูลและตัดคะแนน ---
+        if 'df' in st.session_state:
             df = st.session_state['df']
             
-            # --- ส่วนค้นหา + ระบบตัดคะแนน ---
             st.markdown("---")
             st.markdown("##### 🔍 ค้นหาและจัดการคะแนน")
             
@@ -323,6 +324,7 @@ elif st.session_state['page'] == 'teacher':
                 btn_search = st.button("🔎 ค้นหา", use_container_width=True)
 
             if search_query:
+                # กรองข้อมูล
                 filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
                 
                 if len(filtered_df) == 0:
@@ -337,8 +339,9 @@ elif st.session_state['page'] == 'teacher':
                         std_id = str(vals[2])
                         plate_num = str(vals[6])
                         
-                        # ดึงคะแนน (ถ้าไม่มีให้เป็น 100)
+                        # ดึงคะแนน (ป้องกัน Error ถ้าไม่มีคอลัมน์คะแนน)
                         try:
+                            # Index 11 คือคอลัมน์ L
                             current_score = int(vals[11]) if len(vals) > 11 and str(vals[11]).isdigit() else 100
                         except:
                             current_score = 100
@@ -396,5 +399,4 @@ elif st.session_state['page'] == 'teacher':
                                         else:
                                             st.error("❌ รหัสลับไม่ถูกต้อง")
                             st.markdown("---")
-def go_to_student():
     st.session_state['page'] = 'student'
