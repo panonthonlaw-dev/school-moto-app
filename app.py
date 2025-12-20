@@ -11,7 +11,7 @@ import json
 SHEET_NAME = "Motorcycle_DB"
 # 🔴🔴 แก้ตรงนี้: เอา ID โฟลเดอร์จากด่านที่ 1 มาใส่ 🔴🔴
 DRIVE_FOLDER_ID = "1xxxxxxxxxxxxxxxxxxxxxxxxx" 
-ADMIN_PASSWORD = "schoolpolice"
+ADMIN_PASSWORD = "Patwit064180"
 
 # --- เชื่อมต่อ Google ---
 def get_creds():
