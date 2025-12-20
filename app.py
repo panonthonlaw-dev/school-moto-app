@@ -11,7 +11,7 @@ import json
 SHEET_NAME = "Motorcycle_DB"
 # 🔴🔴 (สำคัญ) อย่าลืมใส่ ID โฟลเดอร์รูปภาพของครูตรงนี้นะครับ 🔴🔴
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
-ADMIN_PASSWORD = "schoolpolice"
+ADMIN_PASSWORD = "Patwit064180"
 
 # --- เชื่อมต่อ Google ---
 def get_creds():
