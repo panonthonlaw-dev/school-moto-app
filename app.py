@@ -105,23 +105,4 @@ with c_logo:
     try:
         st.image("logo.png", width=90) 
     except:
-        st.write("🏍️") 
-
-with c_title:
-    st.title("ระบบลงทะเบียนรถจักรยานยนต์")
-    st.caption("โรงเรียนโพนทองพัฒนาวิทยา")
-
-with c_btn:
-    # ปุ่มสลับหน้า อยู่มุมขวาบน
-    if st.session_state['page'] == 'student':
-        st.button("🔒 สำหรับเจ้าหน้าที่", on_click=go_to_teacher, use_container_width=True)
-    else:
-        st.button("🏠 กลับหน้าหลัก", on_click=go_to_student, use_container_width=True)
-
-st.markdown("---")
-
-# ---------------------------------------
-# 📝 หน้านักเรียนลงทะเบียน
-# ---------------------------------------
-if st.session_state['page'] == 'student':
-    st.info("📝 กรุณ
+        st.write("🏍
