@@ -13,7 +13,7 @@ DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA"
 ADMIN_PASSWORD = "Patwit064180"
 
 # 🔴🔴 อย่าลืมเอา URL ของ Google Apps Script มาใส่ตรงนี้เหมือนเดิมนะครับ 🔴🔴
-GAS_APP_URL = "https://script.google.com/home/projects/1-biJGY6pZ0ecdYetrsR1iDiAXprRzEJ18TmjGyhe4CdAfko6E0MSDv-w/edit" 
+GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 
 # --- เชื่อมต่อ Google Sheets ---
 def get_creds():
