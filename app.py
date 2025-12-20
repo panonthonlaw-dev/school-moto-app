@@ -177,10 +177,12 @@ if st.session_state['page'] == 'student':
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/กรณีครู บุคลากร พ่อค้าแม่ค้า ใส่วันเดือนปีเกิด เช่น 09122530")
+        std_id = c2.text_input("รหัสนักเรียน/กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 12092530")
+        
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = c4.text_input("ห้อง/กรณีครูบุคลากรพ่อค้าแม่ค้ากรอก 0")
+        room_input = c4.text_input("ห้อง กรณีไม่ใช่นักเรียนกรอก 0 (ใส่เฉพาะเลข 0-13)", help="ตัวอย่าง: หากอยู่ห้อง 5 ให้ใส่เลข 5")
+        
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = c6.text_input("สีรถ")
@@ -188,14 +190,25 @@ if st.session_state['page'] == 'student':
         
         doc_c1, doc_c2, doc_c3 = st.columns(3)
         license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
+        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ไม่่มี"], horizontal=True)
         helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
         photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
         
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True):
-            if fname and std_id and plate and photo1:
+            # --- ระบบตรวจสอบเลขห้อง (Validation) ---
+            valid_room = False
+            try:
+                room_num = int(room_input)
+                if 0 <= room_num <= 13:
+                    valid_room = True
+            except ValueError:
+                pass
+
+            if not valid_room:
+                st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (ใส่เฉพาะตัวเลข 0 ถึง 13 เท่านั้น)")
+            elif fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
                     if str(std_id) in sheet.col_values(3): 
@@ -206,11 +219,12 @@ if st.session_state['page'] == 'student':
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
                             thai_now = datetime.now() + timedelta(hours=7)
                             full_name = f"{prefix}{fname}"
-                            sheet.append_row([thai_now.strftime('%d/%m/%Y %H:%M'), full_name, str(std_id), f"{level}/{room}", brand, color, plate, license_status, tax_status, helmet_status, l1, l2])
+                            sheet.append_row([thai_now.strftime('%d/%m/%Y %H:%M'), full_name, str(std_id), f"{level}/{room_input}", brand, color, plate, license_status, tax_status, helmet_status, l1, l2])
                             st.balloons()
                             st.success("✅ ลงทะเบียนสำเร็จ!")
                 except Exception as e: st.error(f"Error: {e}")
-            else: st.warning("⚠️ กรุณากรอกข้อมูลให้ครบ")
+            else:
+                st.warning("⚠️ กรุณากรอกข้อมูลให้ครบและถูกต้อง")
 
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
         go_to_teacher(); st.rerun()
@@ -230,9 +244,7 @@ elif st.session_state['page'] == 'teacher':
                 if len(all_vals) > 1:
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                     st.success("โหลดข้อมูลสำเร็จ")
-                else:
-                    st.session_state.df = pd.DataFrame(columns=["Timestamp","Name","ID","Class","Brand","Color","Plate","License","Tax","Helmet","Img1","Img2"])
-                    st.warning("ยังไม่มีข้อมูล")
+                else: st.warning("ยังไม่มีข้อมูล")
             except Exception as e: st.error(f"Error: {e}")
         
         if 'df' in st.session_state:
@@ -242,9 +254,7 @@ elif st.session_state['page'] == 'teacher':
                 lic_count = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
                 tax_count = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
                 hel_count = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                lic_p = (lic_count/total)*100 if total > 0 else 0
-                tax_p = (tax_count/total)*100 if total > 0 else 0
-                hel_p = (hel_count/total)*100 if total > 0 else 0
+                lic_p, tax_p, hel_p = (lic_count/total)*100, (tax_count/total)*100, (hel_count/total)*100
             except: lic_count, tax_count, hel_count, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
             
             c1, c2, c3, c4 = st.columns(4)
@@ -253,7 +263,6 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 ภาษีปกติ", f"{tax_count} คัน", f"{tax_p:.1f}%")
             c4.metric("⛑️ หมวกกันน็อค", f"{hel_count} คน", f"{hel_p:.1f}%")
 
-            st.markdown("---")
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", key="search_query")
             if st.button("เริ่มการค้นหา") and q:
                 fdf = df[df.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
@@ -261,7 +270,7 @@ elif st.session_state['page'] == 'teacher':
                 else:
                     for i, row in fdf.iterrows():
                         v = row.tolist()
-                        with st.expander(f"📍 {v[6]} | {v[1]}"):
+                        with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
                             c_img, c_info = st.columns([2, 1])
                             with c_img:
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
@@ -275,47 +284,29 @@ elif st.session_state['page'] == 'teacher':
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
             
-            # --- ระบบเลื่อนชั้นปี (LEVEL UP SYSTEM) ---
             st.markdown("---")
-            with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือนสำคัญ!")
-                st.markdown("""
-                การกดปุ่มนี้จะเป็นการแก้ไขข้อมูลนักเรียนทุกคนในระบบ **'แบบถาวร'**
-                - ม.1 -> ม.2, ม.2 -> ม.3 ... ม.5 -> ม.6
-                - ม.3 และ ม.6 จะถูกเปลี่ยนเป็น 'จบการศึกษา 🎓'
-                - **ไม่สามารถกู้คืนข้อมูลเดิมได้** กรุณาตรวจสอบก่อนดำเนินการ
-                """)
-                spwd = st.text_input("ใส่รหัสเจ้าหน้าที่ระดับสูง", type="password", key="upgrade_pwd")
-                if st.button("🚀 เริ่มการเลื่อนชั้นปี (ตรวจสอบรหัสผ่านก่อนกด)", use_container_width=True):
-                    if spwd == "Patwitnext":
-                        try:
-                            sheet = connect_gsheet()
-                            d = sheet.get_all_values()
-                            h = d[0]; r = d[1:]
-                            new_r = []
-                            chg = 0
-                            for row in r:
-                                ol = row[3] # คอลัมน์ระดับชั้น
-                                nl = ol
-                                if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                                elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                                elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                                elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                                elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                                elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                                
-                                if ol != nl:
-                                    row[3] = nl
-                                    chg += 1
-                                new_r.append(row)
-                            
-                            if chg > 0:
-                                sheet.clear()
-                                sheet.update('A1', [h] + new_r)
-                                st.success(f"ดำเนินการสำเร็จ! เปลี่ยนแปลงข้อมูล {chg} รายการ")
-                                if 'df' in st.session_state: del st.session_state.df
-                            else:
-                                st.info("ไม่มีข้อมูลที่ต้องเปลี่ยนแปลง")
-                        except Exception as e: st.error(f"Error: {e}")
-                    else:
-                        st.error("❌ รหัสลับไม่ถูกต้อง")
+            with st.expander("⚙️ เลื่อนชั้นปี"):
+                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและย้อนกลับไม่ได้")
+                spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
+                if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
+                    try:
+                        sheet = connect_gsheet()
+                        d = sheet.get_all_values()
+                        h = d[0]; r = d[1:]
+                        new_r = []
+                        for row in r:
+                            ol = row[3]
+                            nl = ol
+                            if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                            elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                            elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                            elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                            elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                            elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                            row[3] = nl
+                            new_r.append(row)
+                        sheet.clear()
+                        sheet.update('A1', [h] + new_r)
+                        st.success("เลื่อนชั้นสำเร็จ!")
+                        if 'df' in st.session_state: del st.session_state.df
+                    except Exception as e: st.error(f"Error: {e}")
