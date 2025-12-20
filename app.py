@@ -161,9 +161,9 @@ if st.session_state['page'] == 'student':
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
             name = f"{prefix}{fname}"
-        std_id = c2.text_input("รหัสนักเรียน")
+        std_id = c2.text_input("รหัสนักเรียน ครูบุคลาการพ่อค้าแม้ค้า ใส่วันเดือน พ.ศ.เกิด เช่น 02052523")
         c3, c4 = st.columns(2)
-        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู","บุคลากร"])
+        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู,บุคลากร","พ่อค้าแม่ค้า"])
         room = c4.text_input("ห้อง")
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Kawasaki","อื่นๆ"])
