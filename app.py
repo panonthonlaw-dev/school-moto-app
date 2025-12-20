@@ -200,7 +200,7 @@ elif menu == "👮 ครูตรวจสอบ":
             st.markdown("---")
             
             # --- ส่วนค้นหา ---
-            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน/ชั้น)")
+            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
             if search:
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
@@ -286,7 +286,7 @@ elif menu == "👮 ครูตรวจสอบ":
                 
                 if st.button("🚀 ยืนยันเลื่อนชั้นเรียนทั้งหมด"):
                     # 🔴🔴 กำหนดรหัสสำหรับการเลื่อนชั้น ตรงนี้ครับ 🔴🔴
-                    PROMOTION_SECRET_KEY = "PatwitNextLevel" 
+                    PROMOTION_SECRET_KEY = "Patwitnext" 
                     
                     if super_pwd == PROMOTION_SECRET_KEY:
                         try:
@@ -311,7 +311,7 @@ elif menu == "👮 ครูตรวจสอบ":
                                     
                                     if "ม.1" in old_level: new_level = old_level.replace("ม.1", "ม.2")
                                     elif "ม.2" in old_level: new_level = old_level.replace("ม.2", "ม.3")
-                                    elif "ม.3" in old_level: new_level = old_level.replace("ม.3", "ม.4")
+                                    elif "ม.3" in old_level: new_level = "จบการศึกษา 🎓"
                                     elif "ม.4" in old_level: new_level = old_level.replace("ม.4", "ม.5")
                                     elif "ม.5" in old_level: new_level = old_level.replace("ม.5", "ม.6")
                                     elif "ม.6" in old_level: new_level = "จบการศึกษา 🎓"
