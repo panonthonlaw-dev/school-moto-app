@@ -177,10 +177,10 @@ if st.session_state['page'] == 'student':
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
+        std_id = c2.text_input("รหัสนักเรียน/กรณีครู บุคลากร พ่อค้าแม่ค้า ใส่วันเดือนปีเกิด เช่น 09122530")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = c4.text_input("ห้อง/เบอร์โทร")
+        room = c4.text_input("ห้อง/กรณีครูบุคลากรพ่อค้าแม่ค้ากรอก 0")
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = c6.text_input("สีรถ")
@@ -188,7 +188,7 @@ if st.session_state['page'] == 'student':
         
         doc_c1, doc_c2, doc_c3 = st.columns(3)
         license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ไม่ได้ต่อ"], horizontal=True)
+        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
         helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
@@ -238,14 +238,10 @@ elif st.session_state['page'] == 'teacher':
         if 'df' in st.session_state:
             df = st.session_state.df
             total = len(df)
-            
-            # --- ปรับแก้จุดนี้: ตรวจสอบข้อความตรงกับฟอร์มลงทะเบียน ---
             try:
                 lic_count = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                # เช็คคำว่า "✅ ปกติ" ให้ตรงกับ radio button ของหน้าลงทะเบียน
                 tax_count = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
                 hel_count = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                
                 lic_p = (lic_count/total)*100 if total > 0 else 0
                 tax_p = (tax_count/total)*100 if total > 0 else 0
                 hel_p = (hel_count/total)*100 if total > 0 else 0
@@ -257,6 +253,7 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 ภาษีปกติ", f"{tax_count} คัน", f"{tax_p:.1f}%")
             c4.metric("⛑️ หมวกกันน็อค", f"{hel_count} คน", f"{hel_p:.1f}%")
 
+            st.markdown("---")
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", key="search_query")
             if st.button("เริ่มการค้นหา") and q:
                 fdf = df[df.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
@@ -277,3 +274,48 @@ elif st.session_state['page'] == 'teacher':
                                 st.write(f"**เอกสาร:** {v[7]} / {v[8]} / {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
+            
+            # --- ระบบเลื่อนชั้นปี (LEVEL UP SYSTEM) ---
+            st.markdown("---")
+            with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
+                st.error("### ⚠️ คำเตือนสำคัญ!")
+                st.markdown("""
+                การกดปุ่มนี้จะเป็นการแก้ไขข้อมูลนักเรียนทุกคนในระบบ **'แบบถาวร'**
+                - ม.1 -> ม.2, ม.2 -> ม.3 ... ม.5 -> ม.6
+                - ม.3 และ ม.6 จะถูกเปลี่ยนเป็น 'จบการศึกษา 🎓'
+                - **ไม่สามารถกู้คืนข้อมูลเดิมได้** กรุณาตรวจสอบก่อนดำเนินการ
+                """)
+                spwd = st.text_input("ใส่รหัสเจ้าหน้าที่ระดับสูง", type="password", key="upgrade_pwd")
+                if st.button("🚀 เริ่มการเลื่อนชั้นปี (ตรวจสอบรหัสผ่านก่อนกด)", use_container_width=True):
+                    if spwd == "Patwitnext":
+                        try:
+                            sheet = connect_gsheet()
+                            d = sheet.get_all_values()
+                            h = d[0]; r = d[1:]
+                            new_r = []
+                            chg = 0
+                            for row in r:
+                                ol = row[3] # คอลัมน์ระดับชั้น
+                                nl = ol
+                                if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                
+                                if ol != nl:
+                                    row[3] = nl
+                                    chg += 1
+                                new_r.append(row)
+                            
+                            if chg > 0:
+                                sheet.clear()
+                                sheet.update('A1', [h] + new_r)
+                                st.success(f"ดำเนินการสำเร็จ! เปลี่ยนแปลงข้อมูล {chg} รายการ")
+                                if 'df' in st.session_state: del st.session_state.df
+                            else:
+                                st.info("ไม่มีข้อมูลที่ต้องเปลี่ยนแปลง")
+                        except Exception as e: st.error(f"Error: {e}")
+                    else:
+                        st.error("❌ รหัสลับไม่ถูกต้อง")
