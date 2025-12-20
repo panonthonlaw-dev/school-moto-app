@@ -253,7 +253,7 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
-         # (Part 3.2: ระบบค้นหา + PDF มีโลโก้ - วางต่อท้ายสุด)
+        # (Part 3.2: วางต่อท้ายสุด - แก้ไข Indentation แล้ว)
             
             # --- Import ตัวทำ PDF ---
             from reportlab.pdfgen import canvas
@@ -277,21 +277,15 @@ elif st.session_state['page'] == 'teacher':
                     font_name = 'Helvetica'
                 
                 # 2. หัวกระดาษ & โลโก้
-                # --- 🔴 ส่วนเพิ่มโลโก้ตรงนี้ครับ ---
                 try:
-                    # วาดโลโก้ที่มุมซ้ายบน (x=50, y=height-85) ปรับขนาดกว้างxสูง เป็น 50x50
-                    c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
+                    c.drawImage("logo.png", 50, height - 85, width=50, height=50, mask='auto')
                 except:
-                    pass # ถ้าหาไฟล์โลโก้ไม่เจอก็ข้ามไป (ไม่ error)
-                # -------------------------------
+                    pass 
 
                 c.setFont(font_name, 24)
-                # ขยับข้อความชื่อเอกสารหลบโลโก้นิดหน่อย หรือวางตรงกลางเหมือนเดิม
                 c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
                 c.setFont(font_name, 20)
                 c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
-                
-                # เส้นกั้น
                 c.line(50, height - 90, width - 50, height - 90)
 
                 # 3. ข้อมูลส่วนตัว
@@ -310,8 +304,6 @@ elif st.session_state['page'] == 'teacher':
                 # 4. ข้อมูลรถ
                 c.drawString(300, y, f"ยี่ห้อ: {brand}")
                 c.drawString(300, y-25, f"สีรถ: {color}")
-                
-                # ทะเบียนตัวใหญ่
                 c.setFont(font_name, 20)
                 c.drawString(300, y-55, f"ทะเบียน: {plate}")
                 c.rect(295, y-60, 150, 25) 
@@ -331,31 +323,4 @@ elif st.session_state['page'] == 'teacher':
                             res = requests.get(url, timeout=5)
                             if res.status_code == 200:
                                 img = ImageReader(io.BytesIO(res.content))
-                                c.drawImage(img, x, y, width=200, height=200, preserveAspectRatio=True)
-                            else: c.drawString(x, y+100, "โหลดรูปไม่ได้")
-                    except: c.drawString(x, y+100, "Error รูปภาพ")
-
-                c.drawString(60, y_img + 210, "หลักฐานภาพถ่าย:")
-                draw_img(img_url1, 60, y_img)
-                draw_img(img_url2, 300, y_img)
-
-                # 7. ลายเซ็น
-                y_sign = 100
-                c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
-                c.drawString(100, y_sign-20, f"({name})")
-                c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
-                c.drawString(330, y_sign-20, "(.......................................................)")
-                
-                c.setFont(font_name, 12)
-                c.drawRightString(width - 30, 30, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-                
-                c.save()
-                buffer.seek(0)
-                return buffer
-
-            # --- ส่วนค้นหา + ปุ่มกด ---
-            st.markdown("##### 🔍 ค้นหาข้อมูล")
-            c_input, c_btn = st.columns([4, 1])
-            with c_input:
-                search_query = st.text_input("ช่องค้นหา", label_visibility="collapsed", placeholder="พิมพ์ชื่อ หรือ เลขทะเบียน...")
-            with c_btn:
+                                c
