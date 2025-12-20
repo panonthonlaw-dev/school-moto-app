@@ -186,7 +186,7 @@ if st.session_state['page'] == 'student':
         std_id = c2.text_input("รหัสนักเรียน/ครูบุคลากรพ่อค้าแม่ค้า กรอกวันเดือนปีเกิด เช่น 15072520")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู,บุคลากร","พ่อค้าแม่ค้า"])
-        room = c4.text_input("ห้อง/เบอร์โทร")
+        room = c4.text_input("ห้อง/ กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก 0")
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Kawasaki","อื่นๆ"])
         color = c6.text_input("สีรถ")
