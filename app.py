@@ -168,28 +168,53 @@ if st.session_state['page'] == 'student':
             st.rerun()
             # ---------------------------------------
 # ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3.1 ปรับ Dashboard สีเขียว)
+# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3.1 + Auto Logout)
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
+    # ปุ่มกลับหน้าหลัก
     if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
         st.rerun()
         
     st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
     
+    # --- 🕒 ส่วนเช็คเวลาหมดอายุ (Auto Logout) ---
+    # ถ้ามีการล็อกอินค้างไว้ ให้เช็คเวลา
+    if st.session_state.get('logged_in'):
+        # ดึงเวลาปัจจุบัน (timestamp)
+        now = datetime.now().timestamp()
+        last_active = st.session_state.get('last_active', now)
+        
+        # ถ้าเวลาผ่านไปเกิน 3600 วินาที (1 ชั่วโมง)
+        if now - last_active > 3600:
+            st.session_state['logged_in'] = False
+            del st.session_state['last_active'] # ลบตัวแปรเวลาทิ้ง
+            st.error("⏳ หมดเวลาการใช้งาน (Session Expired) กรุณาเข้าสู่ระบบใหม่")
+            # ไม่สั่ง rerun ทันที เพื่อให้เห็นข้อความแจ้งเตือนก่อน
+        else:
+            # ถ้ายังไม่หมดเวลา ให้รีเซ็ตเวลาเป็นปัจจุบัน (นับถอยหลังใหม่)
+            st.session_state['last_active'] = now
+
+    # --- จบส่วนเช็คเวลา ---
+
     if 'logged_in' not in st.session_state: 
         st.session_state['logged_in'] = False
 
+    # ถ้ายังไม่ได้ล็อกอิน (หรือเพิ่งโดนเตะออกมา)
     if not st.session_state['logged_in']:
         pwd = st.text_input("กรอกรหัสผ่าน", type="password")
         if st.button("เข้าสู่ระบบ"):
             if pwd == ADMIN_PASSWORD:
                 st.session_state['logged_in'] = True
+                # ✅ บันทึกเวลาเริ่มต้นตอนล็อกอินสำเร็จ
+                st.session_state['last_active'] = datetime.now().timestamp()
                 st.rerun()
             else:
                 st.error("รหัสผ่านไม่ถูกต้อง")
     else:
+        # ส่วนแสดงผลหลังล็อกอิน
         if st.button("🚪 ออกจากระบบ"):
             st.session_state['logged_in'] = False
+            if 'last_active' in st.session_state: del st.session_state['last_active']
             st.rerun()
         
         st.success("เข้าสู่ระบบเรียบร้อย")
@@ -223,14 +248,8 @@ elif st.session_state['page'] == 'teacher':
 
             # แสดงผล
             c1, c2, c3 = st.columns(3)
-            
-            # คอลัมน์ 1: ไม่ต้องมีเปอร์เซ็นต์
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            
-            # 🟢 คอลัมน์ 2: ใส่ percent ในช่อง delta -> จะได้ตัวเล็ก สีเขียว
             c2.metric("🪪 มีใบขับขี่", f"{lic} คน", delta=f"{lic_pct:.1f}%")
-            
-            # 🟢 คอลัมน์ 3: ใส่ percent ในช่อง delta -> จะได้ตัวเล็ก สีเขียว
             c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
