@@ -43,8 +43,7 @@ if 'page' not in st.session_state:
     st.session_state['page'] = 'student'
 
 def go_to_teacher():
-    st.session_state['page'] = 'teacher'
-    # --- เชื่อมต่อ Google Sheets ---
+    st.session_state['page'] = 'teacher'# --- เชื่อมต่อ Google Sheets ---
 def get_creds():
     key_content = st.secrets["textkey"]["json_content"]
     try:
@@ -60,7 +59,7 @@ def connect_gsheet():
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
-# --- ฟังก์ชันอัปเดตคะแนน (ใหม่) ---
+# --- ฟังก์ชันอัปเดตคะแนน ---
 def update_point(std_id, action):
     try:
         sheet = connect_gsheet()
@@ -70,6 +69,7 @@ def update_point(std_id, action):
         if cell:
             row_num = cell.row
             # ดึงคะแนนปัจจุบัน (สมมติคะแนนอยู่คอลัมน์ L คือ col 12)
+            # *** ถ้าใน Google Sheet คะแนนไม่ได้อยู่คอลัมน์ L ให้แก้เลข 12 เป็นเลขคอลัมน์จริง ***
             current_val = sheet.cell(row_num, 12).value
             
             if not current_val: current_val = 100
@@ -91,7 +91,7 @@ def update_point(std_id, action):
                 new_score = 100
                 msg = "✨ ฟื้นฟูคะแนนเรียบร้อย!"
             
-            # อัปเดตลง Sheet (คอลัมน์ 12)
+            # อัปเดตลง Sheet
             sheet.update_cell(row_num, 12, new_score)
             return True, new_score, msg
         else:
@@ -173,10 +173,8 @@ if st.session_state['page'] == 'student':
         col_img1, col_img2 = st.columns(2)
         photo1 = col_img1.file_uploader("1. รูปด้านหลัง (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
         photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
-        
         submitted = st.form_submit_button("ส่งข้อมูล", use_container_width=True)
-
-        if submitted:
+if submitted:
             if fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
@@ -208,7 +206,7 @@ if st.session_state['page'] == 'student':
         if st.button("🔐 สำหรับเจ้าหน้าที่/ตำรวจนักเรียน", use_container_width=True):
             go_to_teacher()
             st.rerun()
-           # ---------------------------------------
+            # ---------------------------------------
 # 👮 หน้าเจ้าหน้าที่ตรวจสอบ
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
@@ -258,9 +256,57 @@ elif st.session_state['page'] == 'teacher':
                     st.warning("ยังไม่มีข้อมูล")
             except Exception as e: 
                 st.error(f"ดึงข้อมูลไม่ได้: {e}")
+                # ---------------------------------------
+# 👮 หน้าเจ้าหน้าที่ตรวจสอบ
+# ---------------------------------------
+elif st.session_state['page'] == 'teacher':
+    if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
+        st.rerun()
         
-        # --- ส่วนที่เคยมีปัญหา (จัดย่อหน้าให้แล้ว) ---
-        if 'df' in st.session_state:
+    st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
+    
+    # Auto Logout Logic
+    if st.session_state.get('logged_in'):
+        now = datetime.now().timestamp()
+        last_active = st.session_state.get('last_active', now)
+        if now - last_active > 3600:
+            st.session_state['logged_in'] = False
+            del st.session_state['last_active']
+            st.error("⏳ หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่")
+        else:
+            st.session_state['last_active'] = now
+
+    if 'logged_in' not in st.session_state: 
+        st.session_state['logged_in'] = False
+
+    if not st.session_state['logged_in']:
+        pwd = st.text_input("กรอกรหัสผ่าน", type="password")
+        if st.button("เข้าสู่ระบบ"):
+            if pwd == ADMIN_PASSWORD:
+                st.session_state['logged_in'] = True
+                st.session_state['last_active'] = datetime.now().timestamp()
+                st.rerun()
+            else:
+                st.error("รหัสผ่านไม่ถูกต้อง")
+    else:
+        # --- เข้าระบบสำเร็จ ---
+        if st.button("🚪 ออกจากระบบ"):
+            st.session_state['logged_in'] = False
+            if 'last_active' in st.session_state: del st.session_state['last_active']
+            st.rerun()
+        
+        st.success("เข้าสู่ระบบเรียบร้อย")
+        
+        if st.button("🔄 โหลดข้อมูลล่าสุด", use_container_width=True):
+            try:
+                data = connect_gsheet().get_all_records()
+                if data: 
+                    st.session_state['df'] = pd.DataFrame(data)
+                else: 
+                    st.warning("ยังไม่มีข้อมูล")
+            except Exception as e: 
+                st.error(f"ดึงข้อมูลไม่ได้: {e}")
+                if 'df' in st.session_state:
             df = st.session_state['df']
             
             # --- ส่วนค้นหา + ระบบตัดคะแนน ---
@@ -339,5 +385,13 @@ elif st.session_state['page'] == 'teacher':
                                     restore_code = st.text_input("ใส่รหัสลับ", type="password", key=f"code_{std_id}")
                                     if st.button("ยืนยันฟื้นฟู", key=f"res_{std_id}"):
                                         if restore_code == SECRET_RESTORE_CODE:
-                                            res, ns, msg = update_point(std_id,
-                                                                        
+                                            res, ns, msg = update_point(std_id, "restore")
+                                            if res:
+                                                st.success(msg)
+                                                time.sleep(1)
+                                                st.rerun()
+                                        else:
+                                            st.error("❌ รหัสลับไม่ถูกต้อง")
+                            st.markdown("---")
+def go_to_student():
+    st.session_state['page'] = 'student'
