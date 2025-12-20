@@ -97,11 +97,15 @@ def create_pdf(vals, img_url1, img_url2):
     except: font_name = 'Helvetica'
     try: c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
     except: pass 
+    
+    # 1. หัวกระดาษ
     c.setFont(font_name, 24)
     c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 20)
     c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 90, width - 50, height - 90)
+    
+    # 2. ข้อมูลทั่วไป
     c.setFont(font_name, 16)
     name, std_id, classroom, brand, color, plate, lic_status, tax_status = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6]), str(vals[7]), str(vals[8])
     
@@ -117,9 +121,11 @@ def create_pdf(vals, img_url1, img_url2):
     lic_mark = "(/)" if "มี" in lic_status else "( )"
     tax_mark = "(/)" if "ปกติ" in tax_status or "✅" in tax_status else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
+    
+    # 3. ส่วนหลักฐานภาพถ่าย
     c.setFont(font_name, 16)
-    c.drawString(60, height - 255, "หลักฐานภาพถ่าย:")
-    img_y = height - 450 
+    c.drawString(60, height - 250, "หลักฐานภาพถ่าย:")
+    img_y = height - 430 
     def draw_img(url, x, y):
         try:
             if url:
@@ -131,13 +137,26 @@ def create_pdf(vals, img_url1, img_url2):
         except: c.drawString(x, y + 80, "Error รูปภาพ")
     draw_img(img_url1, 80, img_y)
     draw_img(img_url2, 310, img_y)
-    
+
+    # --- 4. เพิ่มส่วนบันทึกข้อความ (ขยับมาอยู่ใต้รูปภาพ) ---
+    note_y = img_y - 40
+    c.setFont(font_name, 16)
+    c.drawString(60, note_y, "บันทึกข้อความเพิ่มเติม:")
+    c.setDash(1, 2) # เส้นประ
+    c.line(60, note_y - 25, 530, note_y - 25)
+    c.line(60, note_y - 50, 530, note_y - 50)
+    c.line(60, note_y - 75, 530, note_y - 75)
+    c.setDash() # กลับเป็นเส้นทึบปกติ
+    # -----------------------------------------------
+
+    # 5. ส่วนลงชื่อ
     y_sign = 85
     c.setFont(font_name, 16)
     c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
     c.drawString(100, y_sign - 20, f"({name})")
     c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
     c.drawString(330, y_sign - 20, "(.......................................................)")
+    
     c.setFont(font_name, 10)
     c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
     c.save()
