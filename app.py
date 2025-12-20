@@ -37,7 +37,32 @@ def upload_to_drive(file_obj, filename):
     media = MediaIoBaseUpload(file_obj, mimetype=file_obj.type, resumable=True)
     file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink'
     ,supportsAllDrives=True).execute()
-    return file.get('webViewLink')
+    return file.get('webViewLink')import requests
+import base64
+
+# 🔴 เอา URL ยาวๆ ที่ได้จากขั้นตอนที่ 1 มาวางตรงนี้
+GAS_APP_URL = "https://script.google.com/home/projects/1-biJGY6pZ0ecdYetrsR1iDiAXprRzEJ18TmjGyhe4CdAfko6E0MSDv-w/edit"
+
+def upload_to_drive(file_obj, filename):
+    # อ่านไฟล์และแปลงเป็นรหัสตัวอักษร (Base64) เพื่อส่งผ่านเน็ต
+    file_content = file_obj.getvalue()
+    base64_str = base64.b64encode(file_content).decode('utf-8')
+    
+    payload = {
+        "folder_id": DRIVE_FOLDER_ID, # ใช้ ID โฟลเดอร์เดิมของคุณได้เลย
+        "filename": filename,
+        "file": base64_str,
+        "mimeType": file_obj.type
+    }
+    
+    # ส่งข้อมูลไปให้ Google Apps Script ทำงานแทน
+    response = requests.post(GAS_APP_URL, json=payload)
+    result = response.json()
+    
+    if result["status"] == "success":
+        return result["link"]
+    else:
+        raise Exception(f"Upload failed: {result['message']}")
 
 # --- หน้าเว็บ ---
 st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="🛵")
