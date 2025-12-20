@@ -61,7 +61,8 @@ def upload_to_drive(file_obj, filename):
         raise Exception(f"เชื่อมต่อไม่ได้: {e}")
 
 # --- หน้าเว็บ ---
-st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="🛵")
+# เปลี่ยนจาก "🛵" เป็นชื่อไฟล์รูปของคุณ เช่น "logo.png"
+st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="logo.jpg")
 st.title("🛵 ระบบลงทะเบียนรถจักรยานยนต์พัฒวิทย์")
 
 menu = st.sidebar.radio("เมนู", ["📝 นักเรียนลงทะเบียน", "👮 ครูตรวจสอบ"])
