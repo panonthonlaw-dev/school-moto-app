@@ -265,7 +265,7 @@ elif st.session_state['page'] == 'teacher':
                     ci, ct = st.columns([2,1])
                     with ci:
                         cc = st.columns(2)
-                        if img1: cc[0].image(img1, caption="หน้า")
+                        if img1: cc[0].image(img1, caption="หลัง")
                         if img2: cc[1].image(img2, caption="ข้าง")
                     with ct:
                         st.write(f"**ชื่อ:** {name_t}")
