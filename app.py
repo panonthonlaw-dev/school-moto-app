@@ -123,8 +123,11 @@ st.markdown("---")
 if st.session_state['page'] == 'student':
     st.info("📝 กรุณากรอกข้อมูลและแนบรูปรถ")
     
+    # 🔴 จุดสังเกต: บรรทัดนี้เริ่มสร้างฟอร์ม
     with st.form("reg_form"):
+        # --- ส่วนกรอกข้อมูล ---
         c1, c2 = st.columns(2)
+        
         with c1:
             sub_c1, sub_c2 = st.columns([1.2, 2]) 
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ว่าที่ร้อยตรี", "ครู", "อื่นๆ"])
@@ -155,7 +158,48 @@ if st.session_state['page'] == 'student':
         st.markdown("### 📸 ถ่ายรูปรถ (2 มุม)")
         col_img1, col_img2 = st.columns(2)
         photo1 = col_img1.file_uploader("1. รูปด้านหน้า (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
-        photo2 = col_img2.file_uploader
+        photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
+        
+        # 🔴🔴 จุดสำคัญ: บรรทัดนี้ต้องย่อหน้าเข้ามา อยู่ในแนวเดียวกับ inputs ด้านบน (ห้ามชิดซ้ายสุด) 🔴🔴
+        submitted = st.form_submit_button("ส่งข้อมูล", use_container_width=True)
+
+        if submitted:
+            if fname and std_id and plate and photo1:
+                try:
+                    sheet = connect_gsheet()
+                    existing_ids = sheet.col_values(3) 
+                    
+                    if std_id in existing_ids:
+                        st.error(f"⚠️ รหัสนักเรียน '{std_id}' นี้สมัครไปแล้ว!") 
+                        st.warning("หากต้องการแก้ไขข้อมูล กรุณาติดต่อ **'ตำรวจนักเรียน'**")
+                    else:
+                        with st.spinner("กำลังอัปโหลด..."):
+                            clean_plate = plate.replace(" ", "")
+                            link1 = upload_to_drive(photo1, f"{std_id}_{clean_plate}_FRONT.jpg")
+                            link2 = ""
+                            if photo2:
+                                 link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
+
+                            if link1: 
+                                sheet.append_row([
+                                    str(datetime.now()), 
+                                    name, 
+                                    std_id, 
+                                    f"{level}/{room}", 
+                                    brand, 
+                                    color, 
+                                    plate,
+                                    license_status,
+                                    tax_status,
+                                    link1, 
+                                    link2
+                                ])
+                                st.success(f"✅ บันทึกข้อมูล {name} เรียบร้อย!")
+                        
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
+            else:
+                st.warning("กรุณากรอกข้อมูลให้ครบ (ชื่อ, รหัสนักเรียน, ทะเบียน, รูปภาพ)")
 # ---------------------------------------
 # 👮 หน้าเจ้าหน้าที่ตรวจสอบ
 # ---------------------------------------
