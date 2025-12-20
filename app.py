@@ -156,12 +156,13 @@ if st.session_state['page'] == 'student':
         col_img1, col_img2 = st.columns(2)
         photo1 = col_img1.file_uploader("1. รูปด้านหน้า (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
         photo2 = col_img2.file_uploader
-        # ---------------------------------------
+# ---------------------------------------
 # 👮 หน้าเจ้าหน้าที่ตรวจสอบ
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
     st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
     
+    # เช็คสถานะ Login
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
 
@@ -174,6 +175,7 @@ elif st.session_state['page'] == 'teacher':
             else:
                 st.error("รหัสผ่านไม่ถูกต้อง")
     else:
+        # ส่วนแสดงผลหลัง Login
         if st.button("🚪 ออกจากระบบ"):
             st.session_state['logged_in'] = False
             st.rerun()
@@ -217,6 +219,7 @@ elif st.session_state['page'] == 'teacher':
             
             st.write(f"พบข้อมูล {len(df)} รายการ")
             
+            # ฟังก์ชันแปลงลิงก์รูปภาพ (จุดที่เคย Error)
             def get_reliable_image_url(url):
                 url = str(url).strip()
                 if not url or url == "": return None
@@ -229,3 +232,98 @@ elif st.session_state['page'] == 'teacher':
                         file_id = match.group(1)
                         break
                 if file_id:
+                    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
+                return url
+
+            # Loop แสดงรายการ
+            for i, row in df.iterrows():
+                vals = row.tolist()
+                name_txt = str(vals[1]) if len(vals) > 1 else "-"
+                std_id_txt = str(vals[2]) if len(vals) > 2 else "-"
+                level_txt = str(vals[3]) if len(vals) > 3 else "-"
+                brand_txt = str(vals[4]) if len(vals) > 4 else "-"
+                color_txt = str(vals[5]) if len(vals) > 5 else "-"
+                plate_txt = str(vals[6]) if len(vals) > 6 else "-"
+                
+                raw_link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
+                raw_link2 = str(vals[-1]).strip() if len(vals) >= 1 else ""
+                img_url1 = get_reliable_image_url(raw_link1)
+                img_url2 = get_reliable_image_url(raw_link2)
+
+                with st.expander(f"🛵 {plate_txt} | 👤 {name_txt}"):
+                    c_img, c_text = st.columns([2,1])
+                    with c_img:
+                        cols = st.columns(2)
+                        if img_url1: cols[0].image(img_url1, caption="ด้านหน้า", use_column_width=True)
+                        else: cols[0].info("ไม่มีรูป")
+                        if img_url2: cols[1].image(img_url2, caption="ด้านข้าง", use_column_width=True)
+                        
+                    with c_text:
+                        st.markdown(f"### 👤 {name_txt}")
+                        st.write(f"**รหัส:** {std_id_txt}")
+                        st.markdown("---")
+                        st.write(f"**ทะเบียน:** {plate_txt}")
+                        st.write(f"**ชั้น:** {level_txt}")
+                        st.write(f"**ยี่ห้อ:** {brand_txt}")
+                        st.write(f"**สี:** {color_txt}")
+                        st.markdown("---")
+                        
+                        lic = str(vals[7]) if len(vals) > 7 else "-"
+                        tax = str(vals[8]) if len(vals) > 8 else "-"
+                        if "http" in lic: lic = row.get('ใบขับขี่', '-')
+                        if "http" in tax: tax = row.get('พรบ_ภาษี', '-')
+
+                        if "มี" in str(lic): st.success(f"ใบขับขี่: {lic}")
+                        else: st.error(f"ใบขับขี่: {lic}")
+                        if "ครบ" in str(tax) or "ปกติ" in str(tax): st.success(f"พรบ./ภาษี: {tax}")
+                        else: st.error(f"พรบ./ภาษี: {tax}")
+
+            st.markdown("---")
+            # --- ส่วนเลื่อนชั้นปี ---
+            with st.expander("⚙️ จัดการเลื่อนชั้นปี"):
+                st.warning("⚠️ โซนอันตราย")
+                super_pwd = st.text_input("🔑 รหัสลับ (Super Admin)", type="password")
+                
+                if st.button("🚀 ยืนยันเลื่อนชั้นเรียนทั้งหมด"):
+                    PROMOTION_SECRET_KEY = "Patwitnext" 
+                    if super_pwd == PROMOTION_SECRET_KEY:
+                        try:
+                            sheet = connect_gsheet()
+                            all_data = sheet.get_all_values()
+                            header = all_data[0]
+                            rows = all_data[1:]
+                            level_idx = 3 
+                            for idx, h in enumerate(header):
+                                if "ชั้น" in h:
+                                    level_idx = idx
+                                    break
+                            
+                            updated_rows = []
+                            change_count = 0
+                            for row in rows:
+                                if len(row) > level_idx:
+                                    old_level = row[level_idx]
+                                    new_level = old_level
+                                    if "ม.1" in old_level: new_level = old_level.replace("ม.1", "ม.2")
+                                    elif "ม.2" in old_level: new_level = old_level.replace("ม.2", "ม.3")
+                                    elif "ม.3" in old_level: new_level = "จบการศึกษา 🎓"
+                                    elif "ม.4" in old_level: new_level = old_level.replace("ม.4", "ม.5")
+                                    elif "ม.5" in old_level: new_level = old_level.replace("ม.5", "ม.6")
+                                    elif "ม.6" in old_level: new_level = "จบการศึกษา 🎓"
+                                    
+                                    if old_level != new_level:
+                                        row[level_idx] = new_level
+                                        change_count += 1
+                                    updated_rows.append(row)
+                            
+                            if change_count > 0:
+                                sheet.clear()
+                                sheet.update('A1', [header] + updated_rows)
+                                st.success(f"✅ สำเร็จ {change_count} คน!")
+                                st.balloons()
+                            else:
+                                st.info("ไม่มีข้อมูลต้องเลื่อนชั้น")
+                        except Exception as e:
+                            st.error(f"เกิดข้อผิดพลาด: {e}")
+                    else:
+                        st.error("❌ รหัสลับไม่ถูกต้อง!")
