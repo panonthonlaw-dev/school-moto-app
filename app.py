@@ -63,26 +63,7 @@ def upload_to_drive(file_obj, filename):
 # --- หน้าเว็บ ---
 # ตรงนี้ใส่ชื่อไฟล์โลโก้ของคุณ (ควรมีนามสกุลไฟล์ด้วย เช่น .png, .jpg)
 st.set_page_config(page_title="patwit moto.", page_icon="logo")
-# --- ซ่อนเฉพาะปุ่มเมนูขวาบน (GitHub/Settings) แต่เก็บเมนูซ้ายไว้ ---
-hide_github_icon = """
-    <style>
-    /* ซ่อนปุ่ม 3 จุด (Menu) ที่มุมขวาบน */
-    #MainMenu {visibility: hidden;}
-    
-    /* ซ่อนปุ่ม Deploy */
-    .stDeployButton {display:none;}
-    
-    /* ซ่อนแถบเครื่องมือ (Toolbar) ด้านขวาบนทั้งหมด */
-    [data-testid="stToolbar"] {visibility: hidden !important;}
-    
-    /* ซ่อน Footer ด้านล่าง */
-    footer {visibility: hidden;}
-    
-    /* (ทางเลือก) ซ่อนแถบสีรุ้งด้านบนสุด */
-    [data-testid="stDecoration"] {visibility: hidden;}
-    </style>
-"""
-st.markdown(hide_github_icon, unsafe_allow_html=True)
+
 # --- ส่วนหัวข้อแบบมีโลโก้ (แก้ใหม่ตรงนี้) ---
 # แบ่งเป็น 2 คอลัมน์: [ช่องเล็กสำหรับรูป, ช่องใหญ่สำหรับข้อความ]
 c_logo, c_title = st.columns([1, 6]) # ลองปรับเลข 1 กับ 6 เพื่อเปลี่ยนสัดส่วนความกว้าง
