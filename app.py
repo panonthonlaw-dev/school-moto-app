@@ -188,7 +188,7 @@ if st.session_state['page'] == 'student':
         
         doc_c1, doc_c2, doc_c3 = st.columns(3)
         license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
+        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ไม่ได้ต่อ"], horizontal=True)
         helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
