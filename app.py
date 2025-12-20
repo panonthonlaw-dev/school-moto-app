@@ -63,11 +63,10 @@ def upload_to_drive(file_obj, filename):
 # --- หน้าเว็บ ---
 # ตรงนี้ใส่ชื่อไฟล์โลโก้ของคุณ (ควรมีนามสกุลไฟล์ด้วย เช่น .png, .jpg)
 st.set_page_config(page_title="patwit moto.", page_icon="logo")
-# --- ซ่อนเมนูและไอคอน GitHub ---
+# --- แก้ไขโค้ดส่วนนี้ใหม่ (ลบบรรทัด header ออก) ---
 hide_menu_style = """
     <style>
     #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
     </style>
