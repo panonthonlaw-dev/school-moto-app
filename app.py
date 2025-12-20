@@ -107,7 +107,7 @@ with c_logo:
 
 with c_title:
     st.title("ระบบลงทะเบียนรถจักรยานยนต์")
-    st.caption("โรงเรียนโพนทองพัฒนาวิทยา")
+    st.title("โรงเรียนโพนทองพัฒนาวิทยา")
 
 with c_btn:
     if st.session_state['page'] == 'student':
