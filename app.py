@@ -164,9 +164,10 @@ if st.session_state['page'] == 'student':
             go_to_teacher()
             st.rerun()
 # ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3 แก้ไข Indentation)
+# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (ฉบับแก้ไขสมบูรณ์)
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
+    # ปุ่มกลับหน้าหลัก
     if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
         st.rerun()
         
@@ -252,12 +253,4 @@ elif st.session_state['page'] == 'teacher':
                         st.write(f"**ชื่อ:** {name_t}")
                         st.write(f"**รหัส:** {str(vals[2]) if len(vals)>2 else '-'}")
                         st.write(f"**ทะเบียน:** {plate_t}")
-                        st.write(f"**ชั้น:** {str(vals[3]) if len(vals)>3 else '-'}")
-                        st.write(f"**รุ่น/สี:** {str(vals[4])} {str(vals[5])}")
-
-            st.markdown("---")
-            # --- ส่วนจัดการเลื่อนชั้นปี ---
-            with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
-                st.error("⚠️ คำเตือน: ระบบจะทำการ 'บันทึกทับข้อมูลเดิม' ทันที ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
-                
-                spwd = st.text_input("รหัสลับ (Super Admin)", type="password
+                        st.write(f"**
