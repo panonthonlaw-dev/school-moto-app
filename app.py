@@ -123,7 +123,7 @@ if menu == "📝 นักเรียนลงทะเบียน":
         
         st.markdown("### 📸 ถ่ายรูปรถ (2 มุม)")
         col_img1, col_img2 = st.columns(2)
-        photo1 = col_img1.file_uploader("1. รูปด้านหน้า (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
+        photo1 = col_img1.file_uploader("1. รูปด้านหลัง (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
         photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
         
         if st.form_submit_button("ส่งข้อมูล"):
