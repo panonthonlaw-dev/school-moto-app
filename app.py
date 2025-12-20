@@ -98,16 +98,14 @@ def create_pdf(vals, img_url1, img_url2):
     try: c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
     except: pass 
     
-    # หัวกระดาษ
     c.setFont(font_name, 24)
     c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 20)
     c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 90, width - 50, height - 90)
     
-    # ข้อมูลทั่วไป
     c.setFont(font_name, 16)
-    # ลำดับข้อมูลใน vals ตาม Google Sheet: 0:Timestamp, 1:Name, 2:ID, 3:Class, 4:Brand, 5:Color, 6:Plate, 7:Lic, 8:Tax, 9:Helmet, 10:Img1, 11:Img2
+    # v: 0:Timestamp, 1:Name, 2:ID, 3:Class, 4:Brand, 5:Color, 6:Plate, 7:Lic, 8:Tax, 9:Helmet, 10:Img1, 11:Img2
     name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
     lic_status, tax_status, helmet_status = str(vals[7]), str(vals[8]), str(vals[9])
     
@@ -138,11 +136,9 @@ def create_pdf(vals, img_url1, img_url2):
                 else: c.drawString(x, y + 80, "โหลดรูปไม่ได้")
         except: c.drawString(x, y + 80, "Error รูปภาพ")
     
-    # ดึงรูปจากคอลัมน์ 10 และ 11
     draw_img(img_url1, 80, img_y)
     draw_img(img_url2, 310, img_y)
 
-    # ส่วนบันทึกข้อความเพิ่มเติม
     note_y = img_y - 40
     c.setFont(font_name, 16)
     c.drawString(60, note_y, "บันทึกข้อความเพิ่มเติม:")
@@ -152,7 +148,6 @@ def create_pdf(vals, img_url1, img_url2):
         c.line(60, line_y, 530, line_y)
     c.setDash()
 
-    # ส่วนลงชื่อ
     y_sign = 85
     c.setFont(font_name, 16)
     c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
@@ -183,143 +178,6 @@ if st.session_state['page'] == 'student':
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/ครูบุคลากรพ่อค้าแม่ค้า กรอกวันเดือนปีเกิด เช่น 15072520")
+        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         c3, c4 = st.columns(2)
-        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู,บุคลากร","พ่อค้าแม่ค้า"])
-        room = c4.text_input("ห้อง/ กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก 0")
-        c5, c6 = st.columns(2)
-        brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Kawasaki","อื่นๆ"])
-        color = c6.text_input("สีรถ")
-        plate = st.text_input("ทะเบียน")
-        
-        st.markdown("##### 📄 ข้อมูลเอกสารและความปลอดภัย")
-        doc_c1, doc_c2, doc_c3 = st.columns(3)
-        license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
-        helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        
-        photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
-        photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
-        
-        if st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True):
-            if fname and std_id and plate and photo1:
-                try:
-                    sheet = connect_gsheet()
-                    if str(std_id) in sheet.col_values(3): 
-                        st.error("❌ รหัสนี้เคยลงทะเบียนไปแล้ว!")
-                    else:
-                        with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
-                            l1 = upload_to_drive(photo1, f"{std_id}_F.jpg")
-                            l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
-                            thai_now = datetime.now() + timedelta(hours=7)
-                            full_name = f"{prefix}{fname}"
-                            # ลำดับคอลัมน์: เวลา, ชื่อ, ID, ชั้น, ยี่ห้อ, สี, ทะเบียน, ใบขับขี่, ภาษี, หมวกกันน็อค, รูป1, รูป2
-                            sheet.append_row([
-                                thai_now.strftime('%d/%m/%Y %H:%M'), 
-                                full_name, str(std_id), f"{level}/{room}", 
-                                brand, color, plate, 
-                                license_status, tax_status, helmet_status, 
-                                l1, l2
-                            ])
-                            st.balloons()
-                            st.success("✅ ลงทะเบียนสำเร็จ!")
-                except Exception as e: st.error(f"Error: {e}")
-            else: st.warning("⚠️ กรุณากรอกข้อมูลให้ครบ")
-
-    if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
-        go_to_teacher(); st.rerun()
-
-elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าหลัก"): go_to_student(); st.rerun()
-    if not st.session_state.get('logged_in'):
-        st.subheader("👮 เข้าสู่ระบบเจ้าหน้าที่")
-        pwd = st.text_input("รหัสผ่าน", type="password")
-        if st.button("เข้าสู่ระบบ"):
-            if pwd == ADMIN_PASSWORD: st.session_state.logged_in = True; st.rerun()
-            else: st.error("รหัสผ่านไม่ถูกต้อง")
-    else:
-        if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
-        if st.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
-            st.session_state.df = pd.DataFrame(connect_gsheet().get_all_records())
-            st.success("อัปเดตข้อมูลสำเร็จ")
-        
-        if 'df' in st.session_state:
-            df = st.session_state.df
-            st.markdown("### 📊 สรุปภาพรวมสถิติ")
-            total = len(df)
-            try:
-                lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
-                tax = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅", na=False)].shape[0]
-                helmet = df[df.iloc[:, 9].astype(str).str.contains("มี", na=False)].shape[0]
-                
-                lic_pct = (lic/total)*100 if total > 0 else 0
-                tax_pct = (tax/total)*100 if total > 0 else 0
-                helmet_pct = (helmet/total)*100 if total > 0 else 0
-            except: lic, tax, helmet, lic_pct, tax_pct, helmet_pct = 0, 0, 0, 0, 0, 0
-            
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 ใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
-            c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
-            c4.metric("⛑️ หมวกกันน็อค", f"{helmet} คน", f"{helmet_pct:.1f}%")
-            
-            st.markdown("---")
-            st.subheader("🔍 ค้นหาข้อมูลทะเบียนรถ")
-            c_search, c_btn = st.columns([3, 1])
-            with c_search:
-                q_input = st.text_input("พิมพ์ชื่อ, รหัส หรือ ทะเบียนรถ", placeholder="พิมพ์คำค้นหา...", label_visibility="collapsed", key="search_query")
-            with c_btn:
-                if st.button("🔎 เริ่มการค้นหา", use_container_width=True):
-                    st.session_state.search_active = True
-
-            if st.session_state.get("search_active") and st.session_state.get("search_query"):
-                q = st.session_state.search_query
-                fdf = df[df.astype(str).apply(lambda x: x.str.contains(q, case=False)).any(axis=1)]
-                if fdf.empty: st.warning(f"❌ ไม่พบข้อมูล: '{q}'")
-                else:
-                    for i, row in fdf.iterrows():
-                        v = row.tolist()
-                        with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
-                            c_img, c_info = st.columns([1.5, 1])
-                            with c_img:
-                                i1, i2 = get_img_link(v[10]), get_img_link(v[11])
-                                if i1: st.image(i1)
-                            with c_info:
-                                st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
-                                st.write(f"**ยี่ห้อ:** {v[4]} | **สี:** {v[5]}")
-                                st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
-                                st.write(f"**หมวกกันน็อค:** {v[9]}")
-                                pdf_data = create_pdf(v, i1, i2)
-                                st.download_button("⬇️ ดาวน์โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", "application/pdf", key=f"dl_{i}")
-
-            st.markdown("---")
-            with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและย้อนกลับไม่ได้")
-                spwd = st.text_input("รหัสลับยืนยัน", type="password", key="upgrade_pwd")
-                if st.button("🚀 เริ่มการเลื่อนชั้นปี (ระวัง!)", use_container_width=True):
-                    if spwd == "Patwitnext":
-                        try:
-                            sheet = connect_gsheet()
-                            d = sheet.get_all_values()
-                            h = d[0]; r = d[1:]
-                            l_idx = 3 # คอลัมน์ชั้น
-                            new_r = []
-                            chg = 0
-                            for row in r:
-                                ol = row[l_idx]; nl = ol
-                                if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                                elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                                elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                                elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                                elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                                elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                                if ol!=nl: row[l_idx]=nl; chg+=1
-                                new_r.append(row)
-                            if chg > 0:
-                                sheet.clear()
-                                sheet.update('A1', [h] + new_r)
-                                st.success(f"สำเร็จ {chg} รายการ")
-                                if 'df' in st.session_state: del st.session_state.df
-                            else: st.info("ไม่มีข้อมูลเปลี่ยนแปลง")
-                        except Exception as e: st.error(f"Error: {e}")
-                    else: st.error("รหัสผิด")
+        level = c3.selectbox("ชั้น", ["ม.1","
