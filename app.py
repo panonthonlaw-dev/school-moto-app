@@ -62,7 +62,7 @@ def upload_to_drive(file_obj, filename):
 
 # --- หน้าเว็บ ---
 # เปลี่ยนจาก "🛵" เป็นชื่อไฟล์รูปของคุณ เช่น "logo.png"
-st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="logo.jpg")
+st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="logo")
 st.title("🛵 ระบบลงทะเบียนรถจักรยานยนต์พัฒวิทย์")
 
 menu = st.sidebar.radio("เมนู", ["📝 นักเรียนลงทะเบียน", "👮 ครูตรวจสอบ"])
