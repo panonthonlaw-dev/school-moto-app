@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, timedelta # เพิ่ม timedelta สำหรับเวลาไทย
+from datetime import datetime, timedelta
 import json
 import requests
 import base64
@@ -98,12 +98,14 @@ def create_pdf(vals, img_url1, img_url2):
     try: c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
     except: pass 
     
+    # หัวกระดาษ
     c.setFont(font_name, 24)
     c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 20)
     c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 90, width - 50, height - 90)
     
+    # ข้อมูลทั่วไป
     c.setFont(font_name, 16)
     name, std_id, classroom, brand, color, plate, lic_status, tax_status = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6]), str(vals[7]), str(vals[8])
     
@@ -135,17 +137,17 @@ def create_pdf(vals, img_url1, img_url2):
     draw_img(img_url1, 80, img_y)
     draw_img(img_url2, 310, img_y)
 
+    # ส่วนบันทึกข้อความเพิ่มเติม
     note_y = img_y - 40
     c.setFont(font_name, 16)
     c.drawString(60, note_y, "บันทึกข้อความเพิ่มเติม:")
     c.setDash(1, 2)
-    c.line(60, note_y - 25, 530, note_y - 25)
-    c.line(60, note_y - 50, 530, note_y - 50)
-    c.line(60, note_y - 75, 530, note_y - 75)
-    c.line(60, note_y - 100, 530, note_y - 100)
-    c.line(60, note_y - 125, 530, note_y - 125)
+    for i in range(5):
+        line_y = note_y - 25 - (i * 25)
+        c.line(60, line_y, 530, line_y)
     c.setDash()
 
+    # ส่วนลงชื่อ
     y_sign = 85
     c.setFont(font_name, 16)
     c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
@@ -154,7 +156,6 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(330, y_sign - 20, "(.......................................................)")
     
     c.setFont(font_name, 10)
-    # ปรับเวลาไทยใน PDF
     thai_now = datetime.now() + timedelta(hours=7)
     c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {thai_now.strftime('%d/%m/%Y %H:%M')}")
     c.save()
@@ -171,16 +172,16 @@ st.markdown("---")
 
 if st.session_state['page'] == 'student':
     st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
-    with st.form("reg_form", clear_on_submit=True): # ล้างข้อมูลหลังกดส่ง
+    with st.form("reg_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("นักเรียนใส่รหัสนักเรียน กรณีครูบุคลากรพ่อค้าแม่ค้าใส่วันเดือนปีที่เกิด เช่น 02072523")
+        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู,บุคลากร","พ่อค้าแม่ค้า"])
-        room = c4.text_input("ห้อง/ร้านค้าที่/บุคลากร ใส่0")
+        room = c4.text_input("ห้อง/เบอร์โทร")
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Kawasaki","อื่นๆ"])
         color = c6.text_input("สีรถ")
@@ -190,45 +191,24 @@ if st.session_state['page'] == 'student':
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
         photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
         
-        submit_btn = st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True)
-
-        if submit_btn:
+        if st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True):
             if fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
-                    # เช็คว่ารหัสซ้ำไหม
                     if str(std_id) in sheet.col_values(3): 
-                        st.error("❌ รหัสนักเรียนนี้เคยลงทะเบียนไปแล้วพบปัญหาติดต่อตำรวจนักเรียน!")
+                        st.error("❌ รหัสนี้เคยลงทะเบียนไปแล้ว!")
                     else:
-                        with st.spinner("⏳ กำลังบันทึกข้อมูลและอัปโหลดรูปภาพ..."):
+                        with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
                             l1 = upload_to_drive(photo1, f"{std_id}_F.jpg")
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
-                            
-                            # ตั้งค่าเวลาไทย
                             thai_now = datetime.now() + timedelta(hours=7)
                             full_name = f"{prefix}{fname}"
-                            
-                            sheet.append_row([
-                                thai_now.strftime('%d/%m/%Y %H:%M'), 
-                                full_name, 
-                                str(std_id), 
-                                f"{level}/{room}", 
-                                brand, 
-                                color, 
-                                plate, 
-                                license_status, 
-                                tax_status, 
-                                l1, 
-                                l2
-                            ])
+                            sheet.append_row([thai_now.strftime('%d/%m/%Y %H:%M'), full_name, str(std_id), f"{level}/{room}", brand, color, plate, license_status, tax_status, l1, l2])
                             st.balloons()
-                            st.success(f"✅ ลงทะเบียนสำเร็จ! ขอบคุณคุณ {full_name}")
-                except Exception as e: 
-                    st.error(f"เกิดข้อผิดพลาด: {e}")
-            else:
-                st.warning("⚠️ กรุณากรอกข้อมูลที่สำคัญให้ครบ (ชื่อ, รหัส, ทะเบียน และรูปถ่าย)")
+                            st.success("✅ ลงทะเบียนสำเร็จ!")
+                except Exception as e: st.error(f"Error: {e}")
+            else: st.warning("⚠️ กรุณากรอกข้อมูลให้ครบ")
 
-    st.markdown("---")
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
         go_to_teacher(); st.rerun()
 
@@ -261,100 +241,63 @@ elif st.session_state['page'] == 'teacher':
             c1.metric("🏍️ รถที่ลงทะเบียน", f"{total} คัน")
             c2.metric("🪪 มีใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
             c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
-            st.markdown("---")
-
-            st.subheader("🔍 ค้นหาข้อมูลทะเบียนรถ")
             
-            # สร้างแถบรับค่าค้นหาและปุ่มกดให้อยู่แถวเดียวกัน
+            st.markdown("---")
+            st.subheader("🔍 ค้นหาข้อมูลทะเบียนรถ")
             c_search, c_btn = st.columns([3, 1])
             with c_search:
-                q = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="เช่น สมชาย หรือ 1001...", label_visibility="collapsed")
+                q_input = st.text_input("พิมพ์ชื่อ, รหัส หรือ ทะเบียนรถ", placeholder="พิมพ์คำค้นหา...", label_visibility="collapsed", key="search_query")
             with c_btn:
-                do_search = st.button("🔎 เริ่มการค้นหา", use_container_width=True)
+                if st.button("🔎 เริ่มการค้นหา", use_container_width=True):
+                    st.session_state.search_active = True
 
-            # ตรวจสอบว่ามีการกดปุ่มค้นหา หรือมีค่าการค้นหาค้างไว้ในสถานะ
-            if do_search and q:
-                # กรองข้อมูลจาก Dataframe
+            if st.session_state.get("search_active") and st.session_state.get("search_query"):
+                q = st.session_state.search_query
                 fdf = df[df.astype(str).apply(lambda x: x.str.contains(q, case=False)).any(axis=1)]
-                
-                if fdf.empty:
-                    st.warning(f"❌ ไม่พบข้อมูลที่เกี่ยวข้องกับ: '{q}'")
+                if fdf.empty: st.warning(f"❌ ไม่พบข้อมูล: '{q}'")
                 else:
-                    st.success(f"✅ พบข้อมูลทั้งหมด {len(fdf)} รายการ")
                     for i, row in fdf.iterrows():
                         v = row.tolist()
-                        std_name = str(v[1])
-                        with st.expander(f"📍 {v[6]} | {std_name}", expanded=True):
+                        with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
                             c_img, c_info = st.columns([1.5, 1])
                             with c_img:
                                 i1, i2 = get_img_link(v[9]), get_img_link(v[10])
-                                col_imgs = st.columns(2)
-                                if i1: col_imgs[0].image(i1, caption="รูปหลังรถ")
-                                if i2: col_imgs[1].image(i2, caption="รูปข้างรถ")
+                                if i1: st.image(i1)
                             with c_info:
-                                st.write(f"**รหัส:** {v[2]}")
-                                st.write(f"**ระดับชั้น:** {v[3]}")
-                                st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
+                                st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
+                                st.write(f"**ยี่ห้อ:** {v[4]} | **สี:** {v[5]}")
                                 st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
-                                if st.button("📄 พิมพ์ PDF", key=f"pdf_{i}"):
-                                    with st.spinner("กำลังสร้างไฟล์..."):
-                                        b = create_pdf(v, i1, i2)
-                                        st.download_button("ดาวน์โหลด PDF", b, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
-            elif do_search and not q:
-                st.warning("⚠️ กรุณาพิมพ์ข้อความที่ต้องการค้นหาก่อนกดปุ่ม")
-            
+                                pdf_data = create_pdf(v, i1, i2)
+                                st.download_button("⬇️ ดาวน์โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", "application/pdf", key=f"dl_{i}")
+
             st.markdown("---")
             with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือนสำคัญ!")
-                st.markdown("""
-                **โปรดระวัง:** การกดปุ่มเลื่อนชั้นปีจะเป็นการแก้ไขข้อมูลนักเรียนทุกคนในระบบ **"แบบถาวร"** - ม.1 -> ม.2, ม.5 -> ม.6 ฯลฯ
-                - ม.3 และ ม.6 จะถูกเปลี่ยนสถานะเป็น 'จบการศึกษา 🎓'
-                - **ไม่สามารถกู้คืนข้อมูลเดิมหรือย้อนกลับ (Undo) ได้** *กรุณาตรวจสอบข้อมูลและมั่นใจว่าต้องการดำเนินการจริงๆ ก่อนใส่รหัสยืนยัน*
-                """)
-                
-                spwd = st.text_input("กรุณาใส่รหัสเจ้าหน้าที่ระดับสูงเพื่อยืนยันการเปลี่ยนแปลง", type="password")
-                
-                if st.button("🚀 เริ่มต้นกระบวนการเลื่อนชั้นปี (ระวัง!)", use_container_width=True):
+                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและย้อนกลับไม่ได้")
+                spwd = st.text_input("รหัสลับยืนยัน", type="password", key="upgrade_pwd")
+                if st.button("🚀 เริ่มการเลื่อนชั้นปี (ระวัง!)", use_container_width=True):
                     if spwd == "Patwitnext":
                         try:
-                            with st.spinner("⏳ กำลังดำเนินการปรับปรุงข้อมูลชั้นปี..."):
-                                sheet = connect_gsheet()
-                                d = sheet.get_all_values()
-                                if len(d) <= 1:
-                                    st.info("ไม่มีข้อมูลนักเรียนในระบบ")
-                                else:
-                                    h = d[0] # หัวตาราง
-                                    r = d[1:] # ข้อมูล
-                                    l_idx = 3 # คอลัมน์ระดับชั้น (D)
-                                    new_r = []
-                                    chg = 0
-                                    
-                                    for row in r:
-                                        ol = row[l_idx]
-                                        nl = ol
-                                        # ตรรกะการเลื่อนชั้น
-                                        if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                                        elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                                        elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                                        elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                                        elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                                        elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                                        
-                                        if ol != nl:
-                                            row[l_idx] = nl
-                                            chg += 1
-                                        new_r.append(row)
-                                    
-                                    if chg > 0:
-                                        sheet.clear()
-                                        sheet.update('A1', [h] + new_r)
-                                        st.success(f"✨ ดำเนินการสำเร็จ! ปรับปรุงข้อมูลทั้งหมด {chg} รายการ")
-                                        # ล้างแคชข้อมูลเพื่อให้ดึงข้อมูลใหม่มาแสดง
-                                        if 'df' in st.session_state:
-                                            del st.session_state.df
-                                    else:
-                                        st.info("ไม่พบข้อมูลที่ตรงตามเงื่อนไขการเลื่อนชั้นปี")
-                        except Exception as e:
-                            st.error(f"เกิดข้อผิดพลาดทางเทคนิค: {e}")
-                    else:
-                        st.error("❌ รหัสลับไม่ถูกต้อง ไม่สามารถดำเนินการได้")
+                            sheet = connect_gsheet()
+                            d = sheet.get_all_values()
+                            h = d[0]; r = d[1:]
+                            l_idx = 3 # คอลัมน์ชั้น
+                            new_r = []
+                            chg = 0
+                            for row in r:
+                                ol = row[l_idx]; nl = ol
+                                if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                if ol!=nl: row[l_idx]=nl; chg+=1
+                                new_r.append(row)
+                            if chg > 0:
+                                sheet.clear()
+                                sheet.update('A1', [h] + new_r)
+                                st.success(f"สำเร็จ {chg} รายการ")
+                                if 'df' in st.session_state: del st.session_state.df
+                            else: st.info("ไม่มีข้อมูลเปลี่ยนแปลง")
+                        except Exception as e: st.error(f"Error: {e}")
+                    else: st.error("รหัสผิด")
