@@ -198,7 +198,7 @@ if st.session_state['page'] == 'student':
                     sheet = connect_gsheet()
                     # เช็คว่ารหัสซ้ำไหม
                     if str(std_id) in sheet.col_values(3): 
-                        st.error("❌ รหัสนักเรียนนี้เคยลงทะเบียนไปแล้ว!")
+                        st.error("❌ รหัสนักเรียนนี้เคยลงทะเบียนไปแล้วพบปัญหาติดต่อตำรวจนักเรียน!")
                     else:
                         with st.spinner("⏳ กำลังบันทึกข้อมูลและอัปโหลดรูปภาพ..."):
                             l1 = upload_to_drive(photo1, f"{std_id}_F.jpg")
