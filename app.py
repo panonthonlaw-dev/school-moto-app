@@ -43,8 +43,7 @@ def upload_to_drive(file_obj, filename):
 
 # --- หน้าเว็บ ---
 st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="🛵")
-st.title("🛵 ระบบลงทะเบียน
-รถจักรยานยนต์พัฒวิทย์")
+st.title("🛵 ระบบลงทะเบียนรถจักรยานยนต์พัฒวิทย์")
 
 # สร้างเมนู
 menu = st.sidebar.radio("เมนู", ["📝 นักเรียนลงทะเบียน", "👮 ครูตรวจสอบ"])
