@@ -206,19 +206,24 @@ elif st.session_state['page'] == 'teacher':
         if 'df' in st.session_state:
             df = st.session_state.df
             st.markdown("### 📊 สรุปภาพรวมสถิติ")
-            total = len(df)
-            try:
-                lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
-                tax = df[df.iloc[:, 8].astype(str).str.contains("ปกติ", na=False)].shape[0]
-                lic_pct = (lic/total)*100 if total > 0 else 0
-                tax_pct = (tax/total)*100 if total > 0 else 0
-            except: lic, tax, lic_pct, tax_pct = 0, 0, 0, 0
+        total = len(df)
+        try:
+            # คอลัมน์ที่ 7 (index 7) คือ ใบขับขี่
+            lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
+            # คอลัมน์ที่ 8 (index 8) คือ ภาษี (เช็คคำว่า "ปกติ" หรือ "✅")
+            tax = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅", na=False)].shape[0]
             
-            c1, c2, c3 = st.columns(3)
-            c1.metric("🏍️ รถที่ลงทะเบียน", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
-            c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
-            st.markdown("---")
+            lic_pct = (lic/total)*100 if total > 0 else 0
+            tax_pct = (tax/total)*100 if total > 0 else 0
+        except Exception as e:
+            lic, tax, lic_pct, tax_pct = 0, 0, 0, 0
+            st.error(f"การคำนวณสถิติผิดพลาด: {e}")
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🏍️ รถที่ลงทะเบียน", f"{total} คัน")
+        c2.metric("🪪 มีใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
+        c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
+        st.markdown("---")
 
             q = st.text_input("🔍 ค้นหาข้อมูล (ชื่อ/รหัส/ทะเบียน)")
             if q:
