@@ -85,7 +85,8 @@ with c_logo:
     except:
         st.write("🏍️") 
 with c_title:
-    st.title("ระบบลงทะเบียนรถจักรยานยนต์")# ---------------------------------------
+    st.title("ระบบลงทะเบียนรถจักรยานยนต์")
+# ---------------------------------------
 # 📝 หน้านักเรียนลงทะเบียน
 # ---------------------------------------
 if st.session_state['page'] == 'student':
@@ -163,59 +164,7 @@ if st.session_state['page'] == 'student':
         if st.button("🔐 สำหรับเจ้าหน้าที่ / ครู", use_container_width=True):
             go_to_teacher()
             st.rerun()
-# ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3.1)
-# ---------------------------------------
-elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
-        st.rerun()
-        
-    st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
-    
-    if 'logged_in' not in st.session_state: 
-        st.session_state['logged_in'] = False
-
-    if not st.session_state['logged_in']:
-        pwd = st.text_input("กรอกรหัสผ่าน", type="password")
-        if st.button("เข้าสู่ระบบ"):
-            if pwd == ADMIN_PASSWORD:
-                st.session_state['logged_in'] = True
-                st.rerun()
-            else:
-                st.error("รหัสผ่านไม่ถูกต้อง")
-    else:
-        if st.button("🚪 ออกจากระบบ"):
-            st.session_state['logged_in'] = False
-            st.rerun()
-        
-        st.success("เข้าสู่ระบบเรียบร้อย")
-        if st.button("🔄 โหลดข้อมูลล่าสุด"):
-            try:
-                data = connect_gsheet().get_all_records()
-                if data: 
-                    st.session_state['df'] = pd.DataFrame(data)
-                else: 
-                    st.warning("ยังไม่มีข้อมูล")
-            except Exception as e: 
-                st.error(f"ดึงข้อมูลไม่ได้: {e}")
-        
-        if 'df' in st.session_state:
-            df = st.session_state['df']
-            st.markdown("### 📊 สรุปภาพรวม")
-            total = len(df)
-            try:
-                lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
-                tax = df[df.iloc[:, 8].astype(str).str.contains("ครบ|ปกติ", na=False)].shape[0]
-            except: 
-                lic=0; tax=0
-
-            c1, c2, c3 = st.columns(3)
-            c1.metric("ทั้งหมด", f"{total}")
-            c2.metric("มีใบขับขี่", f"{lic}")
-            c3.metric("พรบ./ภาษี", f"{tax}")
-            
-            st.markdown("---")
-            # (Part 3.2 ต่อจากด้านบน)
+# (Part 3.2 ต่อจากด้านบน)
             search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
             if search: 
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
@@ -255,6 +204,43 @@ elif st.session_state['page'] == 'teacher':
                         st.write(f"**ชั้น:** {str(vals[3]) if len(vals)>3 else '-'}")
                         # บรรทัดที่เคยมีปัญหา คือบรรทัดนี้ครับ
                         st.write(f"**รุ่น/สี:** {str(vals[4])} {str(vals[5])}")
+
+            st.markdown("---")
+            with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
+                st.error("⚠️ คำเตือน: ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
+                
+                spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
+                
+                if st.button("ยืนยันเลื่อนชั้น"):
+                    if spwd == "Patwitnext":
+                        try:
+                            sheet = connect_gsheet()
+                            d = sheet.get_all_values()
+                            h = d[0]; r = d[1:]
+                            l_idx = 3
+                            for i,x in enumerate(h): 
+                                if "ชั้น" in x: l_idx=i; break
+                            
+                            new_r = []
+                            chg = 0
+                            for row in r:
+                                if len(row) > l_idx:
+                                    ol = row[l_idx]; nl = ol
+                                    if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                    elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                    elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                    elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                    elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                    elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                    if ol!=nl: row[l_idx]=nl; chg+=1
+                                    new_r.append(row)
+                            if chg > 0:
+                                sheet.clear()
+                                sheet.update('A1', [h] + new_r)
+                                st.success(f"สำเร็จ {chg} คน")
+                            else: st.info("ไม่มีข้อมูลต้องเปลี่ยน")
+                        except Exception as e: st.error(f"Error: {e}")
+                    else: st.error("รหัสผิด")
 
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
