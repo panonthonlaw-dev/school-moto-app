@@ -146,6 +146,8 @@ def create_pdf(vals, img_url1, img_url2):
     c.line(60, note_y - 25, 530, note_y - 25)
     c.line(60, note_y - 50, 530, note_y - 50)
     c.line(60, note_y - 75, 530, note_y - 75)
+    c.line(60, note_y - 100, 530, note_y - 100)
+    c.line(60, note_y - 125, 530, note_y - 125)
     c.setDash() # กลับเป็นเส้นทึบปกติ
     # -----------------------------------------------
 
