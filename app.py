@@ -164,9 +164,8 @@ elif menu == "👮 ครูตรวจสอบ":
     st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
     pwd = st.text_input("กรอกรหัสผ่านเพื่อเข้าถึงข้อมูล", type="password")
     
-    # --- เช็คความถูกต้องของรหัสผ่าน ---
+    # --- เช็คความถูกต้องของรหัสผ่าน (ชั้นที่ 1) ---
     if pwd == ADMIN_PASSWORD:
-        # ถ้ารหัสถูก ให้แสดงปุ่มโหลดและข้อมูล
         if st.button("โหลดข้อมูลล่าสุด"):
             try:
                 data = connect_gsheet().get_all_records()
@@ -199,7 +198,7 @@ elif menu == "👮 ครูตรวจสอบ":
             st.markdown("---")
             
             # --- ส่วนค้นหา ---
-            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
+            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน/ชั้น)")
             if search:
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
@@ -272,7 +271,67 @@ elif menu == "👮 ครูตรวจสอบ":
                         
                         with st.expander("🔧 Link ต้นฉบับ"):
                              st.code(f"Link1: {raw_link1}\nLink2: {raw_link2}")
-    
-    # 🔴🔴 ส่วนแจ้งเตือนเมื่อใส่รหัสผิด (เพิ่มใหม่ตรงนี้) 🔴🔴
+            
+            # =========================================================
+            # ⚙️ ส่วนระบบเลื่อนชั้นปี (มีรหัสป้องกัน 2 ชั้น)
+            # =========================================================
+            st.markdown("---")
+            with st.expander("⚙️ จัดการเลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
+                st.warning("⚠️ โซนอันตราย: การดำเนินการนี้จะแก้ไขข้อมูลทั้งหมดในฐานข้อมูล")
+                
+                # ช่องใส่รหัสลับชั้นที่ 2
+                super_pwd = st.text_input("🔑 กรุณาใส่รหัสลับ (Super Admin) เพื่อยืนยัน", type="password")
+                
+                if st.button("🚀 ยืนยันเลื่อนชั้นเรียนทั้งหมด"):
+                    # 🔴🔴 กำหนดรหัสสำหรับการเลื่อนชั้น ตรงนี้ครับ 🔴🔴
+                    PROMOTION_SECRET_KEY = "PatwitNextLevel" 
+                    
+                    if super_pwd == PROMOTION_SECRET_KEY:
+                        try:
+                            sheet = connect_gsheet()
+                            all_data = sheet.get_all_values()
+                            header = all_data[0]
+                            rows = all_data[1:]
+                            
+                            level_idx = 3 
+                            for idx, h in enumerate(header):
+                                if "ชั้น" in h:
+                                    level_idx = idx
+                                    break
+                            
+                            updated_rows = []
+                            change_count = 0
+                            
+                            for row in rows:
+                                if len(row) > level_idx:
+                                    old_level = row[level_idx]
+                                    new_level = old_level
+                                    
+                                    if "ม.1" in old_level: new_level = old_level.replace("ม.1", "ม.2")
+                                    elif "ม.2" in old_level: new_level = old_level.replace("ม.2", "ม.3")
+                                    elif "ม.3" in old_level: new_level = old_level.replace("ม.3", "ม.4")
+                                    elif "ม.4" in old_level: new_level = old_level.replace("ม.4", "ม.5")
+                                    elif "ม.5" in old_level: new_level = old_level.replace("ม.5", "ม.6")
+                                    elif "ม.6" in old_level: new_level = "จบการศึกษา 🎓"
+                                    
+                                    if old_level != new_level:
+                                        row[level_idx] = new_level
+                                        change_count += 1
+                                        
+                                updated_rows.append(row)
+                            
+                            if change_count > 0:
+                                sheet.clear()
+                                sheet.update('A1', [header] + updated_rows)
+                                st.success(f"✅ เลื่อนชั้นสำเร็จ {change_count} คน! (รีเฟรชเพื่อดูข้อมูลใหม่)")
+                                st.balloons()
+                            else:
+                                st.info("ไม่มีข้อมูลต้องเลื่อนชั้น")
+                                
+                        except Exception as e:
+                            st.error(f"เกิดข้อผิดพลาด: {e}")
+                    else:
+                        st.error("❌ รหัสลับไม่ถูกต้อง! การเลื่อนชั้นถูกยกเลิก")
+
     elif pwd != "": 
         st.error("❌ รหัสผ่านไม่ถูกต้อง! กรุณาตรวจสอบอีกครั้ง")
