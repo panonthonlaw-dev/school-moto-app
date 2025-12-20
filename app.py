@@ -63,36 +63,27 @@ def upload_to_drive(file_obj, filename):
 # --- หน้าเว็บ ---
 # ตรงนี้ใส่ชื่อไฟล์โลโก้ของคุณ (ควรมีนามสกุลไฟล์ด้วย เช่น .png, .jpg)
 st.set_page_config(page_title="patwit moto.", page_icon="logo")
-# 🟢🟢 โค้ดสำหรับซ่อนทุกอย่าง ยกเว้นปุ่มลูกศร Sidebar 🟢🟢
+# 🟢🟢 โค้ดสำหรับซ่อนทุกอย่าง เหลือแค่ลูกศรเปิด Sidebar 🟢🟢
 st.markdown("""
     <style>
-        /* 1. ซ่อน Toolbar ด้านขวาบนทั้งหมด (GitHub, Deploy, 3 จุด) */
-        [data-testid="stToolbar"] {
+        /* 1. สั่งซ่อน Header ด้านบนทั้งหมดก่อน (ทั้งแถบ) */
+        header[data-testid="stHeader"] {
             visibility: hidden !important;
-            display: none !important;
         }
 
-        /* 2. ซ่อนแถบสีรุ้งด้านบนสุด */
-        [data-testid="stDecoration"] {
-            visibility: hidden !important;
-            display: none !important;
-        }
-
-        /* 3. ซ่อน Footer (Made with Streamlit) */
-        footer {
-            visibility: hidden !important;
-            display: none !important;
-        }
-
-        /* 4. ⭐ สำคัญ: บังคับให้ปุ่มลูกศรเปิด Sidebar ยังแสดงอยู่เสมอ */
-        section[data-testid="stSidebar"] > div > div:nth-child(2) {
-             visibility: visible !important;
-        }
-        /* หรือใช้ Selector มาตรฐาน */
+        /* 2. สั่งโชว์เฉพาะ "ปุ่มลูกศร Sidebar" กลับขึ้นมา */
         [data-testid="stSidebarCollapsedControl"] {
             visibility: visible !important;
             display: block !important;
-            color: black !important; /* ปรับสีลูกศรให้ชัดขึ้น (ถ้าพื้นหลังขาว) */
+            
+            /* ปรับตำแหน่งนิดหน่อยเผื่อมันเลื่อน */
+            margin-top: 0px; 
+            margin-left: 0px;
+        }
+        
+        /* 3. ซ่อน Footer ด้านล่าง */
+        footer {
+            display: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
