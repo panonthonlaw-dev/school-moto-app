@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
+from datetime import datetime, timedelta # เพิ่ม timedelta สำหรับเวลาไทย
 import json
 import requests
 import base64
@@ -98,14 +98,12 @@ def create_pdf(vals, img_url1, img_url2):
     try: c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
     except: pass 
     
-    # 1. หัวกระดาษ
     c.setFont(font_name, 24)
     c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 20)
     c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 90, width - 50, height - 90)
     
-    # 2. ข้อมูลทั่วไป
     c.setFont(font_name, 16)
     name, std_id, classroom, brand, color, plate, lic_status, tax_status = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6]), str(vals[7]), str(vals[8])
     
@@ -122,7 +120,6 @@ def create_pdf(vals, img_url1, img_url2):
     tax_mark = "(/)" if "ปกติ" in tax_status or "✅" in tax_status else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
     
-    # 3. ส่วนหลักฐานภาพถ่าย
     c.setFont(font_name, 16)
     c.drawString(60, height - 250, "หลักฐานภาพถ่าย:")
     img_y = height - 430 
@@ -138,20 +135,17 @@ def create_pdf(vals, img_url1, img_url2):
     draw_img(img_url1, 80, img_y)
     draw_img(img_url2, 310, img_y)
 
-    # --- 4. เพิ่มส่วนบันทึกข้อความ (ขยับมาอยู่ใต้รูปภาพ) ---
     note_y = img_y - 40
     c.setFont(font_name, 16)
     c.drawString(60, note_y, "บันทึกข้อความเพิ่มเติม:")
-    c.setDash(1, 2) # เส้นประ
+    c.setDash(1, 2)
     c.line(60, note_y - 25, 530, note_y - 25)
     c.line(60, note_y - 50, 530, note_y - 50)
     c.line(60, note_y - 75, 530, note_y - 75)
     c.line(60, note_y - 100, 530, note_y - 100)
     c.line(60, note_y - 125, 530, note_y - 125)
-    c.setDash() # กลับเป็นเส้นทึบปกติ
-    # -----------------------------------------------
+    c.setDash()
 
-    # 5. ส่วนลงชื่อ
     y_sign = 85
     c.setFont(font_name, 16)
     c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
@@ -160,7 +154,9 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(330, y_sign - 20, "(.......................................................)")
     
     c.setFont(font_name, 10)
-    c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    # ปรับเวลาไทยใน PDF
+    thai_now = datetime.now() + timedelta(hours=7)
+    c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {thai_now.strftime('%d/%m/%Y %H:%M')}")
     c.save()
     buffer.seek(0)
     return buffer
@@ -175,14 +171,13 @@ st.markdown("---")
 
 if st.session_state['page'] == 'student':
     st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
-    with st.form("reg_form"):
+    with st.form("reg_form", clear_on_submit=True): # ล้างข้อมูลหลังกดส่ง
         c1, c2 = st.columns(2)
         with c1:
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-            name = f"{prefix}{fname}"
-        std_id = c2.text_input("รหัสนักเรียน ครูบุคลาการพ่อค้าแม้ค้า ใส่วันเดือน พ.ศ.เกิด เช่น 02052523")
+        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู,บุคลากร","พ่อค้าแม่ค้า"])
         room = c4.text_input("ห้อง")
@@ -194,18 +189,45 @@ if st.session_state['page'] == 'student':
         tax_status = st.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด/ไม่แน่ใจ"], horizontal=True)
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
         photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
-        if st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True):
+        
+        submit_btn = st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True)
+
+        if submit_btn:
             if fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
-                    if std_id in sheet.col_values(3): st.error("สมัครไปแล้ว")
+                    # เช็คว่ารหัสซ้ำไหม
+                    if str(std_id) in sheet.col_values(3): 
+                        st.error("❌ รหัสนี้เคยลงทะเบียนไปแล้ว!")
                     else:
-                        with st.spinner("อัปโหลด..."):
+                        with st.spinner("⏳ กำลังบันทึกข้อมูลและอัปโหลดรูปภาพ..."):
                             l1 = upload_to_drive(photo1, f"{std_id}_F.jpg")
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
-                            sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, license_status, tax_status, l1, l2])
-                            st.success("ลงทะเบียนสำเร็จ!")
-                except Exception as e: st.error(f"Error: {e}")
+                            
+                            # ตั้งค่าเวลาไทย
+                            thai_now = datetime.now() + timedelta(hours=7)
+                            full_name = f"{prefix}{fname}"
+                            
+                            sheet.append_row([
+                                thai_now.strftime('%d/%m/%Y %H:%M'), 
+                                full_name, 
+                                str(std_id), 
+                                f"{level}/{room}", 
+                                brand, 
+                                color, 
+                                plate, 
+                                license_status, 
+                                tax_status, 
+                                l1, 
+                                l2
+                            ])
+                            st.balloons()
+                            st.success(f"✅ ลงทะเบียนสำเร็จ! ขอบคุณคุณ {full_name}")
+                except Exception as e: 
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
+            else:
+                st.warning("⚠️ กรุณากรอกข้อมูลที่สำคัญให้ครบ (ชื่อ, รหัส, ทะเบียน และรูปถ่าย)")
+
     st.markdown("---")
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
         go_to_teacher(); st.rerun()
@@ -226,7 +248,6 @@ elif st.session_state['page'] == 'teacher':
         
         if 'df' in st.session_state:
             df = st.session_state.df
-            # --- 📊 ระบบสรุปผล (Metrics) แก้ไขแล้ว ---
             st.markdown("### 📊 สรุปภาพรวมสถิติ")
             total = len(df)
             try:
@@ -261,14 +282,12 @@ elif st.session_state['page'] == 'teacher':
                             st.write(f"**ระดับชั้น:** {v[3]}")
                             st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
                             st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
-                            if st.button("📄 พิมพ์ PDF ประวัติ", key=f"pdf_{i}"):
-                                with st.spinner("กำลังสร้างไฟล์..."):
-                                    b = create_pdf(v, i1, i2)
-                                    st.download_button("ดาวน์โหลด PDF", b, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
+                            if st.button("📄 พิมพ์ PDF", key=f"pdf_{i}"):
+                                b = create_pdf(v, i1, i2)
+                                st.download_button("ดาวน์โหลด PDF", b, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
             
             st.markdown("---")
             with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
-                st.warning("⚠️ ข้อมูลชั้นเรียนจะถูกเปลี่ยนถาวร")
                 spwd = st.text_input("รหัสลับยืนยัน", type="password")
                 if st.button("เริ่มการเลื่อนชั้นปี"):
                     if spwd == "Patwitnext":
@@ -292,7 +311,7 @@ elif st.session_state['page'] == 'teacher':
                             if chg > 0:
                                 sheet.clear()
                                 sheet.update('A1', [h] + new_r)
-                                st.success(f"ดำเนินการสำเร็จ {chg} รายการ")
-                            else: st.info("ไม่มีข้อมูลที่ต้องเปลี่ยนแปลง")
-                        except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+                                st.success(f"สำเร็จ {chg} รายการ")
+                            else: st.info("ไม่มีข้อมูลเปลี่ยนแปลง")
+                        except Exception as e: st.error(f"Error: {e}")
                     else: st.error("รหัสผิด")
