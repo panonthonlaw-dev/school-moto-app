@@ -2,18 +2,21 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 from datetime import datetime
 import json
+import requests  # ใช้ส่งข้อมูลไป Apps Script
+import base64    # ใช้แปลงไฟล์รูป
 
 # --- ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
-# 🔴🔴 (สำคัญ) อย่าลืมใส่ ID โฟลเดอร์รูปภาพของครูตรงนี้นะครับ 🔴🔴
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
 ADMIN_PASSWORD = "Patwit064180"
 
-# --- เชื่อมต่อ Google ---
+# 🔴🔴 เอา URL จาก Google Apps Script (Web App) มาใส่ตรงนี้ 🔴🔴
+# URL จะหน้าตาประมาณ: https://script.google.com/macros/s/AKfycbx.../exec
+GAS_APP_URL = "https://script.google.com/home/projects/1-biJGY6pZ0ecdYetrsR1iDiAXprRzEJ18TmjGyhe4CdAfko6E0MSDv-w/edit" 
+
+# --- เชื่อมต่อ Google Sheets ---
 def get_creds():
     key_content = st.secrets["textkey"]["json_content"]
     try:
@@ -30,39 +33,35 @@ def connect_gsheet():
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
+# --- ฟังก์ชันอัปโหลดแบบใหม่ (ส่งไปให้ Apps Script ช่วย) ---
 def upload_to_drive(file_obj, filename):
-    creds = get_creds()
-    service = build('drive', 'v3', credentials=creds)
-    file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID]}
-    media = MediaIoBaseUpload(file_obj, mimetype=file_obj.type, resumable=True)
-    file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink'
-    ,supportsAllDrives=True).execute()
-    return file.get('webViewLink')import requests
-import base64
+    if GAS_APP_URL == "วาง_URL_ของคุณที่ได้จากขั้นตอน_Deploy_ตรงนี้":
+        st.error("🚨 กรุณาใส่ URL ของ Web App ในโค้ดบรรทัดที่ 16 ก่อนครับ")
+        return None
 
-# 🔴 เอา URL ยาวๆ ที่ได้จากขั้นตอนที่ 1 มาวางตรงนี้
-GAS_APP_URL = "https://script.google.com/home/projects/1-biJGY6pZ0ecdYetrsR1iDiAXprRzEJ18TmjGyhe4CdAfko6E0MSDv-w/edit"
-
-def upload_to_drive(file_obj, filename):
-    # อ่านไฟล์และแปลงเป็นรหัสตัวอักษร (Base64) เพื่อส่งผ่านเน็ต
-    file_content = file_obj.getvalue()
-    base64_str = base64.b64encode(file_content).decode('utf-8')
-    
-    payload = {
-        "folder_id": DRIVE_FOLDER_ID, # ใช้ ID โฟลเดอร์เดิมของคุณได้เลย
-        "filename": filename,
-        "file": base64_str,
-        "mimeType": file_obj.type
-    }
-    
-    # ส่งข้อมูลไปให้ Google Apps Script ทำงานแทน
-    response = requests.post(GAS_APP_URL, json=payload)
-    result = response.json()
-    
-    if result["status"] == "success":
-        return result["link"]
-    else:
-        raise Exception(f"Upload failed: {result['message']}")
+    try:
+        # อ่านไฟล์และแปลงเป็น Base64
+        file_content = file_obj.getvalue()
+        base64_str = base64.b64encode(file_content).decode('utf-8')
+        
+        payload = {
+            "folder_id": DRIVE_FOLDER_ID,
+            "filename": filename,
+            "file": base64_str,
+            "mimeType": file_obj.type
+        }
+        
+        # ส่งข้อมูล
+        response = requests.post(GAS_APP_URL, json=payload)
+        result = response.json()
+        
+        if result.get("status") == "success":
+            return result.get("link")
+        else:
+            raise Exception(f"Upload failed: {result.get('message')}")
+            
+    except Exception as e:
+        raise Exception(f"เกิดข้อผิดพลาดในการเชื่อมต่อ: {e}")
 
 # --- หน้าเว็บ ---
 st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="🛵")
@@ -86,30 +85,28 @@ if menu == "📝 นักเรียนลงทะเบียน":
         
         st.markdown("### 📸 ถ่ายรูปรถ (2 มุม)")
         col_img1, col_img2 = st.columns(2)
-        # --- จุดที่แก้ 1: เพิ่มช่องรับไฟล์เป็น 2 ช่อง ---
         photo1 = col_img1.file_uploader("1. รูปด้านหน้า (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
         photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
         
         if st.form_submit_button("ส่งข้อมูล"):
-            # ต้องมีอย่างน้อย 1 รูปถึงจะยอมให้ส่ง (หรือจะแก้เป็น and photo2 เพื่อบังคับ 2 รูปก็ได้)
             if name and plate and photo1: 
                 try:
                     with st.spinner("กำลังอัปโหลด..."):
-                        # สร้างชื่อไฟล์ไม่ให้ซ้ำ
                         clean_plate = plate.replace(" ", "")
                         
-                        # --- จุดที่แก้ 2: อัปโหลดทีละรูป ---
+                        # อัปโหลดรูปที่ 1
                         link1 = upload_to_drive(photo1, f"{std_id}_{clean_plate}_FRONT.jpg")
                         
+                        # อัปโหลดรูปที่ 2 (ถ้ามี)
                         link2 = ""
-                        if photo2: # ถ้ามีรูปที่ 2 ก็ให้อัปโหลดด้วย
+                        if photo2:
                              link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
 
-                        sheet = connect_gsheet()
-                        # --- จุดที่แก้ 3: บันทึก link1 และ link2 ลง Sheet ---
-                        sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, link1, link2])
-                    
-                    st.success("✅ บันทึกข้อมูลเรียบร้อย!")
+                        if link1: # ถ้าอัปโหลดสำเร็จ
+                            sheet = connect_gsheet()
+                            sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, link1, link2])
+                            st.success("✅ บันทึกข้อมูลเรียบร้อย!")
+                        
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
             else:
@@ -132,27 +129,19 @@ elif menu == "👮 ครูตรวจสอบ":
             search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
             df = st.session_state['df']
             
-            # กรองข้อมูล
             if search:
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
             st.write(f"พบข้อมูล {len(df)} รายการ")
             
             for i, row in df.iterrows():
-                # ดึงข้อมูลออกแบบปลอดภัย (ใช้ .get กัน Error กรณีเปลี่ยนชื่อหัวตาราง)
-                # หมายเหตุ: ต้องแก้ชื่อ key ให้ตรงกับหัวตารางใน Google Sheet จริงๆ ของคุณ
-                # สมมติว่าหัวตารางช่องสุดท้ายคือ 'รูปภาพ1' และ 'รูปภาพ2'
-                # ถ้า Sheet คุณยังเป็นชื่อเก่า โค้ดจะพยายามดึงจาก index แทน
-                
                 plate_txt = row.get('ทะเบียน', list(row.values())[6]) 
                 name_txt = row.get('ชื่อ-นามสกุล', list(row.values())[1])
 
                 with st.expander(f"{plate_txt} : {name_txt}"):
-                    c_img, c_text = st.columns([2,1]) # แบ่งพื้นที่ รูป 2 ส่วน : ข้อความ 1 ส่วน
+                    c_img, c_text = st.columns([2,1])
                     
                     with c_img:
-                        # --- จุดที่แก้ 4: แสดงผล 2 รูป ---
-                        # พยายามดึงลิงก์จากชื่อหัวตาราง หรือลำดับคอลัมน์ (Index)
                         vals = list(row.values())
                         link1 = str(vals[7]) if len(vals) > 7 else ""
                         link2 = str(vals[8]) if len(vals) > 8 else ""
