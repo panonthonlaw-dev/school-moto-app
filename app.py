@@ -253,7 +253,7 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
-          # (Part 3.2: ระบบค้นหา + PDF + เลื่อนชั้นปี - วางต่อท้ายสุด)
+         # (Part 3.2: ระบบค้นหา + PDF มีโลโก้ - วางต่อท้ายสุด)
             
             # --- Import ตัวทำ PDF ---
             from reportlab.pdfgen import canvas
@@ -263,7 +263,7 @@ elif st.session_state['page'] == 'teacher':
             from reportlab.lib.utils import ImageReader
             import io
 
-            # ฟังก์ชันสร้าง PDF (แบบละเอียด)
+            # ฟังก์ชันสร้าง PDF
             def create_pdf(vals, img_url1, img_url2):
                 buffer = io.BytesIO()
                 c = canvas.Canvas(buffer, pagesize=A4)
@@ -274,20 +274,30 @@ elif st.session_state['page'] == 'teacher':
                     pdfmetrics.registerFont(TTFont('THSarabunNew', 'THSarabunNew.ttf'))
                     font_name = 'THSarabunNew'
                 except:
-                    font_name = 'Helvetica' # ถ้าหาไฟล์ไม่เจอจะใช้ฟอนต์อังกฤษแทน
+                    font_name = 'Helvetica'
                 
-                # 2. หัวกระดาษ
+                # 2. หัวกระดาษ & โลโก้
+                # --- 🔴 ส่วนเพิ่มโลโก้ตรงนี้ครับ ---
+                try:
+                    # วาดโลโก้ที่มุมซ้ายบน (x=50, y=height-85) ปรับขนาดกว้างxสูง เป็น 50x50
+                    c.drawImage("logo.png", 50, height - 85, width=50, height=50, mask='auto')
+                except:
+                    pass # ถ้าหาไฟล์โลโก้ไม่เจอก็ข้ามไป (ไม่ error)
+                # -------------------------------
+
                 c.setFont(font_name, 24)
+                # ขยับข้อความชื่อเอกสารหลบโลโก้นิดหน่อย หรือวางตรงกลางเหมือนเดิม
                 c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
                 c.setFont(font_name, 20)
                 c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
+                
+                # เส้นกั้น
                 c.line(50, height - 90, width - 50, height - 90)
 
                 # 3. ข้อมูลส่วนตัว
                 y = height - 130
                 c.setFont(font_name, 16)
                 
-                # ดึงค่าจากตัวแปร
                 name = str(vals[1]); std_id = str(vals[2]); 
                 classroom = str(vals[3]); brand = str(vals[4]); 
                 color = str(vals[5]); plate = str(vals[6]); 
@@ -300,9 +310,11 @@ elif st.session_state['page'] == 'teacher':
                 # 4. ข้อมูลรถ
                 c.drawString(300, y, f"ยี่ห้อ: {brand}")
                 c.drawString(300, y-25, f"สีรถ: {color}")
+                
+                # ทะเบียนตัวใหญ่
                 c.setFont(font_name, 20)
                 c.drawString(300, y-55, f"ทะเบียน: {plate}")
-                c.rect(295, y-60, 150, 25) # ตีกรอบทะเบียน
+                c.rect(295, y-60, 150, 25) 
                 
                 # 5. สถานะ
                 c.setFont(font_name, 16)
@@ -311,7 +323,7 @@ elif st.session_state['page'] == 'teacher':
                 tax_mark = "(/)" if "ครบ" in tax_status or "ปกติ" in tax_status else "( )"
                 c.drawString(60, y_status, f"สถานะเอกสาร:      {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
                 
-                # 6. รูปภาพ
+                # 6. รูปภาพหลักฐาน
                 y_img = y_status - 220
                 def draw_img(url, x, y):
                     try:
@@ -347,100 +359,3 @@ elif st.session_state['page'] == 'teacher':
             with c_input:
                 search_query = st.text_input("ช่องค้นหา", label_visibility="collapsed", placeholder="พิมพ์ชื่อ หรือ เลขทะเบียน...")
             with c_btn:
-                btn_search = st.button("🔎 ค้นหา", use_container_width=True)
-
-            # --- LOGIC แสดงผล ---
-            if not search_query:
-                st.info("👆 กรุณาพิมพ์ข้อมูล และกดปุ่ม **'ค้นหา'**")
-            else:
-                filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
-                
-                if len(filtered_df) == 0:
-                    st.warning(f"❌ ไม่พบข้อมูล: '{search_query}'")
-                else:
-                    st.success(f"✅ พบข้อมูล {len(filtered_df)} รายการ")
-                    
-                    def get_img_link(url):
-                        url = str(url).strip()
-                        if not url: return None
-                        import re
-                        file_id = None
-                        match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
-                        if match: file_id = match.group(1)
-                        else: 
-                            match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
-                            if match: file_id = match.group(1)
-                        if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
-                        return url
-
-                    for i, row in filtered_df.iterrows():
-                        vals = row.tolist()
-                        name_t = str(vals[1]); plate_t = str(vals[6])
-                        std_id_t = str(vals[2])
-                        
-                        img1 = get_img_link(str(vals[-2])) if len(vals)>=2 else None
-                        img2 = get_img_link(str(vals[-1])) if len(vals)>=1 else None
-                        
-                        with st.expander(f"🛵 {plate_t} | {name_t}"):
-                            ci, ct = st.columns([2,1])
-                            with ci:
-                                cc = st.columns(2)
-                                if img1: cc[0].image(img1, caption="หน้า")
-                                if img2: cc[1].image(img2, caption="ข้าง")
-                            with ct:
-                                st.write(f"**ชื่อ:** {name_t}")
-                                st.write(f"**ทะเบียน:** {plate_t}")
-                                st.write(f"**ชั้น:** {str(vals[3])}")
-                                st.markdown("---")
-                                
-                                # ปุ่มโหลด PDF
-                                if st.button(f"📄 โหลด PDF", key=f"gen_{i}"):
-                                    with st.spinner("กำลังสร้าง PDF..."):
-                                        try:
-                                            pdf_bytes = create_pdf(vals, img1, img2)
-                                            st.download_button(
-                                                label="⬇️ คลิกเพื่อดาวน์โหลด",
-                                                data=pdf_bytes,
-                                                file_name=f"Moto_{plate_t}.pdf",
-                                                mime="application/pdf",
-                                                key=f"dl_{i}"
-                                            )
-                                        except Exception as e:
-                                            st.error(f"เกิดข้อผิดพลาด: {e} (อย่าลืมใส่ไฟล์ฟอนต์!)")
-
-            # --- ส่วนเลื่อนชั้นปี ---
-            st.markdown("---")
-            with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
-                st.error("⚠️ คำเตือน: ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
-                spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
-                
-                if st.button("ยืนยันเลื่อนชั้น"):
-                    if spwd == "Patwitnext":
-                        try:
-                            sheet = connect_gsheet()
-                            d = sheet.get_all_values()
-                            h = d[0]; r = d[1:]
-                            l_idx = 3
-                            for i,x in enumerate(h): 
-                                if "ชั้น" in x: l_idx=i; break
-                            
-                            new_r = []
-                            chg = 0
-                            for row in r:
-                                if len(row) > l_idx:
-                                    ol = row[l_idx]; nl = ol
-                                    if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                                    elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                                    elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                                    elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                                    elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                                    elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                                    if ol!=nl: row[l_idx]=nl; chg+=1
-                                    new_r.append(row)
-                            if chg > 0:
-                                sheet.clear()
-                                sheet.update('A1', [h] + new_r)
-                                st.success(f"สำเร็จ {chg} คน")
-                            else: st.info("ไม่มีข้อมูลต้องเปลี่ยน")
-                        except Exception as e: st.error(f"Error: {e}")
-                    else: st.error("รหัสผิด")
