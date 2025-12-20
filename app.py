@@ -263,28 +263,45 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
             st.markdown("---")
 
-            q = st.text_input("🔍 ค้นหาข้อมูล (ชื่อ/รหัส/ทะเบียน)")
-            if q:
+            st.subheader("🔍 ค้นหาข้อมูลทะเบียนรถ")
+            
+            # สร้างแถบรับค่าค้นหาและปุ่มกดให้อยู่แถวเดียวกัน
+            c_search, c_btn = st.columns([3, 1])
+            with c_search:
+                q = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="เช่น สมชาย หรือ 1001...", label_visibility="collapsed")
+            with c_btn:
+                do_search = st.button("🔎 เริ่มการค้นหา", use_container_width=True)
+
+            # ตรวจสอบว่ามีการกดปุ่มค้นหา หรือมีค่าการค้นหาค้างไว้ในสถานะ
+            if do_search and q:
+                # กรองข้อมูลจาก Dataframe
                 fdf = df[df.astype(str).apply(lambda x: x.str.contains(q, case=False)).any(axis=1)]
-                st.success(f"พบข้อมูล {len(fdf)} รายการ")
-                for i, row in fdf.iterrows():
-                    v = row.tolist()
-                    std_name = str(v[1])
-                    with st.expander(f"📍 {v[6]} | {std_name}"):
-                        c_img, c_info = st.columns([1.5,1])
-                        with c_img:
-                            i1, i2 = get_img_link(v[9]), get_img_link(v[10])
-                            col_imgs = st.columns(2)
-                            if i1: col_imgs[0].image(i1, caption="รูปหลังรถ")
-                            if i2: col_imgs[1].image(i2, caption="รูปข้างรถ")
-                        with c_info:
-                            st.write(f"**รหัส:** {v[2]}")
-                            st.write(f"**ระดับชั้น:** {v[3]}")
-                            st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
-                            st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
-                            if st.button("📄 พิมพ์ PDF", key=f"pdf_{i}"):
-                                b = create_pdf(v, i1, i2)
-                                st.download_button("ดาวน์โหลด PDF", b, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
+                
+                if fdf.empty:
+                    st.warning(f"❌ ไม่พบข้อมูลที่เกี่ยวข้องกับ: '{q}'")
+                else:
+                    st.success(f"✅ พบข้อมูลทั้งหมด {len(fdf)} รายการ")
+                    for i, row in fdf.iterrows():
+                        v = row.tolist()
+                        std_name = str(v[1])
+                        with st.expander(f"📍 {v[6]} | {std_name}", expanded=True):
+                            c_img, c_info = st.columns([1.5, 1])
+                            with c_img:
+                                i1, i2 = get_img_link(v[9]), get_img_link(v[10])
+                                col_imgs = st.columns(2)
+                                if i1: col_imgs[0].image(i1, caption="รูปหลังรถ")
+                                if i2: col_imgs[1].image(i2, caption="รูปข้างรถ")
+                            with c_info:
+                                st.write(f"**รหัส:** {v[2]}")
+                                st.write(f"**ระดับชั้น:** {v[3]}")
+                                st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
+                                st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
+                                if st.button("📄 พิมพ์ PDF", key=f"pdf_{i}"):
+                                    with st.spinner("กำลังสร้างไฟล์..."):
+                                        b = create_pdf(v, i1, i2)
+                                        st.download_button("ดาวน์โหลด PDF", b, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
+            elif do_search and not q:
+                st.warning("⚠️ กรุณาพิมพ์ข้อความที่ต้องการค้นหาก่อนกดปุ่ม")
             
             st.markdown("---")
             with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
