@@ -199,7 +199,7 @@ elif menu == "👮 ครูตรวจสอบ":
             st.markdown("---")
             
             # --- ส่วนค้นหา ---
-            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน/ชั้น)")
+            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
             if search:
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
