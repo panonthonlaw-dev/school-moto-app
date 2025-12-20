@@ -230,16 +230,19 @@ elif st.session_state['page'] == 'teacher':
                 if len(all_vals) > 1:
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                     st.success("โหลดข้อมูลสำเร็จ")
-                else: st.warning("ยังไม่มีข้อมูล")
+                else:
+                    st.session_state.df = pd.DataFrame(columns=["Timestamp","Name","ID","Class","Brand","Color","Plate","License","Tax","Helmet","Img1","Img2"])
+                    st.warning("ยังไม่มีข้อมูล")
             except Exception as e: st.error(f"Error: {e}")
         
         if 'df' in st.session_state:
             df = st.session_state.df
             total = len(df)
             
-            # --- ปรับปรุงจุดนี้: การคำนวณสถิติที่ถูกต้อง ---
+            # --- ปรับแก้จุดนี้: ตรวจสอบข้อความตรงกับฟอร์มลงทะเบียน ---
             try:
                 lic_count = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                # เช็คคำว่า "✅ ปกติ" ให้ตรงกับ radio button ของหน้าลงทะเบียน
                 tax_count = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
                 hel_count = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
                 
@@ -271,34 +274,6 @@ elif st.session_state['page'] == 'teacher':
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ยี่ห้อ:** {v[4]} | **สี:** {v[5]}")
-                                st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
-                                st.write(f"**หมวกกันน็อค:** {v[9]}")
+                                st.write(f"**เอกสาร:** {v[7]} / {v[8]} / {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
-            
-            st.markdown("---")
-            with st.expander("⚙️ เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและย้อนกลับไม่ได้")
-                spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
-                if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
-                    try:
-                        sheet = connect_gsheet()
-                        d = sheet.get_all_values()
-                        h = d[0]; r = d[1:]
-                        new_r = []
-                        for row in r:
-                            ol = row[3]
-                            nl = ol
-                            if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                            elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                            elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                            elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                            elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                            elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                            row[3] = nl
-                            new_r.append(row)
-                        sheet.clear()
-                        sheet.update('A1', [h] + new_r)
-                        st.success("เลื่อนชั้นสำเร็จ!")
-                        if 'df' in st.session_state: del st.session_state.df
-                    except Exception as e: st.error(f"Error: {e}")
