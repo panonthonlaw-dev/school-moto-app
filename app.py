@@ -16,6 +16,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
+from reportlab.lib import colors
 
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
@@ -75,33 +76,49 @@ def connect_gsheet():
 def update_point(std_id, action):
     try:
         sheet = connect_gsheet()
-        cell = sheet.find(str(std_id), in_column=3) # ค้นหา ID คอลัมน์ C
+        cell = sheet.find(str(std_id), in_column=3) # ค้นหา ID
         
         if cell:
             row_num = cell.row
-            # คะแนนอยู่ที่คอลัมน์ 12 (L)
-            current_val = sheet.cell(row_num, 12).value
             
+            # 1. ดึงคะแนน (Col 12 / L)
+            current_val = sheet.cell(row_num, 12).value
             if not current_val: current_val = 100
             score = int(current_val)
             
+            # 2. ดึงประวัติเก่า (Col 13 / M)
+            old_history = sheet.cell(row_num, 13).value
+            if not old_history: old_history = ""
+            
             new_score = score
             msg = ""
+            log_entry = ""
+            timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
             
             if action == "no_helmet":
                 new_score -= 5
                 msg = "❌ หัก 5 คะแนน (ไม่สวมหมวก)"
+                log_entry = f"[{timestamp}] -5 : ไม่สวมหมวกกันน็อค"
             elif action == "wrong_parking":
                 new_score -= 5
                 msg = "❌ หัก 5 คะแนน (จอดผิดที่)"
+                log_entry = f"[{timestamp}] -5 : จอดรถผิดที่/นอกโรงจอด"
             elif action == "driving_fast":
                 new_score -= 5
                 msg = "❌ หัก 5 คะแนน (ขับรถเร็ว)"
+                log_entry = f"[{timestamp}] -5 : ขับรถเร็ว/หวาดเสียว"
             elif action == "restore":
                 new_score = 100
                 msg = "✨ ฟื้นฟูคะแนนเรียบร้อย!"
+                log_entry = f"[{timestamp}] RESET : ฟื้นฟูคะแนนเต็ม 100"
             
-            sheet.update_cell(row_num, 12, new_score)
+            # รวมประวัติใหม่ (ขึ้นบรรทัดใหม่)
+            new_history = old_history + "\n" + log_entry if old_history else log_entry
+            
+            # อัปเดตทั้ง 2 ช่อง
+            sheet.update_cell(row_num, 12, new_score) # อัปเดตคะแนน
+            sheet.update_cell(row_num, 13, new_history) # อัปเดตประวัติ
+            
             return True, new_score, msg
         else:
             return False, 0, "ไม่พบข้อมูลนักเรียน"
@@ -142,7 +159,7 @@ def get_img_link(url):
     if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
     return url
 
-# --- ฟังก์ชันสร้าง PDF (นำกลับมาแล้ว) ---
+# --- ฟังก์ชันสร้าง PDF (อัปเดตใหม่: แสดงคะแนน + ประวัติ) ---
 def create_pdf(vals, img_url1, img_url2):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -154,7 +171,7 @@ def create_pdf(vals, img_url1, img_url2):
     except:
         font_name = 'Helvetica'
     
-    # Header
+    # 1. Header
     try:
         c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
     except: pass 
@@ -165,7 +182,7 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 90, width - 50, height - 90)
 
-    # Info
+    # 2. ข้อมูลส่วนตัว
     y = height - 130
     c.setFont(font_name, 16)
     
@@ -173,6 +190,12 @@ def create_pdf(vals, img_url1, img_url2):
     classroom = str(vals[3]); brand = str(vals[4]); 
     color = str(vals[5]); plate = str(vals[6]); 
     lic_status = str(vals[7]); tax_status = str(vals[8])
+    
+    # ดึงคะแนนและประวัติ
+    try: score = str(vals[11]) 
+    except: score = "100"
+    try: history_log = str(vals[12]) 
+    except: history_log = "-"
 
     c.drawString(60, y, f"ชื่อ-นามสกุล: {name}")
     c.drawString(60, y-25, f"รหัสนักเรียน: {std_id}")
@@ -182,39 +205,77 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(300, y-25, f"สีรถ: {color}")
     c.setFont(font_name, 20)
     c.drawString(300, y-55, f"ทะเบียน: {plate}")
-    c.rect(295, y-60, 150, 25) 
     
+    # --- กล่องคะแนนคงเหลือ ---
+    c.setStrokeColor(colors.black)
+    c.rect(450, y-10, 80, 50, fill=0) # กรอบ
+    c.setFont(font_name, 14)
+    c.drawCentredString(490, y+25, "คะแนนคงเหลือ")
+    
+    # เปลี่ยนสีคะแนนถ้าต่ำ
+    if int(score) < 60: c.setFillColor(colors.red)
+    else: c.setFillColor(colors.green)
+    
+    c.setFont(font_name, 30)
+    c.drawCentredString(490, y, score)
+    c.setFillColor(colors.black) # กลับมาดำ
+    # -----------------------
+
     c.setFont(font_name, 16)
     y_status = y - 90
     lic_mark = "(/)" if "มี" in lic_status else "( )"
     tax_mark = "(/)" if "ครบ" in tax_status or "ปกติ" in tax_status else "( )"
     c.drawString(60, y_status, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
     
+    # --- ส่วนแสดงประวัติ (History) ---
+    y_hist = y_status - 40
+    c.setFont(font_name, 14)
+    c.drawString(60, y_hist, "ประวัติการหักคะแนน / การฟื้นฟู:")
+    c.line(60, y_hist-5, 530, y_hist-5)
+    
+    y_hist -= 25
+    c.setFont(font_name, 12)
+    
+    # แยกบรรทัดและแสดงผล (แสดงแค่ 5 รายการล่าสุดเพื่อไม่ให้ล้น)
+    logs = history_log.split('\n')
+    logs = [l for l in logs if l.strip() != ""] # ลบบรรทัดว่าง
+    recent_logs = logs[-5:] # เอาแค่ 5 อันหลังสุด
+    
+    if not recent_logs:
+        c.drawString(80, y_hist, "- ไม่มีการบันทึกประวัติ -")
+        y_hist -= 20
+    else:
+        for log in recent_logs:
+            c.drawString(80, y_hist, log)
+            y_hist -= 15
+    # -----------------------------
+
     # Images
-    y_img = y_status - 220
+    y_img = y_hist - 40
     def draw_img(url, x, y):
         try:
             if url:
                 res = requests.get(url, timeout=5)
                 if res.status_code == 200:
                     img = ImageReader(io.BytesIO(res.content))
-                    c.drawImage(img, x, y, width=200, height=200, preserveAspectRatio=True)
-                else: c.drawString(x, y+100, "โหลดรูปไม่ได้")
-        except: c.drawString(x, y+100, "Error รูปภาพ")
+                    c.drawImage(img, x, y, width=180, height=180, preserveAspectRatio=True)
+                else: c.drawString(x, y+90, "โหลดรูปไม่ได้")
+        except: c.drawString(x, y+90, "Error รูปภาพ")
 
-    c.drawString(60, y_img + 210, "หลักฐานภาพถ่าย:")
+    c.setFont(font_name, 16)
+    c.drawString(60, y_img + 190, "หลักฐานภาพถ่าย:")
     draw_img(img_url1, 60, y_img)
     draw_img(img_url2, 300, y_img)
 
     # Signatures
-    y_sign = 100
+    y_sign = 80
     c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
     c.drawString(100, y_sign-20, f"({name})")
     c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
     c.drawString(330, y_sign-20, "(.......................................................)")
     
-    c.setFont(font_name, 12)
-    c.drawRightString(width - 30, 30, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    c.setFont(font_name, 10)
+    c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
     
     c.save()
     buffer.seek(0)
@@ -292,8 +353,8 @@ if st.session_state['page'] == 'student':
                                  link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
 
                             if link1: 
-                                # เพิ่ม 100 คะแนนเริ่มต้น (คอลัมน์ 12)
-                                sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, license_status, tax_status, link1, link2, 100])
+                                # เพิ่ม 100 คะแนน และ History ว่างๆ
+                                sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, license_status, tax_status, link1, link2, 100, ""])
                                 st.success(f"✅ บันทึกข้อมูล {name} เรียบร้อย!")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
@@ -384,19 +445,20 @@ elif st.session_state['page'] == 'teacher':
                         std_id = str(vals[2])
                         plate_num = str(vals[6])
                         
-                        # Images
                         img1 = get_img_link(str(vals[9])) if len(vals) > 9 else None
                         img2 = get_img_link(str(vals[10])) if len(vals) > 10 else None
                         
-                        # Score
                         try:
                             current_score = int(vals[11]) if len(vals) > 11 and str(vals[11]).isdigit() else 100
                         except:
                             current_score = 100
+                            
+                        # ดึงประวัติมาแสดงในเว็บด้วย (ถ้าอยากดู)
+                        try: history_txt = str(vals[12])
+                        except: history_txt = "-"
 
                         with st.expander(f"👤 {std_name} | 🆔 {std_id} | 🛵 {plate_num}", expanded=True):
                             
-                            # --- ส่วนที่ 1: ข้อมูลและคะแนน ---
                             c_info, c_score = st.columns([2, 1])
                             with c_info:
                                 st.write(f"**ชั้น:** {vals[3]} **ยี่ห้อ:** {vals[4]} **สี:** {vals[5]}")
@@ -405,7 +467,7 @@ elif st.session_state['page'] == 'teacher':
                                 if img2: ci2.image(img2, caption="ด้านข้าง")
                                 
                                 # ปุ่ม PDF
-                                if st.button(f"📄 โหลด PDF", key=f"gen_{i}"):
+                                if st.button(f"📄 โหลด PDF ประวัติ", key=f"gen_{i}"):
                                     with st.spinner("สร้าง PDF..."):
                                         try:
                                             pdf_bytes = create_pdf(vals, img1, img2)
@@ -425,6 +487,11 @@ elif st.session_state['page'] == 'teacher':
                                 st.markdown(f'<div class="score-box {score_class}">{current_score}</div>', unsafe_allow_html=True)
                                 if current_score < 60:
                                     st.caption("⚠️ คะแนนต่ำกว่าเกณฑ์!")
+                                
+                                # แสดงประวัติย่อๆ ในเว็บ
+                                if history_txt and history_txt != "-":
+                                    with st.expander("📜 ดูประวัติย้อนหลัง"):
+                                        st.text(history_txt)
                                 
                                 st.markdown("---")
                                 st.write("🚨 **ตัดคะแนน (-5):**")
