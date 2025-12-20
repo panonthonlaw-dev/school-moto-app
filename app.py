@@ -106,8 +106,7 @@ with c_logo:
         st.write("🏍️") 
 
 with c_title:
-    st.title("ระบบลงทะเบียนรถจักรยานยนต์")
-    st.title("โรงเรียนโพนทองพัฒนาวิทยา")
+    st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
 
 with c_btn:
     if st.session_state['page'] == 'student':
