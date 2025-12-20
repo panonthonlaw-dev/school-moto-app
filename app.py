@@ -294,7 +294,7 @@ elif st.session_state['page'] == 'teacher':
             with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
                 st.error("⚠️ คำเตือน: ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
                 
-                spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
+                spwd = st.text_input("รหัสลับ (เจ้าหน้าที่ระดับสูง)", type="password")
                 
                 if st.button("ยืนยันเลื่อนชั้น"):
                     if spwd == "Patwitnext":
