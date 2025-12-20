@@ -159,7 +159,7 @@ def get_img_link(url):
     if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
     return url
 
-# --- ฟังก์ชันสร้าง PDF (เวอร์ชันแก้ไข Error ค่าว่าง) ---
+# --- ฟังก์ชันสร้าง PDF เวอร์ชันปรับปรุง Layout ป้องกันภาพทับตัวอักษร ---
 def create_pdf(vals, img_url1, img_url2):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -171,7 +171,7 @@ def create_pdf(vals, img_url1, img_url2):
     except:
         font_name = 'Helvetica'
     
-    # Header
+    # 1. หัวกระดาษ
     try:
         c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
     except: pass 
@@ -182,8 +182,8 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 90, width - 50, height - 90)
 
-    # Info
-    y = height - 130
+    # 2. ข้อมูลส่วนตัว (ฝั่งซ้ายและขวา)
+    curr_y = height - 130
     c.setFont(font_name, 16)
     
     name = str(vals[1]); std_id = str(vals[2]); 
@@ -191,94 +191,98 @@ def create_pdf(vals, img_url1, img_url2):
     color = str(vals[5]); plate = str(vals[6]); 
     lic_status = str(vals[7]); tax_status = str(vals[8])
     
-    # --- แก้ไขจุดที่เกิด Error: ตรวจสอบคะแนน ---
+    # ตรวจสอบคะแนน
     try: 
         raw_score = str(vals[11]).strip()
-        if raw_score.isdigit():
-            score = raw_score
-        else:
-            score = "100" # ถ้าว่างหรือเป็นตัวอักษร ให้เป็น 100
+        score = raw_score if raw_score.isdigit() else "100"
     except: 
         score = "100"
 
+    # ดึงประวัติ
     try: 
         history_log = str(vals[12]) if vals[12] else "-"
     except: 
         history_log = "-"
 
-    c.drawString(60, y, f"ชื่อ-นามสกุล: {name}")
-    c.drawString(60, y-25, f"รหัสนักเรียน: {std_id}")
-    c.drawString(60, y-50, f"ระดับชั้น: {classroom}")
+    # แสดงข้อมูลหลัก
+    c.drawString(60, curr_y, f"ชื่อ-นามสกุล: {name}")
+    c.drawString(300, curr_y, f"ยี่ห้อ: {brand}")
     
-    c.drawString(300, y, f"ยี่ห้อ: {brand}")
-    c.drawString(300, y-25, f"สีรถ: {color}")
-    c.setFont(font_name, 20)
-    c.drawString(300, y-55, f"ทะเบียน: {plate}")
+    curr_y -= 25
+    c.drawString(60, curr_y, f"รหัสนักเรียน: {std_id}")
+    c.drawString(300, curr_y, f"สีรถ: {color}")
     
-    # --- กล่องคะแนนคงเหลือ ---
+    curr_y -= 25
+    c.drawString(60, curr_y, f"ระดับชั้น: {classroom}")
+    c.setFont(font_name, 18)
+    c.drawString(300, curr_y, f"ทะเบียน: {plate}")
+    
+    # กล่องคะแนนคงเหลือ (มุมบนขวา)
     c.setStrokeColor(colors.black)
-    c.rect(450, y-10, 80, 50, fill=0) 
+    c.rect(460, height - 120, 80, 50, fill=0) 
     c.setFont(font_name, 14)
-    c.drawCentredString(490, y+25, "คะแนนคงเหลือ")
-    
-    # เปลี่ยนสีคะแนน
+    c.drawCentredString(500, height - 85, "คะแนนคงเหลือ")
     if int(score) < 60: c.setFillColor(colors.red)
     else: c.setFillColor(colors.green)
-    
-    c.setFont(font_name, 30)
-    c.drawCentredString(490, y, score)
+    c.setFont(font_name, 28)
+    c.drawCentredString(500, height - 110, score)
     c.setFillColor(colors.black)
 
+    # สถานะเอกสาร
+    curr_y -= 35
     c.setFont(font_name, 16)
-    y_status = y - 90
     lic_mark = "(/)" if "มี" in lic_status else "( )"
     tax_mark = "(/)" if "ครบ" in tax_status or "ปกติ" in tax_status else "( )"
-    c.drawString(60, y_status, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
+    c.drawString(60, curr_y, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
     
-    # --- ส่วนแสดงประวัติ ---
-    y_hist = y_status - 40
-    c.setFont(font_name, 14)
-    c.drawString(60, y_hist, "ประวัติการหักคะแนน / การฟื้นฟู:")
-    c.line(60, y_hist-5, 530, y_hist-5)
+    # 3. ส่วนแสดงประวัติ (ปรับระยะให้แน่นอน)
+    curr_y -= 30
+    c.setFont(font_name, 15)
+    c.drawString(60, curr_y, "ประวัติการหักคะแนน / การฟื้นฟู:")
+    c.line(60, curr_y - 3, 530, curr_y - 3)
     
-    y_hist -= 25
+    curr_y -= 20
     c.setFont(font_name, 12)
-    
     logs = history_log.split('\n')
     logs = [l for l in logs if l.strip() != ""] 
-    recent_logs = logs[-5:] 
+    recent_logs = logs[-5:] # แสดง 5 รายการล่าสุด
     
     if not recent_logs:
-        c.drawString(80, y_hist, "- ไม่มีการบันทึกประวัติ -")
-        y_hist -= 20
+        c.drawString(80, curr_y, "- ไม่มีการบันทึกประวัติ -")
+        curr_y -= 20
     else:
         for log in recent_logs:
-            c.drawString(80, y_hist, log)
-            y_hist -= 15
+            c.drawString(80, curr_y, log)
+            curr_y -= 15 # ระยะห่างแต่ละบรรทัดประวัติ
 
-    # Images
-    y_img = y_hist - 40
+    # 4. ส่วนแสดงรูปภาพ (ขยับลงมาด้านล่างประวัติ)
+    curr_y -= 20 # เว้นช่องไฟก่อนขึ้นหัวข้อรูป
+    c.setFont(font_name, 16)
+    c.drawString(60, curr_y, "หลักฐานภาพถ่าย:")
+    
+    img_y_pos = curr_y - 160 # กำหนดตำแหน่ง Y สำหรับวางรูปภาพ
+    
     def draw_img(url, x, y):
         try:
             if url:
                 res = requests.get(url, timeout=5)
                 if res.status_code == 200:
                     img = ImageReader(io.BytesIO(res.content))
-                    c.drawImage(img, x, y, width=180, height=180, preserveAspectRatio=True)
-                else: c.drawString(x, y+90, "โหลดรูปไม่ได้")
-        except: c.drawString(x, y+90, "Error รูปภาพ")
+                    # ปรับขนาดรูปให้เล็กลงเล็กน้อยเพื่อความปลอดภัย (170x170)
+                    c.drawImage(img, x, y, width=170, height=170, preserveAspectRatio=True)
+                else: c.drawString(x, y + 80, "โหลดรูปไม่ได้")
+        except: c.drawString(x, y + 80, "Error รูปภาพ")
 
+    draw_img(img_url1, 80, img_y_pos)
+    draw_img(img_url2, 310, img_y_pos)
+
+    # 5. ลายเซ็น (วางไว้ท้ายสุดของหน้า)
+    y_sign = 100
     c.setFont(font_name, 16)
-    c.drawString(60, y_img + 190, "หลักฐานภาพถ่าย:")
-    draw_img(img_url1, 60, y_img)
-    draw_img(img_url2, 300, y_img)
-
-    # Signatures
-    y_sign = 80
     c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
-    c.drawString(100, y_sign-20, f"({name})")
+    c.drawString(100, y_sign - 20, f"({name})")
     c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
-    c.drawString(330, y_sign-20, "(.......................................................)")
+    c.drawString(330, y_sign - 20, "(.......................................................)")
     
     c.setFont(font_name, 10)
     c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
