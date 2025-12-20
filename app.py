@@ -249,7 +249,7 @@ elif st.session_state['page'] == 'teacher':
                 filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
                 
                 if len(filtered_df) == 0:
-                    st.warning("❌ ไม่พบข้อมูลที่ค้นหา")
+                    st.warning("❌ ไม่พบข้อมูลที่ค้นหาหรือเป็นรถไม่ลงทะเบียน")
                 else:
                     st.success(f"✅ พบข้อมูล {len(filtered_df)} รายการ")
                     
