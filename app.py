@@ -149,71 +149,82 @@ elif menu == "👮 ครูตรวจสอบ":
                 st.error(f"ดึงข้อมูลไม่ได้: {e}")
         
         if 'df' in st.session_state:
-            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
+            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน/ชั้น)")
             df = st.session_state['df']
             
-            # กรองข้อมูล
             if search:
+                # แก้ไขการค้นหาให้ครอบคลุมทุกคอลัมน์ (แปลงเป็น string ก่อนค้นหา)
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
             st.write(f"พบข้อมูล {len(df)} รายการ")
             
+            # --- ฟังก์ชันดึงรูป (เหมือนเดิม) ---
+            def get_reliable_image_url(url):
+                url = str(url).strip()
+                if not url or url == "": return None
+                import re
+                file_id = None
+                patterns = [r'/d/([a-zA-Z0-9_-]+)', r'id=([a-zA-Z0-9_-]+)']
+                for p in patterns:
+                    match = re.search(p, url)
+                    if match:
+                        file_id = match.group(1)
+                        break
+                if file_id:
+                    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
+                return url
+
             # วนลูปแสดงผล
             for i, row in df.iterrows():
-                # ใช้ .get เพื่อความปลอดภัย
                 plate_txt = row.get('ทะเบียน', '-')
                 name_txt = row.get('ชื่อ-นามสกุล', '-')
 
-                with st.expander(f"{plate_txt} : {name_txt}"):
+                # แสดงหัวข้อ Expander
+                with st.expander(f"🛵 {plate_txt} | 👤 {name_txt}"):
                     c_img, c_text = st.columns([2,1])
                     
                     with c_img:
                         vals = row.tolist() 
-                        
-                        # ดึงลิงก์มาเหมือนเดิม
-                        link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
-                        link2 = str(vals[-1]).strip() if len(vals) >= 1 else ""
+                        # ดึงลิงก์ (ช่องรองสุดท้าย และ ช่องสุดท้าย)
+                        raw_link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
+                        raw_link2 = str(vals[-1]).strip() if len(vals) >= 1 else ""
+
+                        img_url1 = get_reliable_image_url(raw_link1)
+                        img_url2 = get_reliable_image_url(raw_link2)
 
                         cols = st.columns(2)
-                        
-                        # --- ฟังก์ชันแปลงลิงก์ให้เป็นรูปตัวอย่าง (Thumbnail) ---
-                        def get_thumb(url):
-                            if "id=" in url:
-                                # กรณีลิงก์แบบ uc?id=...
-                                fid = url.split('id=')[1].split('&')[0]
-                                return f"https://drive.google.com/thumbnail?id={fid}&sz=w600"
-                            elif "/d/" in url:
-                                # กรณีลิงก์แบบ view/preview
-                                fid = url.split('/d/')[1].split('/')[0]
-                                return f"https://drive.google.com/thumbnail?id={fid}&sz=w600"
-                            return url
-
-                        # แสดงรูป 1
-                        if "http" in link1:
-                            thumb1 = get_thumb(link1)
-                            # แสดงรูป พร้อมใส่ลิงก์จริงให้กดดูได้ถ้าภาพไม่ขึ้น
-                            cols[0].image(thumb1, caption="ด้านหน้า", use_column_width=True)
-                            cols[0].markdown(f"[🔗 กดเพื่อดูรูปเต็ม]({link1})", unsafe_allow_html=True)
+                        if img_url1:
+                            cols[0].image(img_url1, caption="ด้านหน้า", use_column_width=True)
                         else:
                             cols[0].info("ไม่มีรูป")
 
-                        # แสดงรูป 2
-                        if "http" in link2:
-                            thumb2 = get_thumb(link2)
-                            cols[1].image(thumb2, caption="ด้านข้าง", use_column_width=True)
-                            cols[1].markdown(f"[🔗 กดเพื่อดูรูปเต็ม]({link2})", unsafe_allow_html=True)
-                        else:
-                            cols[1].empty()
-                            
+                        if img_url2:
+                            cols[1].image(img_url2, caption="ด้านข้าง", use_column_width=True)
+                        
                     with c_text:
+                        # --- 🔴 ส่วนที่เพิ่ม: แสดงชื่อเจ้าของรถชัดๆ ---
+                        st.markdown(f"### 👤 {name_txt}")
+                        st.write(f"**รหัสนักเรียน:** {row.get('รหัสนักเรียน', '-')}")
+                        st.markdown("---")
+                        # ----------------------------------------
+                        
+                        st.write(f"**ทะเบียน:** {plate_txt}")
                         st.write(f"**ชั้น:** {row.get('ชั้น', '-')}")
                         st.write(f"**ยี่ห้อ:** {row.get('ยี่ห้อ', '-')}")
-                        st.write(f"**สี:** {row.get('สีรถ', row.get('สี', '-'))}")
+                        st.write(f"**สี:** {row.get('สี', '-')}")
                         
                         st.markdown("---")
-                        st.write(f"**ใบขับขี่:** {row.get('ใบขับขี่', '-')}")
-                        st.write(f"**พรบ./ภาษี:** {row.get('พรบ_ภาษี', '-')}")
                         
-                        # แสดงลิงก์ดิบๆ เพื่อเช็ค (Debug)
-                        with st.expander("ดูลิงก์ต้นฉบับ (สำหรับแก้ปัญหา)"):
-                            st.code(f"Link1: {link1}\nLink2: {link2}")
+                        # สถานะเอกสาร (ใส่สีให้ดูง่าย)
+                        lic = row.get('ใบขับขี่', '-')
+                        tax = row.get('พรบ_ภาษี', '-')
+                        
+                        if "มี" in str(lic): st.success(f"ใบขับขี่: {lic}")
+                        else: st.error(f"ใบขับขี่: {lic}")
+                            
+                        if "ครบ" in str(tax): st.success(f"พรบ./ภาษี: {tax}")
+                        else: st.error(f"พรบ./ภาษี: {tax}")
+                        
+                        # ปุ่ม Debug
+                        with st.expander("🔧 Link ต้นฉบับ"):
+                            st.code(f"Link1: {raw_link1}\nLink2: {raw_link2}")
