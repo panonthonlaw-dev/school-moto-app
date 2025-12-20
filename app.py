@@ -295,9 +295,9 @@ elif st.session_state['page'] == 'teacher':
             
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและย้อนกลับไม่ได้")
-                spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
-                if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
+                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรเรียกคืนไม่ได้")
+                spwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key="upgrade_pwd")
+                if st.button("ปรับปรุงการเลื่อนชั้นปี") and spwd == "Patwitnext":
                     try:
                         sheet = connect_gsheet()
                         d = sheet.get_all_values()
