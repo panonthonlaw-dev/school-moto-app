@@ -234,52 +234,67 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
-            # (Part 3.2 ต่อจากด้านบน)
-            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
-            if search: 
-                df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
-            st.write(f"พบข้อมูล {len(df)} รายการ")
+            # (Part 3.2 วางต่อจาก Dashboard)
             
-            def get_img(url):
-                url = str(url).strip()
-                if not url: return None
-                import re
-                file_id = None
-                match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
-                if match: file_id = match.group(1)
-                else: 
-                    match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
-                    if match: file_id = match.group(1)
-                if file_id: 
-                    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
-                return url
-
-            for i, row in df.iterrows():
-                vals = row.tolist()
-                name_t = str(vals[1]) if len(vals)>1 else "-"
-                plate_t = str(vals[6]) if len(vals)>6 else "-"
-                img1 = get_img(str(vals[-2])) if len(vals)>=2 else None
-                img2 = get_img(str(vals[-1])) if len(vals)>=1 else None
+            # --- ส่วนค้นหา ---
+            search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
+            
+            # 🔴 LOGIC ใหม่: ถ้าช่องค้นหาว่างเปล่า ให้หยุดทำงานตรงนี้ ไม่แสดงข้อมูล
+            if not search:
+                st.info("👆 กรุณาพิมพ์ **ชื่อ** หรือ **เลขทะเบียน** เพื่อเรียกดูข้อมูล")
+            
+            # 🟢 ถ้ามีการพิมพ์ค้นหา ค่อยทำงานต่อ
+            else:
+                # กรองข้อมูล
+                filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
                 
-                with st.expander(f"🛵 {plate_t} | {name_t}"):
-                    ci, ct = st.columns([2,1])
-                    with ci:
-                        cc = st.columns(2)
-                        if img1: cc[0].image(img1, caption="หลัง")
-                        if img2: cc[1].image(img2, caption="ข้าง")
-                    with ct:
-                        st.write(f"**ชื่อ:** {name_t}")
-                        st.write(f"**รหัส:** {str(vals[2]) if len(vals)>2 else '-'}")
-                        st.write(f"**ทะเบียน:** {plate_t}")
-                        st.write(f"**ชั้น:** {str(vals[3]) if len(vals)>3 else '-'}")
-                        # บรรทัดที่เคยมีปัญหา คือบรรทัดนี้ครับ
-                        st.write(f"**รุ่น/สี:** {str(vals[4])} {str(vals[5])}")
+                if len(filtered_df) == 0:
+                    st.warning("❌ ไม่พบข้อมูลที่ค้นหา")
+                else:
+                    st.success(f"✅ พบข้อมูล {len(filtered_df)} รายการ")
+                    
+                    # ฟังก์ชันแปลงลิงก์รูป (Def ไว้ข้างในเพื่อให้เรียกใช้ได้เฉพาะตอนค้นหา)
+                    def get_img(url):
+                        url = str(url).strip()
+                        if not url: return None
+                        import re
+                        file_id = None
+                        match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+                        if match: file_id = match.group(1)
+                        else: 
+                            match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
+                            if match: file_id = match.group(1)
+                        if file_id: 
+                            return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
+                        return url
 
+                    # วนลูปแสดงผล (ใช้ filtered_df แทน df ปกติ)
+                    for i, row in filtered_df.iterrows():
+                        vals = row.tolist()
+                        name_t = str(vals[1]) if len(vals)>1 else "-"
+                        plate_t = str(vals[6]) if len(vals)>6 else "-"
+                        img1 = get_img(str(vals[-2])) if len(vals)>=2 else None
+                        img2 = get_img(str(vals[-1])) if len(vals)>=1 else None
+                        
+                        with st.expander(f"🛵 {plate_t} | {name_t}"):
+                            ci, ct = st.columns([2,1])
+                            with ci:
+                                cc = st.columns(2)
+                                if img1: cc[0].image(img1, caption="หน้า")
+                                if img2: cc[1].image(img2, caption="ข้าง")
+                            with ct:
+                                st.write(f"**ชื่อ:** {name_t}")
+                                st.write(f"**รหัส:** {str(vals[2]) if len(vals)>2 else '-'}")
+                                st.write(f"**ทะเบียน:** {plate_t}")
+                                st.write(f"**ชั้น:** {str(vals[3]) if len(vals)>3 else '-'}")
+                                st.write(f"**รุ่น/สี:** {str(vals[4])} {str(vals[5])}")
+
+            # --- ส่วนเลื่อนชั้นปี (แยกออกมาไว้นอก Loop ค้นหา เพื่อให้กดใช้ได้เสมอ) ---
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
                 st.error("⚠️ คำเตือน: ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
                 
-                spwd = st.text_input("รหัสลับ (เจ้าหน้าที่ระดับสูง)", type="password")
+                spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
                 
                 if st.button("ยืนยันเลื่อนชั้น"):
                     if spwd == "Patwitnext":
