@@ -76,34 +76,65 @@ def connect_gsheet():
 def update_point(std_id, action):
     try:
         sheet = connect_gsheet()
+        # ค้นหาแถวโดยใช้รหัสนักเรียน (คอลัมน์ที่ 3 หรือ C)
         cell = sheet.find(str(std_id), in_column=3)
         if cell:
             row_num = cell.row
+            
+            # 1. ดึงคะแนนปัจจุบัน (คอลัมน์ที่ 12 / L)
             current_val = sheet.cell(row_num, 12).value
-            score = int(current_val) if (current_val and str(current_val).isdigit()) else 100
+            
+            # ป้องกันค่าว่าง หรือค่าที่ไม่ใช่ตัวเลข
+            if not current_val or str(current_val).strip() == "":
+                score = 100
+            else:
+                try:
+                    score = int(current_val)
+                except:
+                    score = 100
+            
+            # 2. ดึงประวัติเดิม (คอลัมน์ที่ 13 / M)
             old_history = sheet.cell(row_num, 13).value
-            if not old_history or old_history == "-": old_history = ""
+            if not old_history or old_history == "-": 
+                old_history = ""
+            
+            # 3. คำนวณคะแนนใหม่และสร้าง Log
             new_score = score
             log_msg = ""
             timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
+            
             if action == "no_helmet":
-                new_score -= 5
+                new_score = score - 5
                 log_msg = f"[{timestamp}] หัก 5 คะแนน : ไม่สวมหมวกกันน็อค"
             elif action == "wrong_parking":
-                new_score -= 5
+                new_score = score - 5
                 log_msg = f"[{timestamp}] หัก 5 คะแนน : จอดรถผิดที่"
             elif action == "driving_fast":
-                new_score -= 5
+                new_score = score - 5
                 log_msg = f"[{timestamp}] หัก 5 คะแนน : ขับรถเร็ว/หวาดเสียว"
             elif action == "restore":
                 new_score = 100
                 log_msg = f"[{timestamp}] RESET : ฟื้นฟูคะแนนเต็ม 100"
-            updated_history = old_history + "\n" + log_msg if old_history else log_msg
-            sheet.update_cell(row_num, 12, new_score)
+            
+            # จำกัดคะแนนไม่ให้ต่ำกว่า 0
+            if new_score < 0: new_score = 0
+            
+            # 4. อัปเดตข้อมูลกลับไปยัง Google Sheets
+            updated_history = (old_history + "\n" + log_msg).strip()
+            
+            # สั่งอัปเดตแบบระบุตำแหน่งชัดเจน
+            sheet.update_cell(row_num, 12, int(new_score))
             sheet.update_cell(row_num, 13, updated_history)
-            return True, new_score, "สำเร็จ"
-        return False, 0, "ไม่พบข้อมูล"
-    except Exception as e: return False, 0, f"Error: {e}"
+            
+            # ล้าง cache ใน session state เพื่อให้โหลดข้อมูลใหม่
+            if 'df' in st.session_state:
+                del st.session_state.df
+                
+            return True, new_score, "บันทึกสำเร็จ"
+        else:
+            return False, 0, "ไม่พบรหัสนักเรียนในระบบ"
+    except Exception as e:
+        return False, 0, f"เกิดข้อผิดพลาด: {str(e)}"
 
 def upload_to_drive(file_obj, filename):
     if "script.google.com" not in GAS_APP_URL:
