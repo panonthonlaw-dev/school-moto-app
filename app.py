@@ -183,7 +183,7 @@ if st.session_state['page'] == 'student':
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
+        std_id = c2.text_input("รหัสนักเรียน/ครูบุคลากรพ่อค้าแม่ค้า กรอกวันเดือนปีเกิด เช่น 15072520")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู,บุคลากร","พ่อค้าแม่ค้า"])
         room = c4.text_input("ห้อง/เบอร์โทร")
