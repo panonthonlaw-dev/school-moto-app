@@ -208,7 +208,7 @@ if st.session_state['page'] == 'student':
         if st.button("🔐 สำหรับเจ้าหน้าที่/ตำรวจนักเรียน", use_container_width=True):
             go_to_teacher()
             st.rerun()
-            # ---------------------------------------
+           # ---------------------------------------
 # 👮 หน้าเจ้าหน้าที่ตรวจสอบ
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
@@ -258,7 +258,9 @@ elif st.session_state['page'] == 'teacher':
                     st.warning("ยังไม่มีข้อมูล")
             except Exception as e: 
                 st.error(f"ดึงข้อมูลไม่ได้: {e}")
-                if 'df' in st.session_state:
+        
+        # --- ส่วนที่เคยมีปัญหา (จัดย่อหน้าให้แล้ว) ---
+        if 'df' in st.session_state:
             df = st.session_state['df']
             
             # --- ส่วนค้นหา + ระบบตัดคะแนน ---
@@ -286,7 +288,7 @@ elif st.session_state['page'] == 'teacher':
                         std_id = str(vals[2])
                         plate_num = str(vals[6])
                         
-                        # ดึงคะแนน (ถ้าไม่มีให้เป็น 100) - สมมติอยู่คอลัมน์ index 11 (คือ L)
+                        # ดึงคะแนน (ถ้าไม่มีให้เป็น 100)
                         try:
                             current_score = int(vals[11]) if len(vals) > 11 and str(vals[11]).isdigit() else 100
                         except:
@@ -337,15 +339,5 @@ elif st.session_state['page'] == 'teacher':
                                     restore_code = st.text_input("ใส่รหัสลับ", type="password", key=f"code_{std_id}")
                                     if st.button("ยืนยันฟื้นฟู", key=f"res_{std_id}"):
                                         if restore_code == SECRET_RESTORE_CODE:
-                                            res, ns, msg = update_point(std_id, "restore")
-                                            if res:
-                                                st.success(msg)
-                                                time.sleep(1)
-                                                st.rerun()
-                                        else:
-                                            st.error("❌ รหัสลับไม่ถูกต้อง")
-                            st.markdown("---")
-        
-
-def go_to_student():
-    st.session_state['page'] = 'student'
+                                            res, ns, msg = update_point(std_id,
+                                                                        
