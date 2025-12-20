@@ -288,30 +288,56 @@ elif st.session_state['page'] == 'teacher':
             
             st.markdown("---")
             with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
-                spwd = st.text_input("รหัสลับยืนยัน", type="password")
-                if st.button("เริ่มการเลื่อนชั้นปี"):
+                st.error("### ⚠️ คำเตือนสำคัญ!")
+                st.markdown("""
+                **โปรดระวัง:** การกดปุ่มเลื่อนชั้นปีจะเป็นการแก้ไขข้อมูลนักเรียนทุกคนในระบบ **"แบบถาวร"** - ม.1 -> ม.2, ม.5 -> ม.6 ฯลฯ
+                - ม.3 และ ม.6 จะถูกเปลี่ยนสถานะเป็น 'จบการศึกษา 🎓'
+                - **ไม่สามารถกู้คืนข้อมูลเดิมหรือย้อนกลับ (Undo) ได้** *กรุณาตรวจสอบข้อมูลและมั่นใจว่าต้องการดำเนินการจริงๆ ก่อนใส่รหัสยืนยัน*
+                """)
+                
+                spwd = st.text_input("กรุณาใส่รหัสลับเพื่อยืนยันการเปลี่ยนแปลง", type="password")
+                
+                if st.button("🚀 เริ่มต้นกระบวนการเลื่อนชั้นปี (ระวัง!)", use_container_width=True):
                     if spwd == "Patwitnext":
                         try:
-                            sheet = connect_gsheet()
-                            d = sheet.get_all_values()
-                            h = d[0]; r = d[1:]
-                            l_idx = 3 
-                            new_r = []
-                            chg = 0
-                            for row in r:
-                                ol = row[l_idx]; nl = ol
-                                if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                                elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                                elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                                elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                                elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                                elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                                if ol!=nl: row[l_idx]=nl; chg+=1
-                                new_r.append(row)
-                            if chg > 0:
-                                sheet.clear()
-                                sheet.update('A1', [h] + new_r)
-                                st.success(f"สำเร็จ {chg} รายการ")
-                            else: st.info("ไม่มีข้อมูลเปลี่ยนแปลง")
-                        except Exception as e: st.error(f"Error: {e}")
-                    else: st.error("รหัสผิด")
+                            with st.spinner("⏳ กำลังดำเนินการปรับปรุงข้อมูลชั้นปี..."):
+                                sheet = connect_gsheet()
+                                d = sheet.get_all_values()
+                                if len(d) <= 1:
+                                    st.info("ไม่มีข้อมูลนักเรียนในระบบ")
+                                else:
+                                    h = d[0] # หัวตาราง
+                                    r = d[1:] # ข้อมูล
+                                    l_idx = 3 # คอลัมน์ระดับชั้น (D)
+                                    new_r = []
+                                    chg = 0
+                                    
+                                    for row in r:
+                                        ol = row[l_idx]
+                                        nl = ol
+                                        # ตรรกะการเลื่อนชั้น
+                                        if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                        elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                        elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                        elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                        elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                        elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                        
+                                        if ol != nl:
+                                            row[l_idx] = nl
+                                            chg += 1
+                                        new_r.append(row)
+                                    
+                                    if chg > 0:
+                                        sheet.clear()
+                                        sheet.update('A1', [h] + new_r)
+                                        st.success(f"✨ ดำเนินการสำเร็จ! ปรับปรุงข้อมูลทั้งหมด {chg} รายการ")
+                                        # ล้างแคชข้อมูลเพื่อให้ดึงข้อมูลใหม่มาแสดง
+                                        if 'df' in st.session_state:
+                                            del st.session_state.df
+                                    else:
+                                        st.info("ไม่พบข้อมูลที่ตรงตามเงื่อนไขการเลื่อนชั้นปี")
+                        except Exception as e:
+                            st.error(f"เกิดข้อผิดพลาดทางเทคนิค: {e}")
+                    else:
+                        st.error("❌ รหัสลับไม่ถูกต้อง ไม่สามารถดำเนินการได้")
