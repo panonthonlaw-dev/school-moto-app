@@ -69,10 +69,7 @@ st.markdown("""
         /* ซ่อนปุ่ม Deploy (ปุ่ม GitHub) */
         .stDeployButton {
             visibility: hidden;
-        }
-        
-        [data-testid="stToolbar"] {
-            visibility: hidden;
+       
         }
         /* ซ่อนขีดสีรุ้งด้านบนสุดของจอ */
         [data-testid="stDecoration"] {
