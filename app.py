@@ -161,8 +161,12 @@ if menu == "📝 นักเรียนลงทะเบียน":
                 st.warning("กรุณากรอกข้อมูลและแนบรูปอย่างน้อย 1 รูป")
 
 elif menu == "👮 ครูตรวจสอบ":
-    pwd = st.text_input("รหัสผ่านเจ้าหน้าที่", type="password")
+    st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
+    pwd = st.text_input("กรอกรหัสผ่านเพื่อเข้าถึงข้อมูล", type="password")
+    
+    # --- เช็คความถูกต้องของรหัสผ่าน ---
     if pwd == ADMIN_PASSWORD:
+        # ถ้ารหัสถูก ให้แสดงปุ่มโหลดและข้อมูล
         if st.button("โหลดข้อมูลล่าสุด"):
             try:
                 data = connect_gsheet().get_all_records()
@@ -180,9 +184,7 @@ elif menu == "👮 ครูตรวจสอบ":
             st.markdown("### 📊 สรุปภาพรวม")
             total_cars = len(df)
             
-            # คำนวณสถิติ
             try:
-                # พยายามหาคอลัมน์ใบขับขี่ (index 7) และ พรบ (index 8)
                 has_license = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
                 has_tax = df[df.iloc[:, 8].astype(str).str.contains("ครบ|ปกติ", na=False)].shape[0]
             except:
@@ -219,13 +221,58 @@ elif menu == "👮 ครูตรวจสอบ":
                     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
                 return url
 
-            # --- วนลูปแสดงข้อมูล (สำคัญ: ย่อหน้าต้องตรงกัน) ---
+            # --- วนลูปแสดงข้อมูล ---
             for i, row in df.iterrows():
                 vals = row.tolist()
                 
-                # ดึงข้อมูล (เช็คความยาวเพื่อป้องกัน Error)
                 name_txt = str(vals[1]) if len(vals) > 1 else "-"
                 std_id_txt = str(vals[2]) if len(vals) > 2 else "-"
                 level_txt = str(vals[3]) if len(vals) > 3 else "-"
                 brand_txt = str(vals[4]) if len(vals) > 4 else "-"
-                color_txt = str
+                color_txt = str(vals[5]) if len(vals) > 5 else "-"
+                plate_txt = str(vals[6]) if len(vals) > 6 else "-"
+                
+                raw_link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
+                raw_link2 = str(vals[-1]).strip() if len(vals) >= 1 else ""
+
+                img_url1 = get_reliable_image_url(raw_link1)
+                img_url2 = get_reliable_image_url(raw_link2)
+
+                with st.expander(f"🛵 {plate_txt} | 👤 {name_txt}"):
+                    c_img, c_text = st.columns([2,1])
+                    
+                    with c_img:
+                        cols = st.columns(2)
+                        if img_url1: cols[0].image(img_url1, caption="ด้านหน้า", use_column_width=True)
+                        else: cols[0].info("ไม่มีรูป")
+
+                        if img_url2: cols[1].image(img_url2, caption="ด้านข้าง", use_column_width=True)
+                        
+                    with c_text:
+                        st.markdown(f"### 👤 {name_txt}")
+                        st.write(f"**รหัส:** {std_id_txt}")
+                        st.markdown("---")
+                        st.write(f"**ทะเบียน:** {plate_txt}")
+                        st.write(f"**ชั้น:** {level_txt}")
+                        st.write(f"**ยี่ห้อ:** {brand_txt}")
+                        st.write(f"**สี:** {color_txt}")
+                        st.markdown("---")
+                        
+                        lic = str(vals[7]) if len(vals) > 7 else "-"
+                        tax = str(vals[8]) if len(vals) > 8 else "-"
+                        
+                        if "http" in lic: lic = row.get('ใบขับขี่', '-')
+                        if "http" in tax: tax = row.get('พรบ_ภาษี', '-')
+
+                        if "มี" in str(lic): st.success(f"ใบขับขี่: {lic}")
+                        else: st.error(f"ใบขับขี่: {lic}")
+                            
+                        if "ครบ" in str(tax) or "ปกติ" in str(tax): st.success(f"พรบ./ภาษี: {tax}")
+                        else: st.error(f"พรบ./ภาษี: {tax}")
+                        
+                        with st.expander("🔧 Link ต้นฉบับ"):
+                             st.code(f"Link1: {raw_link1}\nLink2: {raw_link2}")
+    
+    # 🔴🔴 ส่วนแจ้งเตือนเมื่อใส่รหัสผิด (เพิ่มใหม่ตรงนี้) 🔴🔴
+    elif pwd != "": 
+        st.error("❌ รหัสผ่านไม่ถูกต้อง! กรุณาตรวจสอบอีกครั้ง")
