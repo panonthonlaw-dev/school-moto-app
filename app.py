@@ -93,7 +93,7 @@ if menu == "📝 นักเรียนลงทะเบียน":
             fname = sub_c2.text_input("ชื่อ-นามสกุล (ไม่ต้องใส่คำนำหน้า)")
             name = f"{prefix}{fname}" if fname else ""
 
-        std_id = c2.text_input("รหัสนักเรียน")
+        std_id = c2.text_input("รหัสนักเรียน หรือ หมายเลขร้านค้า")
         
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","บุคลากร","ผู้ประกอบการ"])
@@ -122,8 +122,8 @@ if menu == "📝 นักเรียนลงทะเบียน":
                 try:
                     # 🔴🔴 1. เช็คก่อนว่ามีรหัสนักเรียนซ้ำไหม 🔴🔴
                     sheet = connect_gsheet()
-                    # ดึงข้อมูลรหัสนักเรียนทั้งหมด (คอลัมน์ที่ 3) มาตรวจสอบ
-                    existing_ids = sheet.col_values(3) 
+                    # ดึงข้อมูลชื่อ-สกุลทั้งหมด (คอลัมน์ที่ 2) มาตรวจสอบ
+                    existing_ids = sheet.col_values(2) 
                     
                     if std_id in existing_ids:
                         # ถ้าเจอซ้ำ ให้แจ้งเตือนและหยุดทำงานทันที
