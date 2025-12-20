@@ -82,40 +82,31 @@ menu = st.sidebar.radio("เมนู", ["📝 นักเรียนลงท
 if menu == "📝 นักเรียนลงทะเบียน":
     st.info("กรุณากรอกข้อมูลและแนบรูปรถ")
     with st.form("reg_form"):
-        # --- แถว 1: แก้ไขตรงนี้ (เพิ่มคำนำหน้า) ---
+        # --- ส่วนกรอกข้อมูล (เหมือนเดิม) ---
         c1, c2 = st.columns(2)
         
-        # แบ่งช่อง c1 ออกเป็น 2 ส่วน (คำนำหน้า 35% : ชื่อ 65%)
         with c1:
             sub_c1, sub_c2 = st.columns([1.2, 2]) 
-            prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง",])
-            
-            # ถ้าเลือกอื่นๆ ให้พิมพ์เองได้ (แต่ต้องซ่อนไว้ก่อนถ้าไม่ได้เลือก)
+            prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ว่าที่ร้อยตรี", "ครู", "อื่นๆ"])
             if prefix == "อื่นๆ":
                 prefix = sub_c1.text_input("ระบุคำนำหน้า", key="other_prefix")
-                
             fname = sub_c2.text_input("ชื่อ-นามสกุล (ไม่ต้องใส่คำนำหน้า)")
-            
-            # รวมคำนำหน้ากับชื่อเข้าด้วยกัน เพื่อส่งไปเก็บในตัวแปร name เดิม
             name = f"{prefix}{fname}" if fname else ""
 
         std_id = c2.text_input("รหัสนักเรียน")
         
-        # --- แถว 2 ---
         c3, c4 = st.columns(2)
-        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู/บุคลากร","ผู้ประกอบการ"])
+        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","บุคลากร","ผู้ประกอบการ"])
         room = c4.text_input("ห้อง")
         
         st.markdown("---")
         
-        # --- แถว 3 ---
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
         color = c6.text_input("สีรถ")
         
         plate = st.text_input("ทะเบียน พร้อมจังหวัด(ตัวอย่าง กก1234 ร้อยเอ็ด)")
         
-        # --- ข้อมูลเอกสาร ---
         st.markdown("##### 📄 ข้อมูลเอกสาร")
         doc_col1, doc_col2 = st.columns(2)
         license_status = doc_col1.radio("ใบขับขี่", ["✅ มีใบขับขี่", "❌ ไม่มี"], horizontal=True)
@@ -123,42 +114,53 @@ if menu == "📝 นักเรียนลงทะเบียน":
         
         st.markdown("### 📸 ถ่ายรูปรถ (2 มุม)")
         col_img1, col_img2 = st.columns(2)
-        photo1 = col_img1.file_uploader("1. รูปด้านหลัง (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
+        photo1 = col_img1.file_uploader("1. รูปด้านหน้า (เห็นทะเบียน)", type=['jpg','png','jpeg'], key="p1")
         photo2 = col_img2.file_uploader("2. รูปด้านข้าง/เต็มคัน", type=['jpg','png','jpeg'], key="p2")
         
         if st.form_submit_button("ส่งข้อมูล"):
-            if fname and plate and photo1: # เช็คว่ากรอกชื่อ (fname) แล้ว
+            if fname and std_id and plate and photo1: # เช็ค std_id ด้วยว่ากรอกไหม
                 try:
-                    with st.spinner("กำลังอัปโหลด..."):
-                        clean_plate = plate.replace(" ", "")
-                        
-                        link1 = upload_to_drive(photo1, f"{std_id}_{clean_plate}_FRONT.jpg")
-                        
-                        link2 = ""
-                        if photo2:
-                             link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
+                    # 🔴🔴 1. เช็คก่อนว่ามีรหัสนักเรียนซ้ำไหม 🔴🔴
+                    sheet = connect_gsheet()
+                    # ดึงข้อมูลรหัสนักเรียนทั้งหมด (คอลัมน์ที่ 3) มาตรวจสอบ
+                    existing_ids = sheet.col_values(3) 
+                    
+                    if std_id in existing_ids:
+                        # ถ้าเจอซ้ำ ให้แจ้งเตือนและหยุดทำงานทันที
+                        st.error(f"⚠️ รหัสนักเรียน '{std_id}' นี้สมัครไปแล้ว!")
+                        st.warning("หากต้องการแก้ไขข้อมูล กรุณาติดต่อ **'ตำรวจนักเรียน'**")
+                    
+                    else:
+                        # 🟢🔴 2. ถ้าไม่ซ้ำ ค่อยทำขั้นตอนอัปโหลดและบันทึก 🔴🟢
+                        with st.spinner("กำลังอัปโหลด..."):
+                            clean_plate = plate.replace(" ", "")
+                            
+                            link1 = upload_to_drive(photo1, f"{std_id}_{clean_plate}_FRONT.jpg")
+                            
+                            link2 = ""
+                            if photo2:
+                                 link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
 
-                        if link1: 
-                            sheet = connect_gsheet()
-                            sheet.append_row([
-                                str(datetime.now()), 
-                                name, # ตรงนี้จะส่งไปเป็น "คำนำหน้า+ชื่อ" อัตโนมัติ
-                                std_id, 
-                                f"{level}/{room}", 
-                                brand, 
-                                color, 
-                                plate,
-                                license_status,
-                                tax_status,
-                                link1, 
-                                link2
-                            ])
-                            st.success(f"✅ บันทึกข้อมูล {name} เรียบร้อย!")
+                            if link1: 
+                                sheet.append_row([
+                                    str(datetime.now()), 
+                                    name, 
+                                    std_id, 
+                                    f"{level}/{room}", 
+                                    brand, 
+                                    color, 
+                                    plate,
+                                    license_status,
+                                    tax_status,
+                                    link1, 
+                                    link2
+                                ])
+                                st.success(f"✅ บันทึกข้อมูล {name} เรียบร้อย!")
                         
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
             else:
-                st.warning("กรุณากรอกข้อมูลและแนบรูปอย่างน้อย 1 รูป")
+                st.warning("กรุณากรอกข้อมูลให้ครบ (ชื่อ, รหัสนักเรียน, ทะเบียน, รูปภาพ)")
 
 elif menu == "👮 ครูตรวจสอบ":
     st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
