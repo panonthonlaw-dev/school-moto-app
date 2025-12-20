@@ -253,7 +253,7 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
-       # (Part 3.2: วางต่อท้ายสุด - แก้ไข Syntax Error แล้ว)
+     # (Part 3.2A: ฟังก์ชันสร้าง PDF)
             
             # --- Import ตัวทำ PDF ---
             from reportlab.pdfgen import canvas
@@ -277,12 +277,10 @@ elif st.session_state['page'] == 'teacher':
                     font_name = 'Helvetica'
                 
                 # 2. หัวกระดาษ & โลโก้
-                # --- จุดที่เคย Error แก้ไขให้แล้วครับ (มี except รองรับชัดเจน) ---
                 try:
                     c.drawImage("logo.png", 50, height - 85, width=50, height=50, mask='auto')
                 except Exception:
-                    pass # ถ้าหาไฟล์โลโก้ไม่เจอ ให้ข้ามไป ไม่ต้อง Error
-                # -------------------------------------------------------
+                    pass 
 
                 c.setFont(font_name, 24)
                 c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
@@ -346,6 +344,7 @@ elif st.session_state['page'] == 'teacher':
                 c.save()
                 buffer.seek(0)
                 return buffer
+                # (Part 3.2B: ส่วนแสดงผลและปุ่มกด - วางต่อท้าย 3.2A)
 
             # --- ส่วนค้นหา + ปุ่มกด ---
             st.markdown("##### 🔍 ค้นหาข้อมูล")
@@ -376,4 +375,78 @@ elif st.session_state['page'] == 'teacher':
                         match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
                         if match: file_id = match.group(1)
                         else: 
-                            match = re.search(r'id=([a-zA-Z0-9_-
+                            # แก้ไข Regex ให้สมบูรณ์ตรงนี้ครับ
+                            match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
+                            if match: file_id = match.group(1)
+                        if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
+                        return url
+
+                    for i, row in filtered_df.iterrows():
+                        vals = row.tolist()
+                        name_t = str(vals[1]); plate_t = str(vals[6])
+                        
+                        img1 = get_img_link(str(vals[-2])) if len(vals)>=2 else None
+                        img2 = get_img_link(str(vals[-1])) if len(vals)>=1 else None
+                        
+                        with st.expander(f"🛵 {plate_t} | {name_t}"):
+                            ci, ct = st.columns([2,1])
+                            with ci:
+                                cc = st.columns(2)
+                                if img1: cc[0].image(img1, caption="หน้า")
+                                if img2: cc[1].image(img2, caption="ข้าง")
+                            with ct:
+                                st.write(f"**ชื่อ:** {name_t}")
+                                st.write(f"**ทะเบียน:** {plate_t}")
+                                st.write(f"**ชั้น:** {str(vals[3])}")
+                                st.markdown("---")
+                                
+                                if st.button(f"📄 โหลด PDF", key=f"gen_{i}"):
+                                    with st.spinner("กำลังสร้าง PDF..."):
+                                        try:
+                                            pdf_bytes = create_pdf(vals, img1, img2)
+                                            st.download_button(
+                                                label="⬇️ คลิกเพื่อดาวน์โหลด",
+                                                data=pdf_bytes,
+                                                file_name=f"Moto_{plate_t}.pdf",
+                                                mime="application/pdf",
+                                                key=f"dl_{i}"
+                                            )
+                                        except Exception as e:
+                                            st.error(f"เกิดข้อผิดพลาด: {e}")
+
+            # --- ส่วนเลื่อนชั้นปี ---
+            st.markdown("---")
+            with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
+                st.error("⚠️ คำเตือน: ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
+                spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
+                
+                if st.button("ยืนยันเลื่อนชั้น"):
+                    if spwd == "Patwitnext":
+                        try:
+                            sheet = connect_gsheet()
+                            d = sheet.get_all_values()
+                            h = d[0]; r = d[1:]
+                            l_idx = 3
+                            for i,x in enumerate(h): 
+                                if "ชั้น" in x: l_idx=i; break
+                            
+                            new_r = []
+                            chg = 0
+                            for row in r:
+                                if len(row) > l_idx:
+                                    ol = row[l_idx]; nl = ol
+                                    if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                    elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                    elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                    elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                    elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                    elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                    if ol!=nl: row[l_idx]=nl; chg+=1
+                                    new_r.append(row)
+                            if chg > 0:
+                                sheet.clear()
+                                sheet.update('A1', [h] + new_r)
+                                st.success(f"สำเร็จ {chg} คน")
+                            else: st.info("ไม่มีข้อมูลต้องเปลี่ยน")
+                        except Exception as e: st.error(f"Error: {e}")
+                    else: st.error("รหัสผิด")
