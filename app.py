@@ -10,7 +10,7 @@ import base64
 # --- ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
-ADMIN_PASSWORD = "Patwit064180"
+ADMIN_PASSWORD = "Patwit1150"
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 
 # --- Setup หน้าเว็บ และ ซ่อน Header แบบถาวร ---
