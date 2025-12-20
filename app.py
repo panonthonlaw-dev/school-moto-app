@@ -191,7 +191,7 @@ if st.session_state['page'] == 'student':
         color = c6.text_input("สีรถ")
         plate = st.text_input("ทะเบียน")
         license_status = st.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = st.radio("ภาษี", ["✅ ปกติ", "❌ ขาด/ไม่แน่ใจ"], horizontal=True)
+        tax_status = st.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด/ไม่แน่ใจ"], horizontal=True)
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
         photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True):
