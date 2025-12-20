@@ -168,26 +168,34 @@ elif menu == "👮 ครูตรวจสอบ":
                 with st.expander(f"{plate_txt} : {name_txt}"):
                     c_img, c_text = st.columns([2,1])
                     
-                    with c_img:
-                        # --- แก้ไขจุดที่ Error ตรงนี้ครับ ---
-                        vals = row.tolist() # เปลี่ยนเป็น tolist()
+                   with c_img:
+                        vals = row.tolist() 
                         
-                        # พยายามดึงลิงก์จากคอลัมน์ท้ายๆ
-                        # (เพราะเราเพิ่มคอลัมน์ ใบขับขี่/ภาษี แทรกเข้ามา ลิงก์รูปจะเลื่อนไปอยู่ท้ายสุด)
-                        link1 = str(vals[-2]) if len(vals) >= 2 else "" # รองสุดท้าย
-                        link2 = str(vals[-1]) if len(vals) >= 1 else "" # สุดท้าย
+                        # ดึง 2 ค่าสุดท้ายของแถวมา
+                        link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
+                        link2 = str(vals[-1]).strip() if len(vals) >= 1 else ""
+
+                        # --- เพิ่มบรรทัดนี้เพื่อ Debug (ดูว่าลิงก์คืออะไร) ---
+                        st.caption(f"Debug Link1: {link1}") 
+                        # ---------------------------------------------
 
                         cols = st.columns(2)
-                        # ตรวจสอบว่าเป็นลิงก์จริงไหม
-                        if "http" in link1:
-                            cols[0].image(link1, caption="ด้านหน้า", use_column_width=True)
+                        
+                        # รูปที่ 1
+                        if link1.startswith("http"):
+                            try:
+                                cols[0].image(link1, caption="ด้านหน้า", use_column_width=True)
+                            except:
+                                cols[0].error("โหลดรูปไม่ได้")
                         else:
-                            cols[0].write("ไม่มีรูป 1")
+                            cols[0].write("ไม่มีรูป")
                             
-                        if "http" in link2:
-                            cols[1].image(link2, caption="ด้านข้าง", use_column_width=True)
-                        else:
-                            cols[1].write("ไม่มีรูป 2")
+                        # รูปที่ 2
+                        if link2.startswith("http"):
+                            try:
+                                cols[1].image(link2, caption="ด้านข้าง", use_column_width=True)
+                            except:
+                                cols[1].write("")
                             
                     with c_text:
                         st.write(f"**ชั้น:** {row.get('ชั้น', '-')}")
