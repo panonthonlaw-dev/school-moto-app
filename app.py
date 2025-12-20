@@ -9,14 +9,22 @@ import json
 
 # --- ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
-# 🔴🔴 แก้ตรงนี้: เอา ID โฟลเดอร์จากด่านที่ 1 มาใส่ 🔴🔴
+# 🔴🔴 (สำคัญ) อย่าลืมใส่ ID โฟลเดอร์รูปภาพของครูตรงนี้นะครับ 🔴🔴
 DRIVE_FOLDER_ID = "1xxxxxxxxxxxxxxxxxxxxxxxxx" 
-ADMIN_PASSWORD = "Patwit064180"
+ADMIN_PASSWORD = "schoolpolice"
 
 # --- เชื่อมต่อ Google ---
 def get_creds():
-    # ดึงกุญแจจากระบบ Secrets ของ Streamlit (ปลอดภัยกว่าวางไฟล์)
-    key_dict = json.loads(st.secrets["textkey"]["json_content"])
+    # 🔧 แก้ไขจุดที่ Error: เพิ่ม strict=False เพื่อให้โปรแกรมไม่งอแงเรื่องตัวอักษร
+    key_content = st.secrets["textkey"]["json_content"]
+    # ป้องกันปัญหาเรื่องตัวเว้นบรรทัด (Newlines) ที่มักจะ Error
+    try:
+        key_dict = json.loads(key_content, strict=False)
+    except json.JSONDecodeError:
+        # ถ้ายัง Error ให้ลองล้างค่าตัวอักษรพิเศษ
+        clean_content = key_content.replace('\n', '\\n')
+        key_dict = json.loads(clean_content, strict=False)
+        
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
 
@@ -35,8 +43,9 @@ def upload_to_drive(file_obj, filename):
 
 # --- หน้าเว็บ ---
 st.set_page_config(page_title="ทะเบียนรถ รร.", page_icon="🛵")
-st.title("🛵 ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
+st.title("🛵 ระบบลงทะเบียนรถจักรยานยนต์")
 
+# สร้างเมนู
 menu = st.sidebar.radio("เมนู", ["📝 นักเรียนลงทะเบียน", "👮 ครูตรวจสอบ"])
 
 if menu == "📝 นักเรียนลงทะเบียน":
@@ -45,7 +54,7 @@ if menu == "📝 นักเรียนลงทะเบียน":
         c1, c2 = st.columns(2)
         name = c1.text_input("ชื่อ-นามสกุล")
         std_id = c2.text_input("รหัสนักเรียน")
-        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6",])
+        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ปวช."])
         room = c2.text_input("ห้อง")
         st.markdown("---")
         brand = st.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
@@ -58,33 +67,50 @@ if menu == "📝 นักเรียนลงทะเบียน":
             if name and plate and photo:
                 try:
                     with st.spinner("กำลังอัปโหลด..."):
-                        link = upload_to_drive(photo, f"{std_id}_{plate}.jpg")
+                        # สร้างชื่อไฟล์ไม่ให้ซ้ำ
+                        clean_plate = plate.replace(" ", "")
+                        file_name = f"{std_id}_{clean_plate}.jpg"
+                        
+                        link = upload_to_drive(photo, file_name)
                         sheet = connect_gsheet()
                         sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, link])
-                    st.success("✅ เรียบร้อย!")
+                    st.success("✅ บันทึกข้อมูลเรียบร้อย!")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
             else:
-                st.warning("กรอกให้ครบทุกช่องนะครับ")
+                st.warning("กรุณากรอกข้อมูลให้ครบทุกช่อง")
 
 elif menu == "👮 ครูตรวจสอบ":
     pwd = st.text_input("รหัสผ่านเจ้าหน้าที่", type="password")
     if pwd == ADMIN_PASSWORD:
-        if st.button("โหลดข้อมูล"):
+        if st.button("โหลดข้อมูลล่าสุด"):
             try:
                 data = connect_gsheet().get_all_records()
-                st.session_state['df'] = pd.DataFrame(data)
-            except: st.error("ไม่พบข้อมูล")
+                if data:
+                    st.session_state['df'] = pd.DataFrame(data)
+                else:
+                    st.warning("ยังไม่มีข้อมูลในระบบ")
+            except Exception as e: 
+                st.error(f"ดึงข้อมูลไม่ได้: {e}")
         
         if 'df' in st.session_state:
             search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
             df = st.session_state['df']
+            
+            # กรองข้อมูล
             if search:
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
+            st.write(f"พบข้อมูล {len(df)} รายการ")
+            
             for i, row in df.iterrows():
-                with st.expander(f"{row['ทะเบียน']} - {row['ชื่อ-นามสกุล']}"):
-                    st.write(f"ชั้น: {row['ชั้น']} | รถ: {row['ยี่ห้อ']} ({row['สี']})")
-                    if str(row['รูปภาพ']).startswith('http'):
-                        st.image(row['รูปภาพ'])
-                    else: st.write("ไม่มีรูป")
+                with st.expander(f"{row.get('ทะเบียน','-')} : {row.get('ชื่อ-นามสกุล','-')}"):
+                    c_img, c_text = st.columns([1,2])
+                    with c_img:
+                        if str(row.get('รูปภาพ','')).startswith('http'):
+                            st.image(row['รูปภาพ'], use_column_width=True)
+                        else: st.write("ไม่มีรูป")
+                    with c_text:
+                        st.write(f"**ชั้น:** {row.get('ชั้น','-')}")
+                        st.write(f"**รถ:** {row.get('ยี่ห้อ','-')} สี {row.get('สี','-')}")
+                        st.write(f"**วันเวลา:** {row.get('Timestamp','-')}")
