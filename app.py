@@ -76,52 +76,46 @@ def connect_gsheet():
 def update_point(std_id, action):
     try:
         sheet = connect_gsheet()
-        cell = sheet.find(str(std_id), in_column=3) # ค้นหา ID
+        # ค้นหาแถวจากรหัสนักเรียน (คอลัมน์ 3)
+        cell = sheet.find(str(std_id), in_column=3)
         
         if cell:
             row_num = cell.row
-            
-            # 1. ดึงคะแนน (Col 12 / L)
+            # 1. ดึงคะแนน (Col 12 / L) และเช็คค่าว่าง
             current_val = sheet.cell(row_num, 12).value
-            if not current_val: current_val = 100
-            score = int(current_val)
+            score = int(current_val) if (current_val and str(current_val).isdigit()) else 100
             
             # 2. ดึงประวัติเก่า (Col 13 / M)
             old_history = sheet.cell(row_num, 13).value
-            if not old_history: old_history = ""
+            if not old_history or old_history == "-": old_history = ""
             
             new_score = score
-            msg = ""
-            log_entry = ""
+            log_msg = ""
             timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
             
+            # เงื่อนไขคะแนน
             if action == "no_helmet":
                 new_score -= 5
-                msg = "❌ หัก 5 คะแนน (ไม่สวมหมวก)"
-                log_entry = f"[{timestamp}] -5 : ไม่สวมหมวกกันน็อค"
+                log_msg = f"[{timestamp}] หัก 5 คะแนน : ไม่สวมหมวกกันน็อค"
             elif action == "wrong_parking":
                 new_score -= 5
-                msg = "❌ หัก 5 คะแนน (จอดผิดที่)"
-                log_entry = f"[{timestamp}] -5 : จอดรถผิดที่/นอกโรงจอด"
+                log_msg = f"[{timestamp}] หัก 5 คะแนน : จอดรถผิดที่"
             elif action == "driving_fast":
                 new_score -= 5
-                msg = "❌ หัก 5 คะแนน (ขับรถเร็ว)"
-                log_entry = f"[{timestamp}] -5 : ขับรถเร็ว/หวาดเสียว"
+                log_msg = f"[{timestamp}] หัก 5 คะแนน : ขับรถเร็ว/หวาดเสียว"
             elif action == "restore":
                 new_score = 100
-                msg = "✨ ฟื้นฟูคะแนนเรียบร้อย!"
-                log_entry = f"[{timestamp}] RESET : ฟื้นฟูคะแนนเต็ม 100"
+                log_msg = f"[{timestamp}] RESET : ฟื้นฟูคะแนนเต็ม 100"
             
-            # รวมประวัติใหม่ (ขึ้นบรรทัดใหม่)
-            new_history = old_history + "\n" + log_entry if old_history else log_entry
+            # รวมประวัติใหม่
+            updated_history = old_history + "\n" + log_msg if old_history else log_msg
             
-            # อัปเดตทั้ง 2 ช่อง
-            sheet.update_cell(row_num, 12, new_score) # อัปเดตคะแนน
-            sheet.update_cell(row_num, 13, new_history) # อัปเดตประวัติ
+            # อัปเดตลง Sheet (12=Score, 13=History)
+            sheet.update_cell(row_num, 12, new_score)
+            sheet.update_cell(row_num, 13, updated_history)
             
-            return True, new_score, msg
-        else:
-            return False, 0, "ไม่พบข้อมูลนักเรียน"
+            return True, new_score, "บันทึกข้อมูลสำเร็จ"
+        return False, 0, "ไม่พบรหัสนักเรียน"
     except Exception as e:
         return False, 0, f"Error: {str(e)}"
 
@@ -490,37 +484,39 @@ elif st.session_state['page'] == 'teacher':
                                         st.text(history_txt)
                                 
                                 st.markdown("---")
-                                st.write("🚨 **ตัดคะแนน (-5):**")
-                                if st.button("⛑️ ไม่สวมหมวก", key=f"h_{std_id}"):
-                                    res, ns, msg = update_point(std_id, "no_helmet")
-                                    if res:
-                                        st.success(f"{msg} เหลือ {ns}")
-                                        time.sleep(1) 
-                                        st.rerun() 
+                                st.write("🚨 **แจ้งการกระทำผิด (-5):**")
                                 
-                                if st.button("🅿️ จอดผิดที่", key=f"p_{std_id}"):
-                                    res, ns, msg = update_point(std_id, "wrong_parking")
-                                    if res:
-                                        st.success(f"{msg} เหลือ {ns}")
-                                        time.sleep(1)
-                                        st.rerun()
+                                # เปลี่ยนเป็นระบบเลือก (Radio/Select) แทนปุ่มกดแยกกัน
+                                action_selection = st.radio("เลือกความผิด:", 
+                                                         ["ไม่สวมหมวก", "จอดผิดที่", "ขับรถเร็ว"], 
+                                                         key=f"radio_{std_id}", horizontal=True)
+                                
+                                action_map = {
+                                    "ไม่สวมหมวก": "no_helmet",
+                                    "จอดผิดที่": "wrong_parking",
+                                    "ขับรถเร็ว": "driving_fast"
+                                }
 
-                                if st.button("🏍️ ขับรถเร็ว", key=f"f_{std_id}"):
-                                    res, ns, msg = update_point(std_id, "driving_fast")
-                                    if res:
-                                        st.success(f"{msg} เหลือ {ns}")
-                                        time.sleep(1)
-                                        st.rerun()
-                                
-                                with st.expander("✨ ฟื้นฟูคะแนน (ใส่รหัส)"):
-                                    restore_code = st.text_input("รหัสลับ", type="password", key=f"code_{std_id}")
-                                    if st.button("ยืนยัน", key=f"res_{std_id}"):
-                                        if restore_code == SECRET_RESTORE_CODE:
-                                            res, ns, msg = update_point(std_id, "restore")
+                                # ปุ่มบันทึกข้อมูล
+                                if st.button(f"บันทึกการหักคะแนน", key=f"btn_{std_id}"):
+                                    st.session_state[f"confirm_{std_id}"] = True
+
+                                # ระบบยืนยัน (Confirmation)
+                                if st.session_state.get(f"confirm_{std_id}"):
+                                    st.warning(f"⚠️ ยืนยันการหักคะแนนคุณ {std_name} ในข้อหา '{action_selection}' ใช่หรือไม่?")
+                                    col_yes, col_no = st.columns(2)
+                                    with col_yes:
+                                        if st.button("✅ ใช่, ยืนยัน", key=f"yes_{std_id}"):
+                                            res, ns, msg = update_point(std_id, action_map[action_selection])
                                             if res:
-                                                st.success(msg)
-                                                time.sleep(1)
+                                                st.success(f"{msg} คะแนนคงเหลือ: {ns}")
+                                                st.session_state[f"confirm_{std_id}"] = False
+                                                time.sleep(1.5)
                                                 st.rerun()
+                                    with col_no:
+                                        if st.button("❌ ยกเลิก", key=f"no_{std_id}"):
+                                            st.session_state[f"confirm_{std_id}"] = False
+                                            st.rerun()
                                         else:
                                             st.error("❌ รหัสผิด")
 
