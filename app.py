@@ -483,10 +483,18 @@ elif st.session_state['page'] == 'teacher':
                                     with st.expander("📜 ดูประวัติย้อนหลัง"):
                                         st.text(history_txt)
                                 
+                                ขออภัยครับ ในโค้ดก่อนหน้าผมมุ่งเน้นไปที่ระบบยืนยันการหักคะแนนจนทำให้ส่วนฟื้นฟูหายไป ตอนนี้ผมได้ รวมทุกอย่างเข้าด้วยกัน ทั้งระบบตัดคะแนนแบบมีปุ่มยืนยัน และระบบฟื้นฟูคะแนนที่ต้องใส่รหัสลับครับ
+
+เพื่อให้โค้ดสมบูรณ์ที่สุด ให้คุณนำโค้ดส่วนนี้ไปวางในหน้าเจ้าหน้าที่ (Teacher Page) ตรงส่วนที่แสดงรายละเอียดนักเรียนครับ
+
+👮 โค้ดส่วนจัดการคะแนน (ตัดคะแนน + ฟื้นฟู + ปุ่มยืนยัน)
+ก๊อปปี้ส่วนนี้ไปวางต่อจากส่วนที่แสดงรูปภาพนักเรียนในหน้าเจ้าหน้าที่ครับ
+
+Python
+
                                 st.markdown("---")
+                                # --- 1. ส่วนการตัดคะแนน (มีระบบยืนยัน) ---
                                 st.write("🚨 **แจ้งการกระทำผิด (-5):**")
-                                
-                                # เปลี่ยนเป็นระบบเลือก (Radio/Select) แทนปุ่มกดแยกกัน
                                 action_selection = st.radio("เลือกความผิด:", 
                                                          ["ไม่สวมหมวก", "จอดผิดที่", "ขับรถเร็ว"], 
                                                          key=f"radio_{std_id}", horizontal=True)
@@ -497,11 +505,9 @@ elif st.session_state['page'] == 'teacher':
                                     "ขับรถเร็ว": "driving_fast"
                                 }
 
-                                # ปุ่มบันทึกข้อมูล
                                 if st.button(f"บันทึกการหักคะแนน", key=f"btn_{std_id}"):
                                     st.session_state[f"confirm_{std_id}"] = True
 
-                                # ระบบยืนยัน (Confirmation)
                                 if st.session_state.get(f"confirm_{std_id}"):
                                     st.warning(f"⚠️ ยืนยันการหักคะแนนคุณ {std_name} ในข้อหา '{action_selection}' ใช่หรือไม่?")
                                     col_yes, col_no = st.columns(2)
@@ -516,6 +522,34 @@ elif st.session_state['page'] == 'teacher':
                                     with col_no:
                                         if st.button("❌ ยกเลิก", key=f"no_{std_id}"):
                                             st.session_state[f"confirm_{std_id}"] = False
+                                            st.rerun()
+
+                                st.markdown("<br>", unsafe_allow_html=True)
+                                
+                                # --- 2. ส่วนการฟื้นฟูคะแนน (กลับมาแล้ว) ---
+                                with st.expander("✨ ฟื้นฟูคะแนน (สำหรับเจ้าหน้าที่เท่านั้น)"):
+                                    st.write("กรุณากรอกรหัสลับเพื่อคืนคะแนนเต็ม 100")
+                                    restore_code = st.text_input("รหัสลับฟื้นฟูคะแนน", type="password", key=f"code_{std_id}")
+                                    
+                                    if st.button("ยืนยันการฟื้นฟูคะแนน", key=f"res_btn_{std_id}"):
+                                        if restore_code == SECRET_RESTORE_CODE:
+                                            # ใช้ระบบยืนยันสำหรับการฟื้นฟูด้วยเพื่อความปลอดภัย
+                                            st.session_state[f"confirm_res_{std_id}"] = True
+                                        else:
+                                            st.error("❌ รหัสลับไม่ถูกต้อง")
+                                    
+                                    if st.session_state.get(f"confirm_res_{std_id}"):
+                                        st.success(f"รหัสถูกต้อง! ยืนยันฟื้นฟูคะแนนให้ {std_name} เป็น 100 หรือไม่?")
+                                        ryes, rno = st.columns(2)
+                                        if ryes.button("✅ ยืนยันฟื้นฟู", key=f"ryes_{std_id}"):
+                                            res, ns, msg = update_point(std_id, "restore")
+                                            if res:
+                                                st.success("✨ ฟื้นฟูคะแนนสำเร็จ!")
+                                                st.session_state[f"confirm_res_{std_id}"] = False
+                                                time.sleep(1.5)
+                                                st.rerun()
+                                        if rno.button("❌ ยกเลิก", key=f"rno_{std_id}"):
+                                            st.session_state[f"confirm_res_{std_id}"] = False
                                             st.rerun()
                                         else:
                                             st.error("❌ รหัสผิด")
