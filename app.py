@@ -167,7 +167,8 @@ if st.session_state['page'] == 'student':
             go_to_teacher()
             st.rerun()
             # ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3.1 ปรับปรุง Dashboard)
+# ---------------------------------------
+# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3.1 ปรับ Dashboard สีเขียว)
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
     if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
@@ -209,25 +210,28 @@ elif st.session_state['page'] == 'teacher':
             # คำนวณตัวเลข
             total = len(df)
             try:
-                # นับจำนวนคนที่มีใบขับขี่ และ ภาษีครบ
                 lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
                 tax = df[df.iloc[:, 8].astype(str).str.contains("ครบ|ปกติ", na=False)].shape[0]
                 
-                # คำนวณเปอร์เซ็นต์ (ป้องกันการหารด้วย 0)
                 if total > 0:
                     lic_pct = (lic / total) * 100
                     tax_pct = (tax / total) * 100
                 else:
-                    lic_pct = 0
-                    tax_pct = 0
+                    lic_pct = 0; tax_pct = 0
             except: 
                 lic=0; tax=0; lic_pct=0; tax_pct=0
 
-            # แสดงผลแบบ 3 คอลัมน์ พร้อมเปอร์เซ็นต์
+            # แสดงผล
             c1, c2, c3 = st.columns(3)
+            
+            # คอลัมน์ 1: ไม่ต้องมีเปอร์เซ็นต์
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic} คน ({lic_pct:.1f}%)")
-            c3.metric("📝 พรบ./ภาษี", f"{tax} คัน ({tax_pct:.1f}%)")
+            
+            # 🟢 คอลัมน์ 2: ใส่ percent ในช่อง delta -> จะได้ตัวเล็ก สีเขียว
+            c2.metric("🪪 มีใบขับขี่", f"{lic} คน", delta=f"{lic_pct:.1f}%")
+            
+            # 🟢 คอลัมน์ 3: ใส่ percent ในช่อง delta -> จะได้ตัวเล็ก สีเขียว
+            c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
             # (Part 3.2 ต่อจากด้านบน)
