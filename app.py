@@ -168,35 +168,42 @@ elif menu == "👮 ครูตรวจสอบ":
                     c_img, c_text = st.columns([2,1])
                     
                     with c_img:
-                        # แปลงข้อมูลแถวเป็น List เพื่อดึงตามตำแหน่ง (กรณีชื่อหัวตารางเปลี่ยน)
                         vals = row.tolist() 
                         
-                        # ดึง 2 ช่องสุดท้ายมาเป็นลิงก์ (ตามลำดับที่บันทึก)
+                        # ดึงลิงก์มาเหมือนเดิม
                         link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
                         link2 = str(vals[-1]).strip() if len(vals) >= 1 else ""
 
-                        # --- ส่วนแสดงรูปภาพ ---
                         cols = st.columns(2)
                         
-                        # รูปที่ 1
+                        # --- ฟังก์ชันแปลงลิงก์ให้เป็นรูปตัวอย่าง (Thumbnail) ---
+                        def get_thumb(url):
+                            if "id=" in url:
+                                # กรณีลิงก์แบบ uc?id=...
+                                fid = url.split('id=')[1].split('&')[0]
+                                return f"https://drive.google.com/thumbnail?id={fid}&sz=w600"
+                            elif "/d/" in url:
+                                # กรณีลิงก์แบบ view/preview
+                                fid = url.split('/d/')[1].split('/')[0]
+                                return f"https://drive.google.com/thumbnail?id={fid}&sz=w600"
+                            return url
+
+                        # แสดงรูป 1
                         if "http" in link1:
-                            # แปลงลิงก์ View เป็นลิงก์สำหรับโชว์ภาพ (เผื่อลิงก์ผิด)
-                            if "view?usp=drivesdk" in link1:
-                                file_id = link1.split('/d/')[1].split('/')[0]
-                                link1 = f"https://drive.google.com/uc?export=view&id={file_id}"
-                            
-                            st.image(link1, caption="ด้านหน้า", use_column_width=True)
+                            thumb1 = get_thumb(link1)
+                            # แสดงรูป พร้อมใส่ลิงก์จริงให้กดดูได้ถ้าภาพไม่ขึ้น
+                            cols[0].image(thumb1, caption="ด้านหน้า", use_column_width=True)
+                            cols[0].markdown(f"[🔗 กดเพื่อดูรูปเต็ม]({link1})", unsafe_allow_html=True)
                         else:
-                            st.info("ไม่มีรูปด้านหน้า")
+                            cols[0].info("ไม่มีรูป")
 
-                        # รูปที่ 2
+                        # แสดงรูป 2
                         if "http" in link2:
-                            # แปลงลิงก์ (เผื่อลิงก์ผิด)
-                            if "view?usp=drivesdk" in link2:
-                                file_id = link2.split('/d/')[1].split('/')[0]
-                                link2 = f"https://drive.google.com/uc?export=view&id={file_id}"
-
-                            st.image(link2, caption="ด้านข้าง", use_column_width=True)
+                            thumb2 = get_thumb(link2)
+                            cols[1].image(thumb2, caption="ด้านข้าง", use_column_width=True)
+                            cols[1].markdown(f"[🔗 กดเพื่อดูรูปเต็ม]({link2})", unsafe_allow_html=True)
+                        else:
+                            cols[1].empty()
                             
                     with c_text:
                         st.write(f"**ชั้น:** {row.get('ชั้น', '-')}")
