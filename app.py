@@ -7,6 +7,15 @@ import json
 import requests
 import base64
 import time
+import io
+import re
+
+# --- ส่วนของ PDF Library ---
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
 
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
@@ -38,7 +47,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ฟังก์ชันระบบ ---
+# --- 3. ฟังก์ชันระบบ (Functions) ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 'student'
 
@@ -66,8 +75,7 @@ def connect_gsheet():
 def update_point(std_id, action):
     try:
         sheet = connect_gsheet()
-        # ค้นหา ID ในคอลัมน์ 3 (C)
-        cell = sheet.find(str(std_id), in_column=3)
+        cell = sheet.find(str(std_id), in_column=3) # ค้นหา ID คอลัมน์ C
         
         if cell:
             row_num = cell.row
@@ -121,6 +129,96 @@ def upload_to_drive(file_obj, filename):
             raise Exception(f"Upload failed: {result.get('message')}")
     except Exception as e:
         raise Exception(f"เชื่อมต่อไม่ได้: {e}")
+
+def get_img_link(url):
+    url = str(url).strip()
+    if not url: return None
+    file_id = None
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+    if match: file_id = match.group(1)
+    else: 
+        match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
+        if match: file_id = match.group(1)
+    if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
+    return url
+
+# --- ฟังก์ชันสร้าง PDF (นำกลับมาแล้ว) ---
+def create_pdf(vals, img_url1, img_url2):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    try:
+        pdfmetrics.registerFont(TTFont('THSarabunNew', 'THSarabunNew.ttf'))
+        font_name = 'THSarabunNew'
+    except:
+        font_name = 'Helvetica'
+    
+    # Header
+    try:
+        c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
+    except: pass 
+
+    c.setFont(font_name, 24)
+    c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
+    c.setFont(font_name, 20)
+    c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
+    c.line(50, height - 90, width - 50, height - 90)
+
+    # Info
+    y = height - 130
+    c.setFont(font_name, 16)
+    
+    name = str(vals[1]); std_id = str(vals[2]); 
+    classroom = str(vals[3]); brand = str(vals[4]); 
+    color = str(vals[5]); plate = str(vals[6]); 
+    lic_status = str(vals[7]); tax_status = str(vals[8])
+
+    c.drawString(60, y, f"ชื่อ-นามสกุล: {name}")
+    c.drawString(60, y-25, f"รหัสนักเรียน: {std_id}")
+    c.drawString(60, y-50, f"ระดับชั้น: {classroom}")
+    
+    c.drawString(300, y, f"ยี่ห้อ: {brand}")
+    c.drawString(300, y-25, f"สีรถ: {color}")
+    c.setFont(font_name, 20)
+    c.drawString(300, y-55, f"ทะเบียน: {plate}")
+    c.rect(295, y-60, 150, 25) 
+    
+    c.setFont(font_name, 16)
+    y_status = y - 90
+    lic_mark = "(/)" if "มี" in lic_status else "( )"
+    tax_mark = "(/)" if "ครบ" in tax_status or "ปกติ" in tax_status else "( )"
+    c.drawString(60, y_status, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
+    
+    # Images
+    y_img = y_status - 220
+    def draw_img(url, x, y):
+        try:
+            if url:
+                res = requests.get(url, timeout=5)
+                if res.status_code == 200:
+                    img = ImageReader(io.BytesIO(res.content))
+                    c.drawImage(img, x, y, width=200, height=200, preserveAspectRatio=True)
+                else: c.drawString(x, y+100, "โหลดรูปไม่ได้")
+        except: c.drawString(x, y+100, "Error รูปภาพ")
+
+    c.drawString(60, y_img + 210, "หลักฐานภาพถ่าย:")
+    draw_img(img_url1, 60, y_img)
+    draw_img(img_url2, 300, y_img)
+
+    # Signatures
+    y_sign = 100
+    c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
+    c.drawString(100, y_sign-20, f"({name})")
+    c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
+    c.drawString(330, y_sign-20, "(.......................................................)")
+    
+    c.setFont(font_name, 12)
+    c.drawRightString(width - 30, 30, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    c.save()
+    buffer.seek(0)
+    return buffer
 
 # ==========================================
 # 4. ส่วนแสดงผล (UI)
@@ -264,7 +362,7 @@ elif st.session_state['page'] == 'teacher':
             df = st.session_state['df']
             
             st.markdown("---")
-            st.markdown("##### 🔍 ค้นหาและจัดการคะแนน")
+            st.markdown("##### 🔍 ค้นหา / ตัดคะแนน / พิมพ์ประวัติ")
             
             c_input, c_btn = st.columns([3, 1])
             with c_input:
@@ -286,52 +384,74 @@ elif st.session_state['page'] == 'teacher':
                         std_id = str(vals[2])
                         plate_num = str(vals[6])
                         
+                        # Images
+                        img1 = get_img_link(str(vals[9])) if len(vals) > 9 else None
+                        img2 = get_img_link(str(vals[10])) if len(vals) > 10 else None
+                        
+                        # Score
                         try:
-                            # Index 11 = คอลัมน์ L (Score)
                             current_score = int(vals[11]) if len(vals) > 11 and str(vals[11]).isdigit() else 100
                         except:
                             current_score = 100
 
-                        with st.container():
-                            st.info(f"👤 **{std_name}** | 🆔 {std_id} | 🛵 {plate_num}")
+                        with st.expander(f"👤 {std_name} | 🆔 {std_id} | 🛵 {plate_num}", expanded=True):
                             
-                            c_score, c_action = st.columns([1, 2])
-                            
+                            # --- ส่วนที่ 1: ข้อมูลและคะแนน ---
+                            c_info, c_score = st.columns([2, 1])
+                            with c_info:
+                                st.write(f"**ชั้น:** {vals[3]} **ยี่ห้อ:** {vals[4]} **สี:** {vals[5]}")
+                                ci1, ci2 = st.columns(2)
+                                if img1: ci1.image(img1, caption="ด้านหน้า")
+                                if img2: ci2.image(img2, caption="ด้านข้าง")
+                                
+                                # ปุ่ม PDF
+                                if st.button(f"📄 โหลด PDF", key=f"gen_{i}"):
+                                    with st.spinner("สร้าง PDF..."):
+                                        try:
+                                            pdf_bytes = create_pdf(vals, img1, img2)
+                                            st.download_button(
+                                                label="⬇️ ดาวน์โหลดเอกสาร",
+                                                data=pdf_bytes,
+                                                file_name=f"Moto_{plate_num}.pdf",
+                                                mime="application/pdf",
+                                                key=f"dl_{i}"
+                                            )
+                                        except Exception as e:
+                                            st.error(f"Error PDF: {e}")
+
                             with c_score:
-                                st.write("คะแนนความประพฤติ")
+                                st.markdown("##### ❤️ คะแนนความประพฤติ")
                                 score_class = "score-bad" if current_score < 60 else "score-good"
                                 st.markdown(f'<div class="score-box {score_class}">{current_score}</div>', unsafe_allow_html=True)
                                 if current_score < 60:
                                     st.caption("⚠️ คะแนนต่ำกว่าเกณฑ์!")
-
-                            with c_action:
-                                st.write("🚨 **แจ้งการกระทำผิด (-5 คะแนน):**")
-                                b1, b2, b3 = st.columns(3)
                                 
-                                if b1.button("⛑️ ไม่สวมหมวก", key=f"h_{std_id}"):
+                                st.markdown("---")
+                                st.write("🚨 **ตัดคะแนน (-5):**")
+                                if st.button("⛑️ ไม่สวมหมวก", key=f"h_{std_id}"):
                                     res, ns, msg = update_point(std_id, "no_helmet")
                                     if res:
                                         st.success(f"{msg} เหลือ {ns}")
                                         time.sleep(1) 
                                         st.rerun() 
                                 
-                                if b2.button("🅿️ จอดผิดที่", key=f"p_{std_id}"):
+                                if st.button("🅿️ จอดผิดที่", key=f"p_{std_id}"):
                                     res, ns, msg = update_point(std_id, "wrong_parking")
                                     if res:
                                         st.success(f"{msg} เหลือ {ns}")
                                         time.sleep(1)
                                         st.rerun()
 
-                                if b3.button("🏍️ ขับรถเร็ว", key=f"f_{std_id}"):
+                                if st.button("🏍️ ขับรถเร็ว", key=f"f_{std_id}"):
                                     res, ns, msg = update_point(std_id, "driving_fast")
                                     if res:
                                         st.success(f"{msg} เหลือ {ns}")
                                         time.sleep(1)
                                         st.rerun()
                                 
-                                with st.expander("✨ ฟื้นฟูคะแนน (ใช้รหัสลับ)"):
-                                    restore_code = st.text_input("ใส่รหัสลับ", type="password", key=f"code_{std_id}")
-                                    if st.button("ยืนยันฟื้นฟู", key=f"res_{std_id}"):
+                                with st.expander("✨ ฟื้นฟูคะแนน (ใส่รหัส)"):
+                                    restore_code = st.text_input("รหัสลับ", type="password", key=f"code_{std_id}")
+                                    if st.button("ยืนยัน", key=f"res_{std_id}"):
                                         if restore_code == SECRET_RESTORE_CODE:
                                             res, ns, msg = update_point(std_id, "restore")
                                             if res:
@@ -339,8 +459,7 @@ elif st.session_state['page'] == 'teacher':
                                                 time.sleep(1)
                                                 st.rerun()
                                         else:
-                                            st.error("❌ รหัสลับไม่ถูกต้อง")
-                            st.markdown("---")
+                                            st.error("❌ รหัสผิด")
 
             # --- ส่วนเลื่อนชั้นปี ---
             st.markdown("---")
