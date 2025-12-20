@@ -190,24 +190,21 @@ if st.session_state['page'] == 'student':
         
         doc_c1, doc_c2, doc_c3 = st.columns(3)
         license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ไม่่มี"], horizontal=True)
+        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ไม่มี"], horizontal=True)
         helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
         photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
         
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน", use_container_width=True):
-            # --- ระบบตรวจสอบเลขห้อง (Validation) ---
             valid_room = False
             try:
                 room_num = int(room_input)
-                if 0 <= room_num <= 13:
-                    valid_room = True
-            except ValueError:
-                pass
+                if 0 <= room_num <= 13: valid_room = True
+            except ValueError: pass
 
             if not valid_room:
-                st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (ใส่เฉพาะตัวเลข 0 ถึง 13 เท่านั้น)")
+                st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (เลข 0 ถึง 13 เท่านั้น)")
             elif fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
@@ -219,12 +216,19 @@ if st.session_state['page'] == 'student':
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
                             thai_now = datetime.now() + timedelta(hours=7)
                             full_name = f"{prefix}{fname}"
-                            sheet.append_row([thai_now.strftime('%d/%m/%Y %H:%M'), full_name, str(std_id), f"{level}/{room_input}", brand, color, plate, license_status, tax_status, helmet_status, l1, l2])
+                            # ลำดับ: 0:เวลา, 1:ชื่อ, 2:ID, 3:ชั้น, 4:ยี่ห้อ, 5:สี, 6:ทะเบียน, 7:ใบขับขี่, 8:ภาษี, 9:หมวก, 10:รูป1, 11:รูป2
+                            sheet.append_row([
+                                thai_now.strftime('%d/%m/%Y %H:%M'), 
+                                full_name, str(std_id), f"{level}/{room_input}", 
+                                brand, color, plate, 
+                                license_status, tax_status, helmet_status, 
+                                l1, l2
+                            ])
                             st.balloons()
                             st.success("✅ ลงทะเบียนสำเร็จ!")
                 except Exception as e: st.error(f"Error: {e}")
             else:
-                st.warning("⚠️ กรุณากรอกข้อมูลให้ครบและถูกต้อง")
+                st.warning("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน")
 
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
         go_to_teacher(); st.rerun()
@@ -251,36 +255,41 @@ elif st.session_state['page'] == 'teacher':
             df = st.session_state.df
             total = len(df)
             try:
-                lic_count = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                tax_count = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
-                hel_count = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                lic_p, tax_p, hel_p = (lic_count/total)*100, (tax_count/total)*100, (hel_count/total)*100
-            except: lic_count, tax_count, hel_count, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
+                lic_c = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                tax_c = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
+                hel_c = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                lic_p, tax_p, hel_p = (lic_c/total)*100, (tax_c/total)*100, (hel_c/total)*100
+            except: lic_c, tax_c, hel_c, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
             
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic_count} คน", f"{lic_p:.1f}%")
-            c3.metric("📝 ภาษีปกติ", f"{tax_count} คัน", f"{tax_p:.1f}%")
-            c4.metric("⛑️ หมวกกันน็อค", f"{hel_count} คน", f"{hel_p:.1f}%")
+            c2.metric("🪪 มีใบขับขี่", f"{lic_c} คน", f"{lic_p:.1f}%")
+            c3.metric("📝 ภาษีปกติ", f"{tax_c} คัน", f"{tax_p:.1f}%")
+            c4.metric("⛑️ หมวกกันน็อค", f"{hel_c} คน", f"{hel_p:.1f}%")
 
+            st.markdown("---")
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", key="search_query")
             if st.button("เริ่มการค้นหา") and q:
                 fdf = df[df.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
                 if fdf.empty: st.warning("ไม่พบข้อมูล")
                 else:
+                    st.success(f"✅ พบ {len(fdf)} รายการ")
                     for i, row in fdf.iterrows():
                         v = row.tolist()
                         with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
                             c_img, c_info = st.columns([2, 1])
                             with c_img:
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
-                                sub_img1, sub_img2 = st.columns(2)
-                                if i1: sub_img1.image(i1, caption="รูปหลังรถ")
-                                if i2: sub_img2.image(i2, caption="รูปข้างรถ")
+                                sub1, sub2 = st.columns(2)
+                                if i1: sub1.image(i1, caption="รูปหลังรถ")
+                                if i2: sub2.image(i2, caption="รูปข้างรถ")
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
-                                st.write(f"**ยี่ห้อ:** {v[4]} | **สี:** {v[5]}")
-                                st.write(f"**เอกสาร:** {v[7]} / {v[8]} / {v[9]}")
+                                st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
+                                # แก้ไขจุดแสดงผลเอกสารรายบุคคลที่นี่
+                                st.write(f"**ใบขับขี่:** {v[7]}")
+                                st.write(f"**ภาษี/พรบ:** {v[8]}")
+                                st.write(f"**หมวกกันน็อค:** {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
             
@@ -295,8 +304,7 @@ elif st.session_state['page'] == 'teacher':
                         h = d[0]; r = d[1:]
                         new_r = []
                         for row in r:
-                            ol = row[3]
-                            nl = ol
+                            ol = row[3]; nl = ol
                             if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
                             elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
                             elif "ม.3" in ol: nl="จบการศึกษา 🎓"
