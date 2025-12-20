@@ -163,7 +163,7 @@ if st.session_state['page'] == 'student':
     st.markdown("---")
     c_staff_btn = st.columns([1, 2, 1])
     with c_staff_btn[1]:
-        if st.button("🔐 สำหรับเจ้าหน้าที่ / ครู", use_container_width=True):
+        if st.button("🔐 สำหรับเจ้าหน้าที่/ตำรวจนักเรียน", use_container_width=True):
             go_to_teacher()
             st.rerun()
             # ---------------------------------------
