@@ -164,10 +164,9 @@ if st.session_state['page'] == 'student':
             go_to_teacher()
             st.rerun()
 # ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (ฉบับแก้ไขสมบูรณ์)
+# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3.1)
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
-    # ปุ่มกลับหน้าหลัก
     if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
         st.rerun()
         
@@ -216,6 +215,7 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("พรบ./ภาษี", f"{tax}")
             
             st.markdown("---")
+            # (Part 3.2 ต่อจากด้านบน)
             search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
             if search: 
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
@@ -227,8 +227,7 @@ elif st.session_state['page'] == 'teacher':
                 import re
                 file_id = None
                 match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
-                if match: 
-                    file_id = match.group(1)
+                if match: file_id = match.group(1)
                 else: 
                     match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
                     if match: file_id = match.group(1)
@@ -253,4 +252,44 @@ elif st.session_state['page'] == 'teacher':
                         st.write(f"**ชื่อ:** {name_t}")
                         st.write(f"**รหัส:** {str(vals[2]) if len(vals)>2 else '-'}")
                         st.write(f"**ทะเบียน:** {plate_t}")
-                        st.write(f"**
+                        st.write(f"**ชั้น:** {str(vals[3]) if len(vals)>3 else '-'}")
+                        # บรรทัดที่เคยมีปัญหา คือบรรทัดนี้ครับ
+                        st.write(f"**รุ่น/สี:** {str(vals[4])} {str(vals[5])}")
+
+            st.markdown("---")
+            with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
+                st.error("⚠️ คำเตือน: ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
+                
+                spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
+                
+                if st.button("ยืนยันเลื่อนชั้น"):
+                    if spwd == "Patwitnext":
+                        try:
+                            sheet = connect_gsheet()
+                            d = sheet.get_all_values()
+                            h = d[0]; r = d[1:]
+                            l_idx = 3
+                            for i,x in enumerate(h): 
+                                if "ชั้น" in x: l_idx=i; break
+                            
+                            new_r = []
+                            chg = 0
+                            for row in r:
+                                if len(row) > l_idx:
+                                    ol = row[l_idx]; nl = ol
+                                    if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                    elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                    elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                    elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                    elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                    elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                    if ol!=nl: row[l_idx]=nl; chg+=1
+                                    new_r.append(row)
+                            if chg > 0:
+                                sheet.clear()
+                                sheet.update('A1', [h] + new_r)
+                                st.success(f"สำเร็จ {chg} คน")
+                            else: st.info("ไม่มีข้อมูลต้องเปลี่ยน")
+                        except Exception as e: st.error(f"Error: {e}")
+                    else: st.error("รหัสผิด")
+                        
