@@ -278,7 +278,7 @@ elif st.session_state['page'] == 'teacher':
                 
                 # 2. หัวกระดาษ & โลโก้
                 try:
-                    c.drawImage("logo.png", 50, height - 85, width=50, height=50, mask='auto')
+                    c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
                 except Exception:
                     pass 
 
