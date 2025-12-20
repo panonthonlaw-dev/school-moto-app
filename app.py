@@ -70,7 +70,7 @@ st.markdown("""
         .stDeployButton {
             visibility: hidden;
         }
-        /* ซ่อนเมนู 3 จุด ด้านขวาบน (ถ้าต้องการเอาออกด้วย) */
+        
         [data-testid="stToolbar"] {
             visibility: hidden;
         }
