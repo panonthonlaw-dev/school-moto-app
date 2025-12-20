@@ -54,13 +54,13 @@ if menu == "📝 นักเรียนลงทะเบียน":
         c1, c2 = st.columns(2)
         name = c1.text_input("ชื่อ-นามสกุล")
         std_id = c2.text_input("รหัสนักเรียน")
-        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","คุณครู","ผู้ประกอบการ"])
+        level = c1.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","บุคลากร","ผู้ประกอบการ"])
         room = c2.text_input("ห้อง")
         st.markdown("---")
         brand = st.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
         plate = st.text_input("ทะเบียน พร้อมจังหวัด(ตัวอย่าง กก1234 ร้อยเอ็ด)")
         color = st.text_input("สีรถ")
-        st.markdown("### 📸 ถ่ายรูปรถ")
+        st.markdown("### 📸 ถ่ายรูปรถเห็นทะเบียน")
         photo = st.file_uploader("เลือกรูป", type=['jpg','png','jpeg'])
         
         if st.form_submit_button("ส่งข้อมูล"):
