@@ -107,7 +107,9 @@ def create_pdf(vals, img_url1, img_url2):
     
     # ข้อมูลทั่วไป
     c.setFont(font_name, 16)
-    name, std_id, classroom, brand, color, plate, lic_status, tax_status = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6]), str(vals[7]), str(vals[8])
+    # ลำดับข้อมูลใน vals ตาม Google Sheet: 0:Timestamp, 1:Name, 2:ID, 3:Class, 4:Brand, 5:Color, 6:Plate, 7:Lic, 8:Tax, 9:Helmet, 10:Img1, 11:Img2
+    name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
+    lic_status, tax_status, helmet_status = str(vals[7]), str(vals[8]), str(vals[9])
     
     c.drawString(60, height - 130, f"ชื่อ-นามสกุล: {name}")
     c.drawString(320, height - 130, f"ยี่ห้อ: {brand}")
@@ -120,7 +122,8 @@ def create_pdf(vals, img_url1, img_url2):
     c.setFont(font_name, 16)
     lic_mark = "(/)" if "มี" in lic_status else "( )"
     tax_mark = "(/)" if "ปกติ" in tax_status or "✅" in tax_status else "( )"
-    c.drawString(60, height - 210, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
+    helmet_mark = "(/)" if "มี" in helmet_status else "( )"
+    c.drawString(60, height - 210, f"สถานะเอกสาร: {lic_mark} ใบขับขี่  {tax_mark} พรบ./ภาษี  {helmet_mark} หมวกกันน็อค")
     
     c.setFont(font_name, 16)
     c.drawString(60, height - 250, "หลักฐานภาพถ่าย:")
@@ -134,6 +137,8 @@ def create_pdf(vals, img_url1, img_url2):
                     c.drawImage(img, x, y, width=170, height=170, preserveAspectRatio=True)
                 else: c.drawString(x, y + 80, "โหลดรูปไม่ได้")
         except: c.drawString(x, y + 80, "Error รูปภาพ")
+    
+    # ดึงรูปจากคอลัมน์ 10 และ 11
     draw_img(img_url1, 80, img_y)
     draw_img(img_url2, 310, img_y)
 
@@ -178,16 +183,21 @@ if st.session_state['page'] == 'student':
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/กรณีเป็นครู บคุลากร พ่อค้าแม่ค้า กรอก วันเดือนปี พศ.เกิด เช่น02092565")
+        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู,บุคลากร","พ่อค้าแม่ค้า"])
-        room = c4.text_input("ห้อง/กรณีเป็นครู บคุลากร พ่อค้าแม่ค้า กรอก 0")
+        room = c4.text_input("ห้อง/เบอร์โทร")
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Kawasaki","อื่นๆ"])
         color = c6.text_input("สีรถ")
         plate = st.text_input("ทะเบียน")
-        license_status = st.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = st.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด/ไม่แน่ใจ"], horizontal=True)
+        
+        st.markdown("##### 📄 ข้อมูลเอกสารและความปลอดภัย")
+        doc_c1, doc_c2, doc_c3 = st.columns(3)
+        license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
+        helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
         photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
         
@@ -203,7 +213,14 @@ if st.session_state['page'] == 'student':
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
                             thai_now = datetime.now() + timedelta(hours=7)
                             full_name = f"{prefix}{fname}"
-                            sheet.append_row([thai_now.strftime('%d/%m/%Y %H:%M'), full_name, str(std_id), f"{level}/{room}", brand, color, plate, license_status, tax_status, l1, l2])
+                            # ลำดับคอลัมน์: เวลา, ชื่อ, ID, ชั้น, ยี่ห้อ, สี, ทะเบียน, ใบขับขี่, ภาษี, หมวกกันน็อค, รูป1, รูป2
+                            sheet.append_row([
+                                thai_now.strftime('%d/%m/%Y %H:%M'), 
+                                full_name, str(std_id), f"{level}/{room}", 
+                                brand, color, plate, 
+                                license_status, tax_status, helmet_status, 
+                                l1, l2
+                            ])
                             st.balloons()
                             st.success("✅ ลงทะเบียนสำเร็จ!")
                 except Exception as e: st.error(f"Error: {e}")
@@ -233,14 +250,18 @@ elif st.session_state['page'] == 'teacher':
             try:
                 lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
                 tax = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅", na=False)].shape[0]
+                helmet = df[df.iloc[:, 9].astype(str).str.contains("มี", na=False)].shape[0]
+                
                 lic_pct = (lic/total)*100 if total > 0 else 0
                 tax_pct = (tax/total)*100 if total > 0 else 0
-            except: lic, tax, lic_pct, tax_pct = 0, 0, 0, 0
+                helmet_pct = (helmet/total)*100 if total > 0 else 0
+            except: lic, tax, helmet, lic_pct, tax_pct, helmet_pct = 0, 0, 0, 0, 0, 0
             
-            c1, c2, c3 = st.columns(3)
-            c1.metric("🏍️ รถที่ลงทะเบียน", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
+            c2.metric("🪪 ใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
             c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
+            c4.metric("⛑️ หมวกกันน็อค", f"{helmet} คน", f"{helmet_pct:.1f}%")
             
             st.markdown("---")
             st.subheader("🔍 ค้นหาข้อมูลทะเบียนรถ")
@@ -261,12 +282,13 @@ elif st.session_state['page'] == 'teacher':
                         with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
                             c_img, c_info = st.columns([1.5, 1])
                             with c_img:
-                                i1, i2 = get_img_link(v[9]), get_img_link(v[10])
+                                i1, i2 = get_img_link(v[10]), get_img_link(v[11])
                                 if i1: st.image(i1)
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ยี่ห้อ:** {v[4]} | **สี:** {v[5]}")
                                 st.write(f"**เอกสาร:** {v[7]} / {v[8]}")
+                                st.write(f"**หมวกกันน็อค:** {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ ดาวน์โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", "application/pdf", key=f"dl_{i}")
 
