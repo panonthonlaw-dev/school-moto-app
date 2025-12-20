@@ -170,7 +170,7 @@ with c_title: st.title("ระบบลงทะเบียนรถจัก�
 st.markdown("---")
 
 if st.session_state['page'] == 'student':
-    st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
+    st.info("📝 ลงทะเบียนข้อมูลรถและถ่ายรูปรถ")
     with st.form("reg_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
@@ -181,7 +181,7 @@ if st.session_state['page'] == 'student':
         
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room_input = c4.text_input("ห้อง กรณีไม่ใช่นักเรียนกรอก 0 (ใส่เฉพาะเลข 0-13)", help="ตัวอย่าง: หากอยู่ห้อง 5 ให้ใส่เลข 5")
+        room_input = c4.text_input("ห้องที่ กรณีไม่ใช่นักเรียนกรอก 0 (ใส่เฉพาะเลข 0-13)", help="ตัวอย่าง: หากอยู่ห้อง 5 ให้ใส่เลข 5")
         
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
