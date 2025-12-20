@@ -140,6 +140,7 @@ elif menu == "👮 ครูตรวจสอบ":
     if pwd == ADMIN_PASSWORD:
         if st.button("โหลดข้อมูลล่าสุด"):
             try:
+                # ดึงข้อมูลใหม่ทั้งหมด
                 data = connect_gsheet().get_all_records()
                 if data:
                     st.session_state['df'] = pd.DataFrame(data)
@@ -152,13 +153,15 @@ elif menu == "👮 ครูตรวจสอบ":
             search = st.text_input("🔍 ค้นหา (ชื่อ/ทะเบียน)")
             df = st.session_state['df']
             
+            # กรองข้อมูล
             if search:
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
             st.write(f"พบข้อมูล {len(df)} รายการ")
             
+            # วนลูปแสดงผล
             for i, row in df.iterrows():
-                # หมายเหตุ: ใช้ .get('ชื่อหัวตาราง') จะแม่นยำที่สุด
+                # ใช้ .get เพื่อความปลอดภัย (ถ้าไม่เจอ key จะได้ไม่ error)
                 plate_txt = row.get('ทะเบียน', '-')
                 name_txt = row.get('ชื่อ-นามสกุล', '-')
 
@@ -166,24 +169,32 @@ elif menu == "👮 ครูตรวจสอบ":
                     c_img, c_text = st.columns([2,1])
                     
                     with c_img:
-                        # พยายามดึงลิงก์ (เผื่อชื่อหัวตารางไม่ตรง)
-                        vals = list(row.values())
-                        # link อยู่ 2 ช่องสุดท้าย
-                        link1 = str(vals[-2]) if len(vals) >= 2 else ""
-                        link2 = str(vals[-1]) if len(vals) >= 1 else ""
+                        # --- แก้ไขจุดที่ Error ตรงนี้ครับ ---
+                        vals = row.tolist() # เปลี่ยนเป็น tolist()
+                        
+                        # พยายามดึงลิงก์จากคอลัมน์ท้ายๆ
+                        # (เพราะเราเพิ่มคอลัมน์ ใบขับขี่/ภาษี แทรกเข้ามา ลิงก์รูปจะเลื่อนไปอยู่ท้ายสุด)
+                        link1 = str(vals[-2]) if len(vals) >= 2 else "" # รองสุดท้าย
+                        link2 = str(vals[-1]) if len(vals) >= 1 else "" # สุดท้าย
 
                         cols = st.columns(2)
+                        # ตรวจสอบว่าเป็นลิงก์จริงไหม
                         if "http" in link1:
                             cols[0].image(link1, caption="ด้านหน้า", use_column_width=True)
+                        else:
+                            cols[0].write("ไม่มีรูป 1")
+                            
                         if "http" in link2:
                             cols[1].image(link2, caption="ด้านข้าง", use_column_width=True)
+                        else:
+                            cols[1].write("ไม่มีรูป 2")
                             
                     with c_text:
                         st.write(f"**ชั้น:** {row.get('ชั้น', '-')}")
                         st.write(f"**ยี่ห้อ:** {row.get('ยี่ห้อ', '-')}")
                         st.write(f"**สี:** {row.get('สีรถ', row.get('สี', '-'))}")
                         
-                        # แสดงข้อมูลที่เพิ่มใหม่
                         st.markdown("---")
+                        # ดึงข้อมูลใหม่ที่เพิ่งเพิ่ม
                         st.write(f"**ใบขับขี่:** {row.get('ใบขับขี่', '-')}")
                         st.write(f"**พรบ./ภาษี:** {row.get('พรบ_ภาษี', '-')}")
