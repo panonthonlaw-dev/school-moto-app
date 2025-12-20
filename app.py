@@ -280,7 +280,7 @@ elif st.session_state['page'] == 'teacher':
                 # --- 🔴 ส่วนเพิ่มโลโก้ตรงนี้ครับ ---
                 try:
                     # วาดโลโก้ที่มุมซ้ายบน (x=50, y=height-85) ปรับขนาดกว้างxสูง เป็น 50x50
-                    c.drawImage("logo.png", 50, height - 85, width=50, height=50, mask='auto')
+                    c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
                 except:
                     pass # ถ้าหาไฟล์โลโก้ไม่เจอก็ข้ามไป (ไม่ error)
                 # -------------------------------
