@@ -153,12 +153,11 @@ elif menu == "👮 ครูตรวจสอบ":
             df = st.session_state['df']
             
             if search:
-                # แก้ไขการค้นหาให้ครอบคลุมทุกคอลัมน์ (แปลงเป็น string ก่อนค้นหา)
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
             
             st.write(f"พบข้อมูล {len(df)} รายการ")
             
-            # --- ฟังก์ชันดึงรูป (เหมือนเดิม) ---
+            # ฟังก์ชันแปลงลิงก์รูป
             def get_reliable_image_url(url):
                 url = str(url).strip()
                 if not url or url == "": return None
@@ -176,16 +175,26 @@ elif menu == "👮 ครูตรวจสอบ":
 
             # วนลูปแสดงผล
             for i, row in df.iterrows():
-                plate_txt = row.get('ทะเบียน', '-')
-                name_txt = row.get('ชื่อ-นามสกุล', '-')
+                # --- 🔴 จุดที่แก้: อ่านข้อมูลจากลำดับช่อง (Index) แทนชื่อหัวตาราง ---
+                vals = row.tolist() # แปลงข้อมูลทั้งแถวเป็นรายการ
+                
+                # ปกติช่องที่ 2 คือชื่อ (Index 1) และช่องที่ 7 คือทะเบียน (Index 6)
+                # เช็คความยาวก่อนเพื่อความปลอดภัย
+                name_txt = str(vals[1]) if len(vals) > 1 else "-"
+                std_id_txt = str(vals[2]) if len(vals) > 2 else "-"
+                plate_txt = str(vals[6]) if len(vals) > 6 else "-"
+                
+                # หรือถ้าอยากใช้ .get เหมือนเดิม ให้ลองดึงหลายๆ แบบเผื่อไว้
+                if name_txt == "-" or name_txt == "":
+                     name_txt = row.get('ชื่อ-นามสกุล', row.get('ชื่อ', row.get('Name', '-')))
+                # -------------------------------------------------------------
 
-                # แสดงหัวข้อ Expander
+                # แสดงผล
                 with st.expander(f"🛵 {plate_txt} | 👤 {name_txt}"):
                     c_img, c_text = st.columns([2,1])
                     
                     with c_img:
-                        vals = row.tolist() 
-                        # ดึงลิงก์ (ช่องรองสุดท้าย และ ช่องสุดท้าย)
+                        # ดึงลิงก์ (2 ช่องสุดท้าย)
                         raw_link1 = str(vals[-2]).strip() if len(vals) >= 2 else ""
                         raw_link2 = str(vals[-1]).strip() if len(vals) >= 1 else ""
 
@@ -202,29 +211,32 @@ elif menu == "👮 ครูตรวจสอบ":
                             cols[1].image(img_url2, caption="ด้านข้าง", use_column_width=True)
                         
                     with c_text:
-                        # --- 🔴 ส่วนที่เพิ่ม: แสดงชื่อเจ้าของรถชัดๆ ---
                         st.markdown(f"### 👤 {name_txt}")
-                        st.write(f"**รหัสนักเรียน:** {row.get('รหัสนักเรียน', '-')}")
+                        st.write(f"**รหัสนักเรียน:** {std_id_txt}")
                         st.markdown("---")
-                        # ----------------------------------------
                         
                         st.write(f"**ทะเบียน:** {plate_txt}")
-                        st.write(f"**ชั้น:** {row.get('ชั้น', '-')}")
-                        st.write(f"**ยี่ห้อ:** {row.get('ยี่ห้อ', '-')}")
-                        st.write(f"**สี:** {row.get('สี', '-')}")
+                        st.write(f"**ชั้น:** {vals[3] if len(vals) > 3 else '-'}") # Index 3
+                        st.write(f"**ยี่ห้อ:** {vals[4] if len(vals) > 4 else '-'}") # Index 4
+                        st.write(f"**สี:** {vals[5] if len(vals) > 5 else '-'}")    # Index 5
                         
                         st.markdown("---")
                         
-                        # สถานะเอกสาร (ใส่สีให้ดูง่าย)
-                        lic = row.get('ใบขับขี่', '-')
-                        tax = row.get('พรบ_ภาษี', '-')
+                        # สถานะใบขับขี่ (Index 7) และ ภาษี (Index 8)
+                        # (ถ้าคุณแทรกคอลัมน์ Index อาจจะเลื่อน ให้ลองเช็คตรงนี้)
+                        lic = str(vals[7]) if len(vals) > 7 else "-"
+                        tax = str(vals[8]) if len(vals) > 8 else "-"
                         
+                        # ถ้าอ่านแล้วเป็นลิงก์รูป (แปลว่า index ผิด) ให้พยายามใช้ key ช่วย
+                        if "http" in lic: lic = row.get('ใบขับขี่', '-')
+                        if "http" in tax: tax = row.get('พรบ_ภาษี', '-')
+
                         if "มี" in str(lic): st.success(f"ใบขับขี่: {lic}")
                         else: st.error(f"ใบขับขี่: {lic}")
                             
                         if "ครบ" in str(tax): st.success(f"พรบ./ภาษี: {tax}")
                         else: st.error(f"พรบ./ภาษี: {tax}")
                         
-                        # ปุ่ม Debug
-                        with st.expander("🔧 Link ต้นฉบับ"):
+                        with st.expander("🔧 Debug"):
+                             st.write(vals) # ดูข้อมูลดิบทั้งแถว
                             st.code(f"Link1: {raw_link1}\nLink2: {raw_link2}")
