@@ -81,7 +81,7 @@ def upload_to_drive(file_obj, filename):
 c_logo, c_title = st.columns([1, 8])
 with c_logo:
     try:
-        st.image("logo.png", width=90) 
+        st.image("logo", width=90) 
     except:
         st.write("🏍️") 
 with c_title:
