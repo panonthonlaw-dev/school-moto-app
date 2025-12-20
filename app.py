@@ -162,8 +162,9 @@ if st.session_state['page'] == 'student':
     with c_staff_btn[1]:
         if st.button("🔐 สำหรับเจ้าหน้าที่ / ครู", use_container_width=True):
             go_to_teacher()
-            st.rerun()# ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ
+            st.rerun()
+# ---------------------------------------
+# 👮 หน้าเจ้าหน้าที่ตรวจสอบ (Part 3)
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
     if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
@@ -247,7 +248,11 @@ elif st.session_state['page'] == 'teacher':
                         st.write(f"**รุ่น/สี:** {str(vals[4])} {str(vals[5])}")
 
             st.markdown("---")
-            with st.expander("⚙️ เลื่อนชั้นปี"):
+            # --- ส่วนจัดการเลื่อนชั้นปี ---
+            with st.expander("⚙️ เลื่อนชั้นปี (สำหรับสิ้นปีการศึกษา)"):
+                # 🔴🔴 เพิ่มคำเตือนตรงนี้ครับ 🔴🔴
+                st.error("⚠️ คำเตือน: ระบบจะทำการ 'บันทึกทับข้อมูลเดิม' ทันที ข้อมูลชั้นเรียนเก่าจะถูกเปลี่ยนและไม่สามารถกู้คืนย้อนหลังได้")
+                
                 spwd = st.text_input("รหัสลับ (Super Admin)", type="password")
                 if st.button("ยืนยันเลื่อนชั้น"):
                     if spwd == "Patwitnext":
@@ -273,11 +278,3 @@ elif st.session_state['page'] == 'teacher':
                                     if ol!=nl: row[l_idx]=nl; chg+=1
                                     new_r.append(row)
                             if chg>0:
-                                sheet.clear()
-                                sheet.update('A1', [h]+new_r)
-                                st.success(f"สำเร็จ {chg} คน")
-                            else: st.info("ไม่มีข้อมูลต้องเปลี่ยน")
-                        except Exception as e: st.error(f"Error: {e}")
-                    else: st.error("รหัสผิด")
-    st.caption("โรงเรียนโพนทองพัฒนาวิทยา")
-st.markdown("---")
