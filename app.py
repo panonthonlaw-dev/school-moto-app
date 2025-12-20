@@ -253,7 +253,7 @@ elif st.session_state['page'] == 'teacher':
             c3.metric("📝 พรบ./ภาษี", f"{tax} คัน", delta=f"{tax_pct:.1f}%")
             
             st.markdown("---")
-        # (Part 3.2: วางต่อท้ายสุด - แก้ไข Indentation แล้ว)
+       # (Part 3.2: วางต่อท้ายสุด - แก้ไข Syntax Error แล้ว)
             
             # --- Import ตัวทำ PDF ---
             from reportlab.pdfgen import canvas
@@ -277,10 +277,12 @@ elif st.session_state['page'] == 'teacher':
                     font_name = 'Helvetica'
                 
                 # 2. หัวกระดาษ & โลโก้
+                # --- จุดที่เคย Error แก้ไขให้แล้วครับ (มี except รองรับชัดเจน) ---
                 try:
                     c.drawImage("logo.png", 50, height - 85, width=50, height=50, mask='auto')
-                except:
-                    pass 
+                except Exception:
+                    pass # ถ้าหาไฟล์โลโก้ไม่เจอ ให้ข้ามไป ไม่ต้อง Error
+                # -------------------------------------------------------
 
                 c.setFont(font_name, 24)
                 c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
@@ -323,4 +325,55 @@ elif st.session_state['page'] == 'teacher':
                             res = requests.get(url, timeout=5)
                             if res.status_code == 200:
                                 img = ImageReader(io.BytesIO(res.content))
-                                c
+                                c.drawImage(img, x, y, width=200, height=200, preserveAspectRatio=True)
+                            else: c.drawString(x, y+100, "โหลดรูปไม่ได้")
+                    except: c.drawString(x, y+100, "Error รูปภาพ")
+
+                c.drawString(60, y_img + 210, "หลักฐานภาพถ่าย:")
+                draw_img(img_url1, 60, y_img)
+                draw_img(img_url2, 300, y_img)
+
+                # 7. ลายเซ็น
+                y_sign = 100
+                c.drawString(60, y_sign, "ลงชื่อ ....................................................... เจ้าของรถ")
+                c.drawString(100, y_sign-20, f"({name})")
+                c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
+                c.drawString(330, y_sign-20, "(.......................................................)")
+                
+                c.setFont(font_name, 12)
+                c.drawRightString(width - 30, 30, f"พิมพ์เมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+                
+                c.save()
+                buffer.seek(0)
+                return buffer
+
+            # --- ส่วนค้นหา + ปุ่มกด ---
+            st.markdown("##### 🔍 ค้นหาข้อมูล")
+            c_input, c_btn = st.columns([4, 1])
+            
+            with c_input:
+                search_query = st.text_input("ช่องค้นหา", label_visibility="collapsed", placeholder="พิมพ์ชื่อ หรือ เลขทะเบียน...")
+            
+            with c_btn:
+                btn_search = st.button("🔎 ค้นหา", use_container_width=True)
+
+            # --- LOGIC แสดงผล ---
+            if not search_query:
+                st.info("👆 กรุณาพิมพ์ข้อมูล และกดปุ่ม **'ค้นหา'**")
+            else:
+                filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
+                
+                if len(filtered_df) == 0:
+                    st.warning(f"❌ ไม่พบข้อมูล: '{search_query}'")
+                else:
+                    st.success(f"✅ พบข้อมูล {len(filtered_df)} รายการ")
+                    
+                    def get_img_link(url):
+                        url = str(url).strip()
+                        if not url: return None
+                        import re
+                        file_id = None
+                        match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+                        if match: file_id = match.group(1)
+                        else: 
+                            match = re.search(r'id=([a-zA-Z0-9_-
