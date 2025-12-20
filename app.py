@@ -109,13 +109,13 @@ if st.session_state['page'] == 'student':
         std_id = c2.text_input("รหัสนักเรียน (ครู/พ่อค้าแม้ค้าใช้วัน เดือน พ.ศ.เกิด เช่น020923)")
         
         c3, c4 = st.columns(2)
-        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","บุคลากร","พ่อค้าแม่ค้า"])
+        level = c3.selectbox("ชั้น", ["ม.1","ม.2","ม.3","ม.4","ม.5","ม.6","ครู/บุคลากร","พ่อค้าแม่ค้า"])
         room = c4.text_input("ห้อง")
         
         st.markdown("---")
         
         c5, c6 = st.columns(2)
-        brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","Vespa","อื่นๆ"])
+        brand = c5.selectbox("ยี่ห้อ", ["Honda","Yamaha","Suzuki","GPX","kawasaki","อื่นๆ"])
         color = c6.text_input("สีรถ")
         
         plate = st.text_input("ทะเบียน พร้อมจังหวัด (ตัวอย่าง กก1234 ร้อยเอ็ด)")
