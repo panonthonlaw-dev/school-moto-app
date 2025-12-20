@@ -63,25 +63,29 @@ def upload_to_drive(file_obj, filename):
 # --- หน้าเว็บ ---
 # ตรงนี้ใส่ชื่อไฟล์โลโก้ของคุณ (ควรมีนามสกุลไฟล์ด้วย เช่น .png, .jpg)
 st.set_page_config(page_title="patwit moto.", page_icon="logo")
-# 🟢🟢 โค้ดสำหรับซ่อนทุกอย่าง เหลือแค่ลูกศรเปิด Sidebar 🟢🟢
+# 🟢🟢 โค้ดท่าไม้ตาย: แยกปุ่มลูกศรออกมา แล้วลบ Header ทิ้ง 🟢🟢
 st.markdown("""
     <style>
-        /* 1. สั่งซ่อน Header ด้านบนทั้งหมดก่อน (ทั้งแถบ) */
-        header[data-testid="stHeader"] {
+        /* 1. ซ่อน Header ทั้งแถบ (ทั้งแถบสีรุ้ง แถบขาว ปุ่ม GitHub ปุ่ม Deploy หายเกลี้ยง) */
+        header {
             visibility: hidden !important;
+            height: 0px !important;
         }
 
-        /* 2. สั่งโชว์เฉพาะ "ปุ่มลูกศร Sidebar" กลับขึ้นมา */
+        /* 2. ดึงเฉพาะ "ปุ่มลูกศร" ให้กลับมาแสดงผล และบังคับให้ลอยอยู่มุมซ้ายบน */
         [data-testid="stSidebarCollapsedControl"] {
             visibility: visible !important;
             display: block !important;
-            
-            /* ปรับตำแหน่งนิดหน่อยเผื่อมันเลื่อน */
-            margin-top: 0px; 
-            margin-left: 0px;
+            position: fixed !important;  /* บังคับตำแหน่ง */
+            top: 15px !important;        /* ระยะห่างจากด้านบน */
+            left: 15px !important;       /* ระยะห่างจากด้านซ้าย */
+            z-index: 999999 !important;  /* บังคับให้อยู่บนสุดเสมอ */
+            background-color: white;     /* ใส่พื้นหลังสีขาวให้ปุ่มหน่อยจะได้ไม่จม */
+            border-radius: 50%;          /* ทำปุ่มกลม (ถ้าชอบ) */
+            padding: 5px;                /* เพิ่มพื้นที่รอบปุ่ม */
         }
         
-        /* 3. ซ่อน Footer ด้านล่าง */
+        /* 3. ซ่อน Footer */
         footer {
             display: none !important;
         }
