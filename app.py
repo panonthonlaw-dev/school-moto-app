@@ -159,7 +159,7 @@ def get_img_link(url):
     if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
     return url
 
-# --- ฟังก์ชันสร้าง PDF (อัปเดตใหม่: แสดงคะแนน + ประวัติ) ---
+# --- ฟังก์ชันสร้าง PDF (เวอร์ชันแก้ไข Error ค่าว่าง) ---
 def create_pdf(vals, img_url1, img_url2):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -171,7 +171,7 @@ def create_pdf(vals, img_url1, img_url2):
     except:
         font_name = 'Helvetica'
     
-    # 1. Header
+    # Header
     try:
         c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
     except: pass 
@@ -182,7 +182,7 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawCentredString(width/2, height - 75, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 90, width - 50, height - 90)
 
-    # 2. ข้อมูลส่วนตัว
+    # Info
     y = height - 130
     c.setFont(font_name, 16)
     
@@ -191,11 +191,20 @@ def create_pdf(vals, img_url1, img_url2):
     color = str(vals[5]); plate = str(vals[6]); 
     lic_status = str(vals[7]); tax_status = str(vals[8])
     
-    # ดึงคะแนนและประวัติ
-    try: score = str(vals[11]) 
-    except: score = "100"
-    try: history_log = str(vals[12]) 
-    except: history_log = "-"
+    # --- แก้ไขจุดที่เกิด Error: ตรวจสอบคะแนน ---
+    try: 
+        raw_score = str(vals[11]).strip()
+        if raw_score.isdigit():
+            score = raw_score
+        else:
+            score = "100" # ถ้าว่างหรือเป็นตัวอักษร ให้เป็น 100
+    except: 
+        score = "100"
+
+    try: 
+        history_log = str(vals[12]) if vals[12] else "-"
+    except: 
+        history_log = "-"
 
     c.drawString(60, y, f"ชื่อ-นามสกุล: {name}")
     c.drawString(60, y-25, f"รหัสนักเรียน: {std_id}")
@@ -208,18 +217,17 @@ def create_pdf(vals, img_url1, img_url2):
     
     # --- กล่องคะแนนคงเหลือ ---
     c.setStrokeColor(colors.black)
-    c.rect(450, y-10, 80, 50, fill=0) # กรอบ
+    c.rect(450, y-10, 80, 50, fill=0) 
     c.setFont(font_name, 14)
     c.drawCentredString(490, y+25, "คะแนนคงเหลือ")
     
-    # เปลี่ยนสีคะแนนถ้าต่ำ
+    # เปลี่ยนสีคะแนน
     if int(score) < 60: c.setFillColor(colors.red)
     else: c.setFillColor(colors.green)
     
     c.setFont(font_name, 30)
     c.drawCentredString(490, y, score)
-    c.setFillColor(colors.black) # กลับมาดำ
-    # -----------------------
+    c.setFillColor(colors.black)
 
     c.setFont(font_name, 16)
     y_status = y - 90
@@ -227,7 +235,7 @@ def create_pdf(vals, img_url1, img_url2):
     tax_mark = "(/)" if "ครบ" in tax_status or "ปกติ" in tax_status else "( )"
     c.drawString(60, y_status, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
     
-    # --- ส่วนแสดงประวัติ (History) ---
+    # --- ส่วนแสดงประวัติ ---
     y_hist = y_status - 40
     c.setFont(font_name, 14)
     c.drawString(60, y_hist, "ประวัติการหักคะแนน / การฟื้นฟู:")
@@ -236,10 +244,9 @@ def create_pdf(vals, img_url1, img_url2):
     y_hist -= 25
     c.setFont(font_name, 12)
     
-    # แยกบรรทัดและแสดงผล (แสดงแค่ 5 รายการล่าสุดเพื่อไม่ให้ล้น)
     logs = history_log.split('\n')
-    logs = [l for l in logs if l.strip() != ""] # ลบบรรทัดว่าง
-    recent_logs = logs[-5:] # เอาแค่ 5 อันหลังสุด
+    logs = [l for l in logs if l.strip() != ""] 
+    recent_logs = logs[-5:] 
     
     if not recent_logs:
         c.drawString(80, y_hist, "- ไม่มีการบันทึกประวัติ -")
@@ -248,7 +255,6 @@ def create_pdf(vals, img_url1, img_url2):
         for log in recent_logs:
             c.drawString(80, y_hist, log)
             y_hist -= 15
-    # -----------------------------
 
     # Images
     y_img = y_hist - 40
