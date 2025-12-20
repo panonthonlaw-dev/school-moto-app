@@ -36,7 +36,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ฟังก์ชันระบบ (Functions) ---
+# --- 3. ฟังก์ชันระบบ ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 'student'
 
@@ -115,7 +115,7 @@ def create_pdf(vals, img_url1, img_url2):
     
     c.setFont(font_name, 16)
     lic_mark = "(/)" if "มี" in lic_status else "( )"
-    tax_mark = "(/)" if "ครบ" in tax_status or "ปกติ" in tax_status else "( )"
+    tax_mark = "(/)" if "ปกติ" in tax_status or "✅" in tax_status else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:       {lic_mark} ใบขับขี่         {tax_mark} พรบ./ภาษี")
     c.setFont(font_name, 16)
     c.drawString(60, height - 255, "หลักฐานภาพถ่าย:")
@@ -186,44 +186,40 @@ if st.session_state['page'] == 'student':
                             st.success("ลงทะเบียนสำเร็จ!")
                 except Exception as e: st.error(f"Error: {e}")
     st.markdown("---")
-    if st.button("🔐 ส่วนสำหรับเจ้าหน้าที่ตรวจสอบ", use_container_width=True):
+    if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
         go_to_teacher(); st.rerun()
 
 elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าลงทะเบียน"): go_to_student(); st.rerun()
+    if st.button("🏠 กลับหน้าหลัก"): go_to_student(); st.rerun()
     if not st.session_state.get('logged_in'):
         st.subheader("👮 เข้าสู่ระบบเจ้าหน้าที่")
-        pwd = st.text_input("รหัสผ่านผู้ดูแลระบบ", type="password")
+        pwd = st.text_input("รหัสผ่าน", type="password")
         if st.button("เข้าสู่ระบบ"):
             if pwd == ADMIN_PASSWORD: st.session_state.logged_in = True; st.rerun()
             else: st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
-        if st.button("🔄 ดึงข้อมูลล่าสุดจาก Sheet", use_container_width=True):
+        if st.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
             st.session_state.df = pd.DataFrame(connect_gsheet().get_all_records())
             st.success("อัปเดตข้อมูลสำเร็จ")
         
         if 'df' in st.session_state:
             df = st.session_state.df
+            # --- 📊 ระบบสรุปผล (Metrics) แก้ไขแล้ว ---
             st.markdown("### 📊 สรุปภาพรวมสถิติ")
-        total = len(df)
-        try:
-            # คอลัมน์ที่ 7 (index 7) คือ ใบขับขี่
-            lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
-            # คอลัมน์ที่ 8 (index 8) คือ ภาษี (เช็คคำว่า "ปกติ" หรือ "✅")
-            tax = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅", na=False)].shape[0]
+            total = len(df)
+            try:
+                lic = df[df.iloc[:, 7].astype(str).str.contains("มี", na=False)].shape[0]
+                tax = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅", na=False)].shape[0]
+                lic_pct = (lic/total)*100 if total > 0 else 0
+                tax_pct = (tax/total)*100 if total > 0 else 0
+            except: lic, tax, lic_pct, tax_pct = 0, 0, 0, 0
             
-            lic_pct = (lic/total)*100 if total > 0 else 0
-            tax_pct = (tax/total)*100 if total > 0 else 0
-        except Exception as e:
-            lic, tax, lic_pct, tax_pct = 0, 0, 0, 0
-            st.error(f"การคำนวณสถิติผิดพลาด: {e}")
-        
-        c1, c2, c3 = st.columns(3)
-        c1.metric("🏍️ รถที่ลงทะเบียน", f"{total} คัน")
-        c2.metric("🪪 มีใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
-        c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
-        st.markdown("---")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("🏍️ รถที่ลงทะเบียน", f"{total} คัน")
+            c2.metric("🪪 มีใบขับขี่", f"{lic} คน", f"{lic_pct:.1f}%")
+            c3.metric("📝 ภาษีปกติ", f"{tax} คัน", f"{tax_pct:.1f}%")
+            st.markdown("---")
 
             q = st.text_input("🔍 ค้นหาข้อมูล (ชื่อ/รหัส/ทะเบียน)")
             if q:
@@ -247,10 +243,10 @@ elif st.session_state['page'] == 'teacher':
                             if st.button("📄 พิมพ์ PDF ประวัติ", key=f"pdf_{i}"):
                                 with st.spinner("กำลังสร้างไฟล์..."):
                                     b = create_pdf(v, i1, i2)
-                                    st.download_button("ดาวน์โหลดไฟล์ PDF", b, f"Profile_{v[6]}.pdf", "application/pdf", key=f"dl_{i}")
+                                    st.download_button("ดาวน์โหลด PDF", b, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
             
             st.markdown("---")
-            with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี (Super Admin Only)"):
+            with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
                 st.warning("⚠️ ข้อมูลชั้นเรียนจะถูกเปลี่ยนถาวร")
                 spwd = st.text_input("รหัสลับยืนยัน", type="password")
                 if st.button("เริ่มการเลื่อนชั้นปี"):
@@ -259,7 +255,7 @@ elif st.session_state['page'] == 'teacher':
                             sheet = connect_gsheet()
                             d = sheet.get_all_values()
                             h = d[0]; r = d[1:]
-                            l_idx = 3 # คอลัมน์ชั้น
+                            l_idx = 3 
                             new_r = []
                             chg = 0
                             for row in r:
@@ -278,4 +274,4 @@ elif st.session_state['page'] == 'teacher':
                                 st.success(f"ดำเนินการสำเร็จ {chg} รายการ")
                             else: st.info("ไม่มีข้อมูลที่ต้องเปลี่ยนแปลง")
                         except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-                    else: st.error("รหัสผ่าน Super Admin ไม่ถูกต้อง")
+                    else: st.error("รหัสผิด")
