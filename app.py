@@ -35,8 +35,8 @@ def upload_to_drive(file_obj, filename):
     service = build('drive', 'v3', credentials=creds)
     file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID]}
     media = MediaIoBaseUpload(file_obj, mimetype=file_obj.type, resumable=True)
-    file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink
-    ,supportsAllDrives=True').execute()
+    file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink'
+    ,supportsAllDrives=True).execute()
     return file.get('webViewLink')
 
 # --- หน้าเว็บ ---
