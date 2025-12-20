@@ -8,14 +8,14 @@ import requests
 import base64
 import time
 
-# --- ตั้งค่า (Config) ---
+# --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
 ADMIN_PASSWORD = "Patwit1150"
-SECRET_RESTORE_CODE = "POLICE2025" # รหัสลับสำหรับคืนคะแนน
+SECRET_RESTORE_CODE = "POLICE2025" 
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 
-# --- Setup หน้าเว็บ ---
+# --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
 
 st.markdown("""
@@ -38,12 +38,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- State Management ---
+# --- 3. ฟังก์ชันระบบ (สำคัญมาก ห้ามลบ) ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 'student'
 
 def go_to_teacher():
-    st.session_state['page'] = 'teacher'# --- เชื่อมต่อ Google Sheets ---
+    st.session_state['page'] = 'teacher'
+
+def go_to_student():
+    st.session_state['page'] = 'student'
+
 def get_creds():
     key_content = st.secrets["textkey"]["json_content"]
     try:
@@ -59,17 +63,15 @@ def connect_gsheet():
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
-# --- ฟังก์ชันอัปเดตคะแนน ---
 def update_point(std_id, action):
     try:
         sheet = connect_gsheet()
-        # ค้นหาแถวจากรหัสนักเรียน (ค้นในคอลัมน์ C คือ col 3)
+        # ค้นหา ID ในคอลัมน์ 3 (C)
         cell = sheet.find(str(std_id), in_column=3)
         
         if cell:
             row_num = cell.row
-            # ดึงคะแนนปัจจุบัน (สมมติคะแนนอยู่คอลัมน์ L คือ col 12)
-            # *** ถ้าใน Google Sheet คะแนนไม่ได้อยู่คอลัมน์ L ให้แก้เลข 12 เป็นเลขคอลัมน์จริง ***
+            # คะแนนอยู่ที่คอลัมน์ 12 (L)
             current_val = sheet.cell(row_num, 12).value
             
             if not current_val: current_val = 100
@@ -91,7 +93,6 @@ def update_point(std_id, action):
                 new_score = 100
                 msg = "✨ ฟื้นฟูคะแนนเรียบร้อย!"
             
-            # อัปเดตลง Sheet
             sheet.update_cell(row_num, 12, new_score)
             return True, new_score, msg
         else:
@@ -99,7 +100,6 @@ def update_point(std_id, action):
     except Exception as e:
         return False, 0, f"Error: {str(e)}"
 
-# --- ฟังก์ชันอัปโหลดรูป ---
 def upload_to_drive(file_obj, filename):
     if "script.google.com" not in GAS_APP_URL:
         st.error("🚨 กรุณาใส่ URL Web App")
@@ -121,8 +121,9 @@ def upload_to_drive(file_obj, filename):
             raise Exception(f"Upload failed: {result.get('message')}")
     except Exception as e:
         raise Exception(f"เชื่อมต่อไม่ได้: {e}")
-      # ==========================================
-# ส่วนหัวเว็บ
+
+# ==========================================
+# 4. ส่วนแสดงผล (UI)
 # ==========================================
 c_logo, c_title = st.columns([1, 8])
 with c_logo:
@@ -136,7 +137,7 @@ with c_title:
 st.markdown("---")
 
 # ---------------------------------------
-# 📝 หน้านักเรียนลงทะเบียน
+# A. หน้านักเรียนลงทะเบียน
 # ---------------------------------------
 if st.session_state['page'] == 'student':
     st.info("📝 กรุณากรอกข้อมูลและแนบรูปรถ")
@@ -193,7 +194,7 @@ if st.session_state['page'] == 'student':
                                  link2 = upload_to_drive(photo2, f"{std_id}_{clean_plate}_SIDE.jpg")
 
                             if link1: 
-                                # เพิ่ม 100 คะแนนเริ่มต้น (ช่องสุดท้าย)
+                                # เพิ่ม 100 คะแนนเริ่มต้น
                                 sheet.append_row([str(datetime.now()), name, std_id, f"{level}/{room}", brand, color, plate, license_status, tax_status, link1, link2, 100])
                                 st.success(f"✅ บันทึกข้อมูล {name} เรียบร้อย!")
                 except Exception as e:
@@ -201,7 +202,6 @@ if st.session_state['page'] == 'student':
             else:
                 st.warning("กรุณากรอกข้อมูลให้ครบ")
 
-    # ส่วนนี้ออกมานอก Form แล้ว (Indentation ถอยกลับมาเท่ากับ if ด้านบน)
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("---")
     c_staff_btn = st.columns([1, 2, 1])
@@ -209,8 +209,9 @@ if st.session_state['page'] == 'student':
         if st.button("🔐 สำหรับเจ้าหน้าที่/ตำรวจนักเรียน", use_container_width=True):
             go_to_teacher()
             st.rerun()
-            # ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ
+
+# ---------------------------------------
+# B. หน้าเจ้าหน้าที่ตรวจสอบ
 # ---------------------------------------
 elif st.session_state['page'] == 'teacher':
     if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
@@ -218,7 +219,7 @@ elif st.session_state['page'] == 'teacher':
         
     st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
     
-    # Auto Logout Logic
+    # Auto Logout
     if st.session_state.get('logged_in'):
         now = datetime.now().timestamp()
         last_active = st.session_state.get('last_active', now)
@@ -242,57 +243,6 @@ elif st.session_state['page'] == 'teacher':
             else:
                 st.error("รหัสผ่านไม่ถูกต้อง")
     else:
-        # --- เข้าระบบสำเร็จ ---
-        if st.button("🚪 ออกจากระบบ"):
-            st.session_state['logged_in'] = False
-            if 'last_active' in st.session_state: del st.session_state['last_active']
-            st.rerun()
-        
-        st.success("เข้าสู่ระบบเรียบร้อย")
-        
-        if st.button("🔄 โหลดข้อมูลล่าสุด", use_container_width=True):
-            try:
-                data = connect_gsheet().get_all_records()
-                if data: 
-                    st.session_state['df'] = pd.DataFrame(data)
-                else: 
-                    st.warning("ยังไม่มีข้อมูล")
-            except Exception as e: 
-                st.error(f"ดึงข้อมูลไม่ได้: {e}")
-             # ---------------------------------------
-# 👮 หน้าเจ้าหน้าที่ตรวจสอบ
-# ---------------------------------------
-elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าลงทะเบียน", on_click=go_to_student):
-        st.rerun()
-        
-    st.markdown("### 👮 ส่วนสำหรับเจ้าหน้าที่")
-    
-    # Auto Logout Logic
-    if st.session_state.get('logged_in'):
-        now = datetime.now().timestamp()
-        last_active = st.session_state.get('last_active', now)
-        if now - last_active > 3600:
-            st.session_state['logged_in'] = False
-            del st.session_state['last_active']
-            st.error("⏳ หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่")
-        else:
-            st.session_state['last_active'] = now
-
-    if 'logged_in' not in st.session_state: 
-        st.session_state['logged_in'] = False
-
-    if not st.session_state['logged_in']:
-        pwd = st.text_input("กรอกรหัสผ่าน", type="password")
-        if st.button("เข้าสู่ระบบ"):
-            if pwd == ADMIN_PASSWORD:
-                st.session_state['logged_in'] = True
-                st.session_state['last_active'] = datetime.now().timestamp()
-                st.rerun()
-            else:
-                st.error("รหัสผ่านไม่ถูกต้อง")
-    else:
-        # --- เข้าระบบสำเร็จ ---
         if st.button("🚪 ออกจากระบบ"):
             st.session_state['logged_in'] = False
             if 'last_active' in st.session_state: del st.session_state['last_active']
@@ -310,7 +260,6 @@ elif st.session_state['page'] == 'teacher':
             except Exception as e: 
                 st.error(f"ดึงข้อมูลไม่ได้: {e}")
         
-        # --- ส่วนแสดงผลข้อมูลและตัดคะแนน ---
         if 'df' in st.session_state:
             df = st.session_state['df']
             
@@ -324,7 +273,6 @@ elif st.session_state['page'] == 'teacher':
                 btn_search = st.button("🔎 ค้นหา", use_container_width=True)
 
             if search_query:
-                # กรองข้อมูล
                 filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
                 
                 if len(filtered_df) == 0:
@@ -332,27 +280,23 @@ elif st.session_state['page'] == 'teacher':
                 else:
                     st.success(f"✅ พบ {len(filtered_df)} รายการ")
                     
-                    # วนลูปแสดงผลรายคน
                     for i, row in filtered_df.iterrows():
                         vals = row.tolist()
                         std_name = str(vals[1])
                         std_id = str(vals[2])
                         plate_num = str(vals[6])
                         
-                        # ดึงคะแนน (ป้องกัน Error ถ้าไม่มีคอลัมน์คะแนน)
                         try:
-                            # Index 11 คือคอลัมน์ L
+                            # Index 11 = คอลัมน์ L (Score)
                             current_score = int(vals[11]) if len(vals) > 11 and str(vals[11]).isdigit() else 100
                         except:
                             current_score = 100
 
-                        # สร้างกรอบแสดงผล
                         with st.container():
                             st.info(f"👤 **{std_name}** | 🆔 {std_id} | 🛵 {plate_num}")
                             
                             c_score, c_action = st.columns([1, 2])
                             
-                            # 1. แสดงคะแนน
                             with c_score:
                                 st.write("คะแนนความประพฤติ")
                                 score_class = "score-bad" if current_score < 60 else "score-good"
@@ -360,7 +304,6 @@ elif st.session_state['page'] == 'teacher':
                                 if current_score < 60:
                                     st.caption("⚠️ คะแนนต่ำกว่าเกณฑ์!")
 
-                            # 2. ปุ่มตัดคะแนน
                             with c_action:
                                 st.write("🚨 **แจ้งการกระทำผิด (-5 คะแนน):**")
                                 b1, b2, b3 = st.columns(3)
@@ -386,7 +329,6 @@ elif st.session_state['page'] == 'teacher':
                                         time.sleep(1)
                                         st.rerun()
                                 
-                                # ระบบฟื้นฟูคะแนน
                                 with st.expander("✨ ฟื้นฟูคะแนน (ใช้รหัสลับ)"):
                                     restore_code = st.text_input("ใส่รหัสลับ", type="password", key=f"code_{std_id}")
                                     if st.button("ยืนยันฟื้นฟู", key=f"res_{std_id}"):
@@ -399,4 +341,3 @@ elif st.session_state['page'] == 'teacher':
                                         else:
                                             st.error("❌ รหัสลับไม่ถูกต้อง")
                             st.markdown("---")
-    st.session_state['page'] = 'student'
