@@ -30,24 +30,60 @@ GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLK
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
 
-# --- 3. ฟังก์ชันระบบ (ย้ายมาไว้บนสุดเพื่อแก้ NameError) ---
-
 def img_to_b64(img_path):
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return ""
 
-def connect_gsheet():
-    key_content = st.secrets["textkey"]["json_content"]
-    try: key_dict = json.loads(key_content, strict=False)
-    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
-    client = gspread.authorize(creds)
-    return client.open(SHEET_NAME).sheet1
+st.markdown("""
+    <style>
+        header { visibility: hidden !important; height: 0px !important; }
+        footer { visibility: hidden !important; height: 0px !important; }
+        [data-testid="stSidebar"] { display: none; }
+        .block-container { padding-top: 2rem; }
+        .metric-card {
+            background-color: #ffffff; padding: 15px; border-radius: 10px;
+            border: 1px solid #e2e8f0; text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .metric-value { font-size: 2.5rem; font-weight: 800; color: #1e293b; line-height: 1.2; }
+        .metric-percent { font-size: 1.1rem; color: #16a34a; font-weight: bold; margin-top: -5px; margin-bottom: 5px; }
+        .metric-label { font-size: 1rem; color: #64748b; }
+        .score-display {
+            font-size: 1.5rem; font-weight: bold; color: #ef4444;
+            background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
+            margin-bottom: 10px;
+        }
+        .atm-card {
+            width: 100%; max-width: 450px; aspect-ratio: 1.586;
+            background: #ffffff; border-radius: 15px; border: 2px solid #cbd5e1;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 20px; position: relative; font-family: 'Sarabun', sans-serif;
+            color: #334155; margin: auto;
+        }
+        .atm-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; }
+        .atm-logo { height: 55px; width: auto; }
+        .atm-title { text-align: right; }
+        .atm-school-name { font-size: 16px; font-weight: bold; color: #1e293b; }
+        .atm-card-name { font-size: 14px; color: #059669; font-weight: bold; }
+        .atm-body { display: flex; gap: 15px; }
+        .atm-photo { width: 100px; height: 125px; border-radius: 8px; object-fit: cover; border: 1px solid #cbd5e1; background-color: #f1f5f9; }
+        .atm-info { font-size: 14px; line-height: 1.5; flex: 1; color: #334155; }
+        .atm-score-box { position: absolute; bottom: 35px; right: 20px; text-align: right; }
+        .atm-score-label { font-size: 12px; color: #64748b; }
+        .atm-score-val { font-size: 32px; font-weight: 800; line-height: 1; }
+        .atm-disclaimer { position: absolute; bottom: 8px; right: 15px; font-size: 9px; color: #ef4444; opacity: 0.8; font-style: italic; }
+        
+        div[data-testid="stForm"] { border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; }
+    </style>
+""", unsafe_allow_html=True)
 
-# ฟังก์ชันโหลดข้อมูล (ย้ายมาตรงนี้เพื่อให้เรียกใช้ได้ทั่วโปรแกรม)
+# --- 3. ฟังก์ชันระบบ ---
+if 'page' not in st.session_state: st.session_state['page'] = 'student'
+if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
+if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
+
 def load_data():
     try:
         sheet = connect_gsheet()
@@ -59,6 +95,23 @@ def load_data():
         st.error(f"โหลดข้อมูลไม่สำเร็จ: {e}")
         return False
     return False
+
+def clear_form_state():
+    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
+    for key in keys_to_clear:
+        if key in st.session_state: st.session_state[key] = ""
+
+def reset_results(): st.session_state['search_results_df'] = None
+def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
+
+def connect_gsheet():
+    key_content = st.secrets["textkey"]["json_content"]
+    try: key_dict = json.loads(key_content, strict=False)
+    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open(SHEET_NAME).sheet1
 
 def upload_to_drive(file_obj, filename):
     file_content = file_obj.getvalue()
@@ -74,16 +127,7 @@ def get_img_link(url):
     file_id = match.group(1) or match.group(2) if match else None
     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
 
-def clear_form_state():
-    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
-    for key in keys_to_clear:
-        if key in st.session_state:
-            st.session_state[key] = ""
-
-def reset_results(): st.session_state['search_results_df'] = None
-def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
-
-# --- ฟังก์ชันสร้าง PDF ---
+# --- ฟังก์ชัน PDF ---
 def create_pdf(vals, img_url1, img_url2, face_url=None):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -129,24 +173,20 @@ def create_pdf(vals, img_url1, img_url2, face_url=None):
                 c.rect(x, y, w, h)
         except: pass
 
-    # Draw Vehicle Images (Middle)
     draw_img_func(img_url1, 70, height - 415, 180, 180)
     draw_img_func(img_url2, 300, height - 415, 180, 180)
 
-    # History Section
     note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
     c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
     for line in note_text.split('\n'):
         for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
     c.drawText(text_obj)
     
-    # Signature Section
     sign_y = 180 
     c.setFont(font_name, 16)
     c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ")
     c.drawString(100, sign_y - 20, f"({name})")
 
-    # Face Image (Top Right)
     if face_url:
         draw_img_func(face_url, 450, height - 200, 90, 110) # รูปหน้าคนอยู่ขวาบน
         c.setFont(font_name, 12); c.drawCentredString(495, height - 215, "(เจ้าของรถ)")
@@ -156,50 +196,6 @@ def create_pdf(vals, img_url1, img_url2, face_url=None):
     
     c.save(); buffer.seek(0); return buffer
 
-# --- CSS Styling ---
-st.markdown("""
-    <style>
-        header { visibility: hidden !important; height: 0px !important; }
-        footer { visibility: hidden !important; height: 0px !important; }
-        [data-testid="stSidebar"] { display: none; }
-        .block-container { padding-top: 2rem; }
-        .metric-card {
-            background-color: #ffffff; padding: 15px; border-radius: 10px;
-            border: 1px solid #e2e8f0; text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .metric-value { font-size: 2.5rem; font-weight: 800; color: #1e293b; line-height: 1.2; }
-        .metric-percent { font-size: 1.1rem; color: #16a34a; font-weight: bold; margin-top: -5px; margin-bottom: 5px; }
-        .metric-label { font-size: 1rem; color: #64748b; }
-        .score-display {
-            font-size: 1.5rem; font-weight: bold; color: #ef4444;
-            background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
-            margin-bottom: 10px;
-        }
-        .atm-card {
-            width: 100%; max-width: 450px; aspect-ratio: 1.586;
-            background: #ffffff; border-radius: 15px; border: 2px solid #cbd5e1;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            padding: 20px; position: relative; font-family: 'Sarabun', sans-serif;
-            color: #334155; margin: auto;
-        }
-        .atm-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; }
-        .atm-logo { height: 55px; width: auto; }
-        .atm-title { text-align: right; }
-        .atm-school-name { font-size: 16px; font-weight: bold; color: #1e293b; }
-        .atm-card-name { font-size: 14px; color: #059669; font-weight: bold; }
-        .atm-body { display: flex; gap: 15px; }
-        .atm-photo { width: 100px; height: 125px; border-radius: 8px; object-fit: cover; border: 1px solid #cbd5e1; background-color: #f1f5f9; }
-        .atm-info { font-size: 14px; line-height: 1.5; flex: 1; color: #334155; }
-        .atm-score-box { position: absolute; bottom: 35px; right: 20px; text-align: right; }
-        .atm-score-label { font-size: 12px; color: #64748b; }
-        .atm-score-val { font-size: 32px; font-weight: 800; line-height: 1; }
-        .atm-disclaimer { position: absolute; bottom: 8px; right: 15px; font-size: 9px; color: #ef4444; opacity: 0.8; font-style: italic; }
-        
-        div[data-testid="stForm"] { border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; }
-    </style>
-""", unsafe_allow_html=True)
-
 # --- 4. Main UI ---
 c_logo, c_title = st.columns([1, 8])
 logo_path = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
@@ -208,11 +204,6 @@ with c_logo:
     else: st.write("🏍️")
 with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
 st.markdown("---")
-
-# Session State Initialization
-if 'page' not in st.session_state: st.session_state['page'] = 'student'
-if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
-if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 
 if st.session_state['page'] == 'student':
     if st.session_state.get("reg_success", False):
@@ -461,7 +452,9 @@ elif st.session_state['page'] == 'teacher':
                             st.write("---")
                             st.caption("จัดการคะแนน:")
                             pts = st.number_input("จำนวนแต้ม", 1, 50, 5, key=f"p_{i}")
-                            note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}")
+                            # ตรวจสอบค่า note เพื่อเคลียร์ค่าอัตโนมัติ
+                            default_note = st.session_state.get(f"n_{i}", "")
+                            note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", value=default_note, key=f"n_widget_{i}")
                             pwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"pw_{i}")
                             
                             b1, b2 = st.columns(2)
@@ -471,6 +464,12 @@ elif st.session_state['page'] == 'teacher':
                                     tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
                                     s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts} คะแนน: {note}", str(ns)]])
+                                    
+                                    # Clear Inputs
+                                    st.session_state[f"n_{i}"] = "" 
+                                    st.session_state[f"pw_{i}"] = ""
+                                    st.session_state[f"p_{i}"] = 5
+                                    
                                     load_data()
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                 else: st.error("ข้อมูลไม่ครบ/รหัสผิด")
@@ -480,6 +479,12 @@ elif st.session_state['page'] == 'teacher':
                                     tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
                                     s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note}", str(ns)]])
+                                    
+                                    # Clear Inputs
+                                    st.session_state[f"n_{i}"] = ""
+                                    st.session_state[f"pw_{i}"] = ""
+                                    st.session_state[f"p_{i}"] = 5
+                                    
                                     load_data()
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                     
