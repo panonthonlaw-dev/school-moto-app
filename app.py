@@ -42,19 +42,29 @@ st.markdown("""
         footer { visibility: hidden !important; height: 0px !important; }
         [data-testid="stSidebar"] { display: none; }
         .block-container { padding-top: 2rem; }
+        
+        /* Metric Card Style Updated */
         .metric-card {
             background-color: #ffffff; padding: 15px; border-radius: 10px;
             border: 1px solid #e2e8f0; text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .metric-value { font-size: 2.2rem; font-weight: bold; color: #1e293b; }
-        .metric-percent { font-size: 1.1rem; color: #16a34a; font-weight: bold; }
-        .metric-label { font-size: 1rem; color: #64748b; margin-top: 5px; }
+        .metric-value { 
+            font-size: 2.5rem; font-weight: 800; color: #1e293b; line-height: 1.2;
+        }
+        .metric-percent { 
+            font-size: 1.1rem; color: #16a34a; font-weight: bold; margin-top: -5px; margin-bottom: 5px;
+        }
+        .metric-label { 
+            font-size: 1rem; color: #64748b; 
+        }
+
         .score-display {
             font-size: 1.5rem; font-weight: bold; color: #ef4444;
             background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
             margin-bottom: 10px;
         }
+        
         /* ATM Card Style */
         .atm-card {
             width: 100%; max-width: 450px; aspect-ratio: 1.586;
@@ -76,7 +86,6 @@ st.markdown("""
         .atm-score-val { font-size: 32px; font-weight: 800; line-height: 1; }
         .atm-disclaimer { position: absolute; bottom: 8px; right: 15px; font-size: 9px; color: #ef4444; opacity: 0.8; font-style: italic; }
         
-        /* Button Styling Adjustments */
         div[data-testid="stForm"] { border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; }
     </style>
 """, unsafe_allow_html=True)
@@ -86,12 +95,10 @@ if 'page' not in st.session_state: st.session_state['page'] = 'student'
 if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 
-# ฟังก์ชันรีเซ็ตฟอร์ม
 def clear_form_state():
     keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
     for key in keys_to_clear:
-        if key in st.session_state:
-            st.session_state[key] = ""
+        if key in st.session_state: st.session_state[key] = ""
 
 def reset_results(): st.session_state['search_results_df'] = None
 def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
@@ -174,11 +181,10 @@ if st.session_state['page'] == 'student':
     if st.session_state.get("reg_success", False):
         st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
         st.balloons()
-        clear_form_state() # ล้างค่าฟอร์ม
+        clear_form_state()
         st.session_state.reg_success = False
 
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
-    
     with st.form("reg_form", clear_on_submit=False):
         sc1, sc2 = st.columns(2)
         with sc1:
@@ -328,7 +334,6 @@ elif st.session_state['page'] == 'edit':
 elif st.session_state['page'] == 'teacher':
     if st.button("🏠 กลับหน้าหลัก", use_container_width=True): go_to_page('student')
     
-    # --- Login Form แก้ไขปัญหาปุ่มกดไม่ได้ ---
     if not st.session_state.get('logged_in'):
         with st.form("login_form"):
             st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
@@ -340,7 +345,6 @@ elif st.session_state['page'] == 'teacher':
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
     else:
-        # --- ส่วนเจ้าหน้าที่ (Restore Full Features) ---
         c1, c2 = st.columns(2)
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
             vals = connect_gsheet().get_all_values()
@@ -349,15 +353,23 @@ elif st.session_state['page'] == 'teacher':
         
         if 'df' in st.session_state:
             df = st.session_state.df
-            # Summary Metrics
-            t = len(df); l = df[df.iloc[:,7].str.contains("มี", na=False)].shape[0]; tx = df[df.iloc[:,8].str.contains("ปกติ|✅", na=False)].shape[0]; h = df[df.iloc[:,9].str.contains("มี", na=False)].shape[0]
-            m1, m2, m3, m4 = st.columns(4)
-            m1.markdown(f'<div class="metric-card"><div class="metric-value">{t}</div><div class="metric-label">รถทั้งหมด</div></div>', unsafe_allow_html=True)
-            m2.markdown(f'<div class="metric-card"><div class="metric-value">{l}</div><div class="metric-label">ใบขับขี่</div></div>', unsafe_allow_html=True)
-            m3.markdown(f'<div class="metric-card"><div class="metric-value">{tx}</div><div class="metric-label">ภาษี</div></div>', unsafe_allow_html=True)
-            m4.markdown(f'<div class="metric-card"><div class="metric-value">{h}</div><div class="metric-label">หมวก</div></div>', unsafe_allow_html=True)
+            # --- 📊 แสดง Metrics พร้อม % สีเขียว ---
+            total = len(df); lok = df[df.iloc[:,7].str.contains("มี", na=False)].shape[0]; tok = df[df.iloc[:,8].str.contains("ปกติ|✅", na=False)].shape[0]; hok = df[df.iloc[:,9].str.contains("มี", na=False)].shape[0]
             
-            # Search & Filter Filters Restored
+            m1, m2, m3, m4 = st.columns(4)
+            with m1:
+                st.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-percent">100%</div><div class="metric-label">รถทั้งหมด</div></div>', unsafe_allow_html=True)
+            with m2:
+                p = (lok/total*100) if total else 0
+                st.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">ใบขับขี่</div></div>', unsafe_allow_html=True)
+            with m3:
+                p = (tok/total*100) if total else 0
+                st.markdown(f'<div class="metric-card"><div class="metric-value">{tok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">ภาษี</div></div>', unsafe_allow_html=True)
+            with m4:
+                p = (hok/total*100) if total else 0
+                st.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">หมวก</div></div>', unsafe_allow_html=True)
+            
+            # --- 🔍 ค้นหาและตัวกรอง ---
             st.markdown("---")
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
             if st.button("ค้นหา", use_container_width=True, type="primary") and q:
@@ -406,7 +418,6 @@ elif st.session_state['page'] == 'teacher':
                                     s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts}: {note}", str(ns)]])
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                     
-            # Promotion System (Moved to bottom)
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน"):
                 up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
