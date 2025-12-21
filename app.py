@@ -134,7 +134,7 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.save(); buffer.seek(0); return buffer
 
-# --- 4. Logic UI ---
+# --- 4. Main App Header ---
 c_logo, c_title = st.columns([1, 8])
 with c_logo:
     logo_file = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
@@ -144,7 +144,7 @@ with c_title: st.title("ระบบลงทะเบียนรถจัก�
 st.markdown("---")
 
 if st.session_state['page'] == 'student':
-    st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
+    st.info("📝 ลงทะเบียนรถจักรยานยนต์นักเรียน")
     with st.form("reg_form", clear_on_submit=True):
         sc1, sc2 = st.columns(2)
         with sc1:
@@ -169,7 +169,7 @@ if st.session_state['page'] == 'student':
                 else:
                     l1 = upload_to_drive(p1, f"{std_id}_F.jpg"); l2 = upload_to_drive(p2, f"{std_id}_S.jpg") if p2 else ""
                     sheet.append_row([(datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), f"{level}/{room}", brand, color, plate, ls, ts, hs, l1, l2, "", "100"])
-                    st.success("✅ ลงทะเบียนสำเร็จ คะแนนเริ่มต้น 100 แต้ม"); st.balloons()
+                    st.success("✅ สำเร็จ! คะแนนเริ่มต้น 100 แต้ม"); st.balloons()
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_page('teacher')
 
 elif st.session_state['page'] == 'dashboard':
@@ -182,7 +182,7 @@ elif st.session_state['page'] == 'dashboard':
         df[score_col] = pd.to_numeric(df[score_col], errors='coerce').fillna(100)
         df['LV'] = df[class_col].apply(lambda x: str(x).split('/')[0])
         p_col1, p_col2, p_col3 = st.columns(3)
-        with p_col1: st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 ใบขับขี่", hole=0.3), use_container_width=True)
+        with p_col1: st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 ใบขับขี่รวม", hole=0.3), use_container_width=True)
         with p_col2: st.plotly_chart(px.pie(df, names=df.columns[8], title="📝 ภาษี/พรบ.", hole=0.3), use_container_width=True)
         with p_col3: st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ หมวกกันน็อค", hole=0.3), use_container_width=True)
         b_col1, b_col2 = st.columns(2)
@@ -232,7 +232,7 @@ elif st.session_state['page'] == 'teacher':
             m1.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-percent">100%</div><div class="metric-label">🏍️ ทั้งหมด</div></div>', unsafe_allow_html=True)
             m2.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-percent">{(lok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">🪪 ใบขับขี่</div></div>', unsafe_allow_html=True)
             m3.markdown(f'<div class="metric-card"><div class="metric-value">{tok}</div><div class="metric-percent">{(tok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">📝 ภาษีปกติ</div></div>', unsafe_allow_html=True)
-            m4.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{(hok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">⛑️ หมวกกันน็อค</div></div>', unsafe_allow_html=True)
+            m4.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{(hok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">⛑️ มีหมวก</div></div>', unsafe_allow_html=True)
 
             st.markdown("---")
             q_txt = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
@@ -261,39 +261,39 @@ elif st.session_state['page'] == 'teacher':
                             c_im, c_in = st.columns([2, 1])
                             with c_im:
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
-                                sub1, sub2 = st.columns(2); if i1: sub1.image(i1, caption="หลัง"); if i2: sub2.image(i2, caption="ข้าง")
+                                sub1, sub2 = st.columns(2)
+                                if i1:
+                                    sub1.image(i1, caption="หลัง")
+                                if i2:
+                                    sub2.image(i2, caption="ข้าง")
                             with c_in:
                                 st.markdown(f'<div class="score-display">คะแนนวินัย: {curr_score} แต้ม</div>', unsafe_allow_html=True)
                                 st.download_button("⬇️ โหลด PDF", create_pdf(v, i1, i2), f"{v[6]}.pdf", key=f"pdf_{i}", mime="application/pdf")
                                 if st.button("✏️ แก้ไขข้อมูลเบื้องต้น", key=f"e_{i}"): st.session_state.edit_data = v; go_to_page('edit')
                                 
                                 st.write("---"); st.write("🛡️ **จัดการวินัยจราจร (หัก/เพิ่มแต้มจะบันทึกข้อความทันที)**")
-                                points = st.number_input("คะแนนที่จะปรับ", min_value=1, max_value=50, value=5, key=f"pts_{i}")
-                                nn = st.text_area("✍️ ระบุเหตุผลการหักหรือเพิ่มแต้ม (จำเป็น)", key=f"n_{i}", placeholder="เช่น ไม่สวมหมวกกันน็อค, ช่วยเหลือเจ้าหน้าที่...")
+                                points = st.number_input("จำนวนแต้ม", min_value=1, max_value=50, value=5, key=f"pts_{i}")
+                                nn = st.text_area("✍️ ระบุเหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}")
                                 apwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"apwd_{i}")
                                 
-                                col_sc1, col_sc2 = st.columns(2)
-                                # ปุ่มหักคะแนนที่ทำหน้าที่บันทึกข้อความด้วย
-                                if col_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}", use_container_width=True):
-                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลในช่องบันทึกเจ้าหน้าที่ก่อนหักคะแนน")
+                                c_sc1, c_sc2 = st.columns(2)
+                                if c_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}", use_container_width=True):
+                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลก่อนหักคะแนน")
                                     elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผิด")
                                     else:
                                         sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = max(0, curr_score - points)
-                                        # ระบุสาเหตุลงในบันทึกอัตโนมัติ
                                         final_note = f"หัก {points} คะแนน: {nn}"
                                         sheet.update(f'M{cell.row}:N{cell.row}', [[final_note, str(new_s)]])
-                                        st.success("บันทึกการหักคะแนนและข้อความแล้ว!"); time.sleep(1); st.rerun()
+                                        st.success("บันทึกสำเร็จ!"); time.sleep(1); st.rerun()
 
-                                # ปุ่มเพิ่มคะแนนที่ทำหน้าที่บันทึกข้อความด้วย
-                                if col_sc2.button(f"🟢 เพิ่ม {points} แต้ม", key=f"add_{i}", use_container_width=True):
-                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลในช่องบันทึกเจ้าหน้าที่ก่อนเพิ่มคะแนน")
+                                if c_sc2.button(f"🟢 เพิ่ม {points} แต้ม", key=f"add_{i}", use_container_width=True):
+                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลก่อนเพิ่มคะแนน")
                                     elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผิด")
                                     else:
                                         sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = min(100, curr_score + points)
-                                        # ระบุสาเหตุลงในบันทึกอัตโนมัติ
                                         final_note = f"เพิ่ม {points} คะแนน: {nn}"
                                         sheet.update(f'M{cell.row}:N{cell.row}', [[final_note, str(new_s)]])
-                                        st.success("บันทึกการเพิ่มคะแนนและข้อความแล้ว!"); time.sleep(1); st.rerun()
+                                        st.success("บันทึกสำเร็จ!"); time.sleep(1); st.rerun()
 
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียนประจำปี"):
