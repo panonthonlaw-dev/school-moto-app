@@ -29,7 +29,7 @@ SESSION_TIMEOUT_MINUTES = 30
 
 # --- 🔑 ระบบจัดการสิทธิ์ ---
 OFFICER_ACCOUNTS = {
-    "Patwit1150": {"name": "แอดมินสูงสุด", "role": "admin"},
+    "Patwit1510": {"name": "แอดมินสูงสุด", "role": "admin"},
     "Pencharee001": {"name": "ครูเพ็ญชรีย์ (ปกครอง)", "role": "admin"},
     "Chaiya001": {"name": "ครูไชยา(ปกครอง)", "role": "admin"},
     "Jak001": {"name": "ยามจักร (รปภ.)", "role": "admin"},
