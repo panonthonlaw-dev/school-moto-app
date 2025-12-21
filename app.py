@@ -190,10 +190,10 @@ if st.session_state['page'] == 'student':
             fname = st.text_input("ชื่อ-นามสกุล")
         std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         c3, c4 = st.columns(2)
-        level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
+        level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
         room_input = c4.text_input("ห้อง (ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
         c5, c6 = st.columns(2)
-        brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
+        brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = c6.text_input("สีรถ"); plate = st.text_input("ทะเบียนรถ")
         doc_c1, doc_c2, doc_c3 = st.columns(3)
         lic_s = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
@@ -235,7 +235,6 @@ elif st.session_state['page'] == 'dashboard':
             st.plotly_chart(px.pie(values=[hel_ok, total-hel_ok], names=['✅ มีหมวก', '❌ ไม่มี'], title="⛑️ การสวมหมวกกันน็อค", color_discrete_sequence=['#9b59b6', '#bdc3c7'], hole=0.3), use_container_width=True)
             df['L_Group'] = df.iloc[:, 3].apply(lambda x: str(x).split('/')[0])
             st.plotly_chart(px.bar(df.groupby('L_Group').size().reset_index(name='จำนวน'), x='L_Group', y='จำนวน', title="📚 จำนวนรถแยกตามระดับชั้น", color='จำนวน', color_continuous_scale='Blues'), use_container_width=True)
-    else: st.warning("กรุณากดดึงข้อมูลล่าสุดที่หน้าเจ้าหน้าที่ก่อน")
 
 elif st.session_state['page'] == 'edit':
     st.subheader("✏️ แก้ไขข้อมูลรายบุคคล")
@@ -294,31 +293,6 @@ elif st.session_state['page'] == 'teacher':
             with m_col3: st.markdown(f"""<div class="metric-card"><div class="metric-value">{tax_ok}</div><div class="metric-percent">{(tax_ok/total*100) if total > 0 else 0:.1f}%</div><div class="metric-label">📝 ภาษีปกติ</div></div>""", unsafe_allow_html=True)
             with m_col4: st.markdown(f"""<div class="metric-card"><div class="metric-value">{hel_ok}</div><div class="metric-percent">{(hel_ok/total*100) if total > 0 else 0:.1f}%</div><div class="metric-label">⛑️ มีหมวกกันน็อค</div></div>""", unsafe_allow_html=True)
 
-            # --- ⚙️ ระบบจัดการชั้นเรียนและฐานข้อมูล (นำกลับมาให้ชัดเจน) ---
-            st.markdown("---")
-            with st.expander("⚙️ ระบบเลื่อนชั้นเรียน (Class Promotion System)"):
-                st.warning("⚠️ การเลื่อนชั้นจะปรับปรุงระดับชั้นนักเรียนทุกคนในฐานข้อมูล (เช่น ม.1 -> ม.2)")
-                up_pwd = st.text_input("ใส่รหัสยืนยันการเลื่อนชั้น (Patwitnext)", type="password")
-                if st.button("ตกลงเลื่อนชั้นเรียนทุกคน"):
-                    if up_pwd == UPGRADE_PASSWORD:
-                        try:
-                            with st.spinner("⏳ กำลังดำเนินการเลื่อนชั้น..."):
-                                sheet = connect_gsheet(); d = sheet.get_all_values()
-                                h = d[0]; r = d[1:]; new_r = []
-                                for row in r:
-                                    ol = str(row[3]); nl = ol
-                                    if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                                    elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                                    elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                                    elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                                    elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                                    elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                                    row[3] = nl; new_r.append(row)
-                                sheet.clear(); sheet.update('A1', [h] + new_r)
-                                st.success("✅ เลื่อนชั้นนักเรียนสำเร็จ!"); del st.session_state.df
-                        except Exception as e: st.error(f"Error: {e}")
-                    else: st.error("❌ รหัสผ่านไม่ถูกต้อง")
-
             st.markdown("---")
             st.subheader("🔎 1. ค้นหาประวัติ (ชื่อ/รหัส/ทะเบียน)")
             q_txt = st.text_input("พิมพ์ ชื่อ, รหัส หรือ ทะเบียนรถ", key="q_txt", on_change=reset_results)
@@ -366,3 +340,29 @@ elif st.session_state['page'] == 'teacher':
                                     if apwd == UPGRADE_PASSWORD:
                                         sheet = connect_gsheet(); cell = sheet.find(str(v[2])); sheet.update_acell(f'M{cell.row}', new_n); st.success("บันทึกแล้ว!")
                                     else: st.error("รหัสผิด")
+            else: st.info("💡 กรุณาใช้ส่วนการค้นหาหรือตัวกรองด้านบน")
+
+            # --- ⚙️ ระบบเลื่อนชั้นเรียน (ย้ายมาไว้ล่างสุดตามคำขอ) ---
+            st.markdown("---")
+            with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียนประจำปี"):
+                st.warning("⚠️ คำเตือน: ระบบจะเปลี่ยน ม.1 -> ม.2, ม.2 -> ม.3... และชั้นสูงสุดจะจบการศึกษา")
+                up_pwd = st.text_input("รหัสยืนยันการเลื่อนชั้น", type="password", key="prom_pwd")
+                if st.button("ยืนยันเลื่อนชั้นนักเรียนทั้งระบบ"):
+                    if up_pwd == UPGRADE_PASSWORD:
+                        try:
+                            with st.spinner("⏳ กำลังประมวลผลการเลื่อนชั้น..."):
+                                sheet = connect_gsheet(); d = sheet.get_all_values()
+                                h = d[0]; r = d[1:]; new_r = []
+                                for row in r:
+                                    ol = str(row[3]); nl = ol
+                                    if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                    elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                    elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                    elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                    elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                    elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                    row[3] = nl; new_r.append(row)
+                                sheet.clear(); sheet.update('A1', [h] + new_r)
+                                st.success("✅ เลื่อนชั้นสำเร็จ!"); del st.session_state.df
+                        except Exception as e: st.error(f"Error: {e}")
+                    else: st.error("❌ รหัสผ่านไม่ถูกต้อง")
