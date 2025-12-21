@@ -30,12 +30,133 @@ GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLK
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
 
+# --- 3. ฟังก์ชันระบบ (ย้ายมาไว้บนสุดเพื่อแก้ NameError) ---
+
 def img_to_b64(img_path):
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return ""
 
+def connect_gsheet():
+    key_content = st.secrets["textkey"]["json_content"]
+    try: key_dict = json.loads(key_content, strict=False)
+    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open(SHEET_NAME).sheet1
+
+# ฟังก์ชันโหลดข้อมูล (ย้ายมาตรงนี้เพื่อให้เรียกใช้ได้ทั่วโปรแกรม)
+def load_data():
+    try:
+        sheet = connect_gsheet()
+        vals = sheet.get_all_values()
+        if len(vals) > 1:
+            st.session_state.df = pd.DataFrame(vals[1:], columns=[f"C{i}" for i, h in enumerate(vals[0])])
+            return True
+    except Exception as e:
+        st.error(f"โหลดข้อมูลไม่สำเร็จ: {e}")
+        return False
+    return False
+
+def upload_to_drive(file_obj, filename):
+    file_content = file_obj.getvalue()
+    base64_str = base64.b64encode(file_content).decode('utf-8')
+    payload = {"folder_id": DRIVE_FOLDER_ID, "filename": filename, "file": base64_str, "mimeType": file_obj.type}
+    try:
+        res = requests.post(GAS_APP_URL, json=payload).json()
+        return res.get("link") if res.get("status") == "success" else None
+    except: return None
+
+def get_img_link(url):
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)', str(url))
+    file_id = match.group(1) or match.group(2) if match else None
+    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
+
+def clear_form_state():
+    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            st.session_state[key] = ""
+
+def reset_results(): st.session_state['search_results_df'] = None
+def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
+
+# --- ฟังก์ชันสร้าง PDF ---
+def create_pdf(vals, img_url1, img_url2, face_url=None):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    f_reg, f_bold = "THSarabunNew.ttf", "THSarabunNewBold.ttf"
+    font_name, font_bold = ('Thai', 'ThaiBold') if os.path.exists(f_reg) else ('Helvetica', 'Helvetica-Bold')
+    if font_name == 'Thai':
+        pdfmetrics.registerFont(TTFont('Thai', f_reg))
+        pdfmetrics.registerFont(TTFont('ThaiBold', f_bold))
+    logo = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
+    if logo: c.drawImage(logo, 50, height - 85, width=50, height=50, mask='auto')
+    
+    # Header
+    c.setFont(font_bold, 22); c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
+    c.setFont(font_name, 18); c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
+    c.line(50, height - 85, width - 50, height - 85)
+    
+    # Data extraction
+    name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
+    lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
+    raw_note = str(vals[12]).strip() if len(vals) > 12 else ""
+    note_text = raw_note if raw_note and raw_note.lower() != "nan" else "ไม่พบประวัติ"
+    score = str(vals[13]) if len(vals) > 13 and str(vals[13]).lower() != "nan" else "100"
+    
+    # Text Information
+    c.setFont(font_name, 16)
+    c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}"); c.drawString(300, height - 115, f"ยี่ห้อรถ: {brand}")
+    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}"); c.drawString(300, height - 135, f"สีรถ: {color}")
+    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}"); c.setFont(font_bold, 16); c.drawString(300, height - 155, f"ทะเบียน: {plate}")
+    
+    c.setFont(font_bold, 18); color_val = (0.7, 0, 0) if int(score) < 80 else (0, 0.5, 0); c.setFillColorRGB(*color_val)
+    c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
+    c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
+    c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
+    
+    # --- Image Drawing Function ---
+    def draw_img_func(url, x, y, w, h):
+        try:
+            if url and "drive.google.com" in url:
+                res = requests.get(url, timeout=5)
+                img_data = ImageReader(io.BytesIO(res.content))
+                c.drawImage(img_data, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
+                c.rect(x, y, w, h)
+        except: pass
+
+    # Draw Vehicle Images (Middle)
+    draw_img_func(img_url1, 70, height - 415, 180, 180)
+    draw_img_func(img_url2, 300, height - 415, 180, 180)
+
+    # History Section
+    note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
+    c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
+    for line in note_text.split('\n'):
+        for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
+    c.drawText(text_obj)
+    
+    # Signature Section
+    sign_y = 180 
+    c.setFont(font_name, 16)
+    c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ")
+    c.drawString(100, sign_y - 20, f"({name})")
+
+    # Face Image (Top Right)
+    if face_url:
+        draw_img_func(face_url, 450, height - 200, 90, 110) # รูปหน้าคนอยู่ขวาบน
+        c.setFont(font_name, 12); c.drawCentredString(495, height - 215, "(เจ้าของรถ)")
+
+    c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
+    c.drawString(340, sign_y - 20, "(.........................................)")
+    
+    c.save(); buffer.seek(0); return buffer
+
+# --- CSS Styling ---
 st.markdown("""
     <style>
         header { visibility: hidden !important; height: 0px !important; }
@@ -79,114 +200,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ฟังก์ชันระบบ ---
-if 'page' not in st.session_state: st.session_state['page'] = 'student'
-if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
-if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
-
-def clear_form_state():
-    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
-    for key in keys_to_clear:
-        if key in st.session_state: st.session_state[key] = ""
-
-def reset_results(): st.session_state['search_results_df'] = None
-def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
-
-def connect_gsheet():
-    key_content = st.secrets["textkey"]["json_content"]
-    try: key_dict = json.loads(key_content, strict=False)
-    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
-    client = gspread.authorize(creds)
-    return client.open(SHEET_NAME).sheet1
-
-def upload_to_drive(file_obj, filename):
-    file_content = file_obj.getvalue()
-    base64_str = base64.b64encode(file_content).decode('utf-8')
-    payload = {"folder_id": DRIVE_FOLDER_ID, "filename": filename, "file": base64_str, "mimeType": file_obj.type}
-    try:
-        res = requests.post(GAS_APP_URL, json=payload).json()
-        return res.get("link") if res.get("status") == "success" else None
-    except: return None
-
-def get_img_link(url):
-    match = re.search(r'/d/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)', str(url))
-    file_id = match.group(1) or match.group(2) if match else None
-    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
-
-# --- ฟังก์ชัน PDF (รูปอยู่ขวาบน) ---
-def create_pdf(vals, img_url1, img_url2, face_url=None):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    f_reg, f_bold = "THSarabunNew.ttf", "THSarabunNewBold.ttf"
-    font_name, font_bold = ('Thai', 'ThaiBold') if os.path.exists(f_reg) else ('Helvetica', 'Helvetica-Bold')
-    if font_name == 'Thai':
-        pdfmetrics.registerFont(TTFont('Thai', f_reg))
-        pdfmetrics.registerFont(TTFont('ThaiBold', f_bold))
-    logo = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
-    if logo: c.drawImage(logo, 50, height - 85, width=50, height=50, mask='auto')
-    
-    # Header
-    c.setFont(font_bold, 22); c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
-    c.setFont(font_name, 18); c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
-    c.line(50, height - 85, width - 50, height - 85)
-    
-    # Data extraction
-    name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
-    lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
-    raw_note = str(vals[12]).strip() if len(vals) > 12 else ""
-    note_text = raw_note if raw_note and raw_note.lower() != "nan" else "ไม่พบประวัติ"
-    score = str(vals[13]) if len(vals) > 13 and str(vals[13]).lower() != "nan" else "100"
-    
-    # Text Information (ขยับข้อความไปซ้ายหน่อย เพื่อเว้นที่ให้รูปขวาบน)
-    c.setFont(font_name, 16)
-    c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}")
-    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}")
-    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}")
-    
-    c.drawString(280, height - 115, f"ยี่ห้อรถ: {brand}")
-    c.drawString(280, height - 135, f"สีรถ: {color}")
-    c.setFont(font_bold, 16); c.drawString(280, height - 155, f"ทะเบียน: {plate}")
-    
-    c.setFont(font_bold, 18); color_val = (0.7, 0, 0) if int(score) < 80 else (0, 0.5, 0); c.setFillColorRGB(*color_val)
-    c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
-    c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
-    c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
-    
-    # --- Image Drawing Function ---
-    def draw_img_func(url, x, y, w, h):
-        try:
-            if url and "drive.google.com" in url:
-                res = requests.get(url, timeout=5)
-                img_data = ImageReader(io.BytesIO(res.content))
-                c.drawImage(img_data, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
-                c.rect(x, y, w, h)
-        except: pass
-
-    # 1. Face Image (Top Right)
-    if face_url:
-        draw_img_func(face_url, 460, height - 195, 90, 110)
-        c.setFont(font_name, 12)
-        c.drawCentredString(505, height - 210, "(เจ้าของรถ)")
-
-    # 2. Vehicle Images (Middle)
-    draw_img_func(img_url1, 70, height - 415, 180, 180)
-    draw_img_func(img_url2, 300, height - 415, 180, 180)
-
-    # 3. History
-    note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
-    c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
-    for line in note_text.split('\n'):
-        for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
-    c.drawText(text_obj)
-    
-    # 4. Signature
-    sign_y = 90; c.setFont(font_name, 16); c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ"); c.drawString(100, sign_y - 20, f"({name})")
-    c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
-    c.save(); buffer.seek(0); return buffer
-
 # --- 4. Main UI ---
 c_logo, c_title = st.columns([1, 8])
 logo_path = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
@@ -195,6 +208,11 @@ with c_logo:
     else: st.write("🏍️")
 with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
 st.markdown("---")
+
+# Session State Initialization
+if 'page' not in st.session_state: st.session_state['page'] = 'student'
+if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
+if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 
 if st.session_state['page'] == 'student':
     if st.session_state.get("reg_success", False):
@@ -348,9 +366,7 @@ elif st.session_state['page'] == 'edit':
             if nf: l1 = upload_to_drive(nf, f"{v[2]}_F_n.jpg"); 
             if ns: l2 = upload_to_drive(ns, f"{v[2]}_S_n.jpg")
             sheet.update(f'B{cell.row}:L{cell.row}', [[nm, v[2], cl, br, co, pl, lc, tx, hl, l1, l2]])
-            
-            # Auto-Refresh Data after Edit
-            load_data() 
+            load_data()
             st.success("เสร็จสิ้น"); st.session_state.edit_data = None; go_to_page('teacher')
     if st.button("ยกเลิก", use_container_width=True): go_to_page('teacher')
 
@@ -368,13 +384,11 @@ elif st.session_state['page'] == 'teacher':
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
     else:
-        # Load Data Initially if not loaded
-        if 'df' not in st.session_state:
-            load_data()
+        if 'df' not in st.session_state: load_data()
 
         c1, c2 = st.columns(2)
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
-            load_data() # Manual Refresh
+            load_data()
             st.session_state.search_results_df = None
         if c2.button("📊 รายงานสถิติ", use_container_width=True): go_to_page('dashboard')
         
@@ -390,10 +404,9 @@ elif st.session_state['page'] == 'teacher':
             st.markdown("---")
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
             if st.button("ค้นหา", use_container_width=True, type="primary") and q:
-                # Auto-Refresh before Search
                 with st.spinner("กำลังดึงข้อมูลล่าสุด..."):
                     load_data()
-                    df = st.session_state.df # Re-assign df after refresh
+                    df = st.session_state.df
                     st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q, case=False).any(), axis=1)]
             
             st.write("")
@@ -458,9 +471,7 @@ elif st.session_state['page'] == 'teacher':
                                     tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
                                     s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts} คะแนน: {note}", str(ns)]])
-                                    
-                                    # Auto-Refresh Data after update
-                                    load_data() 
+                                    load_data()
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                 else: st.error("ข้อมูลไม่ครบ/รหัสผิด")
                             if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
@@ -469,8 +480,6 @@ elif st.session_state['page'] == 'teacher':
                                     tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
                                     s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note}", str(ns)]])
-                                    
-                                    # Auto-Refresh Data after update
                                     load_data()
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                     
