@@ -284,7 +284,7 @@ elif st.session_state['page'] == 'teacher':
                                 if st.button("✏️ แก้ไขข้อมูลเบื้องต้น", key=f"e_{i}"): st.session_state.edit_data = v; go_to_page('edit')
                                 st.write("---"); st.write("🛡️ **จัดการคะแนนวินัยจราจร**")
                                 points = st.number_input("จำนวนคะแนนที่จะปรับ", min_value=1, max_value=50, value=5, key=f"pts_{i}")
-                                apwd = st.text_input("รหัสยืนยันการทำรายการ (เจ้าหน้าที่ระดับสูง)", type="password", key=f"apwd_{i}")
+                                apwd = st.text_input("รหัสยืนยัน เจ้าหน้าที่ระดับสูง", type="password", key=f"apwd_{i}")
                                 col_sc1, col_sc2 = st.columns(2)
                                 if col_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}"):
                                     if apwd == UPGRADE_PASSWORD:
