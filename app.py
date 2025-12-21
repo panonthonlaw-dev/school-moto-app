@@ -27,18 +27,19 @@ GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLK
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
 
+# ปรับปรุง CSS ให้ตัวกรองเด่นชัดขึ้น
 st.markdown("""
     <style>
         header { visibility: hidden !important; height: 0px !important; }
         footer { visibility: hidden !important; height: 0px !important; }
         [data-testid="stSidebar"] { display: none; }
         .block-container { padding-top: 2rem; }
-        .filter-container {
-            background-color: #f0f2f6;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #d1d5db;
-            margin-bottom: 20px;
+        .filter-box {
+            background-color: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 2px solid #e9ecef;
+            margin-bottom: 1rem;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -188,7 +189,7 @@ if st.session_state['page'] == 'student':
         
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room_input = c4.text_input("ห้อง(ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
+        room_input = c4.text_input("ห้อง (ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
         
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
@@ -208,7 +209,7 @@ if st.session_state['page'] == 'student':
             try:
                 room_num = int(room_input)
                 if 0 <= room_num <= 13: valid_room = True
-            except: pass
+            except ValueError: pass
 
             if not valid_room:
                 st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (เลข 0 ถึง 13 เท่านั้น)")
@@ -223,13 +224,7 @@ if st.session_state['page'] == 'student':
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
                             thai_now = datetime.now() + timedelta(hours=7)
                             full_name = f"{prefix}{fname}"
-                            sheet.append_row([
-                                thai_now.strftime('%d/%m/%Y %H:%M'), 
-                                full_name, str(std_id), f"{level}/{room_input}", 
-                                brand, color, plate, 
-                                license_status, tax_status, helmet_status, 
-                                l1, l2
-                            ])
+                            sheet.append_row([thai_now.strftime('%d/%m/%Y %H:%M'), full_name, str(std_id), f"{level}/{room_input}", brand, color, plate, license_status, tax_status, helmet_status, l1, l2])
                             st.balloons()
                             st.success("✅ ลงทะเบียนสำเร็จ!")
                 except Exception as e: st.error(f"Error: {e}")
@@ -249,15 +244,15 @@ elif st.session_state['page'] == 'teacher':
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
         
-        # --- 1. โหลดข้อมูล ---
+        # --- 1. ส่วนดึงข้อมูล ---
         st.subheader("🛠️ การจัดการข้อมูล")
-        if st.button("🔄 ดึงข้อมูลล่าสุดจากระบบ", use_container_width=True):
+        if st.button("🔄 ดึงข้อมูลล่าสุด (ต้องกดก่อนค้นหาหรือกรอง)", use_container_width=True):
             try:
                 all_vals = connect_gsheet().get_all_values()
                 if len(all_vals) > 1:
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                     st.success("โหลดข้อมูลสำเร็จ! ระบบค้นหาและตัวกรองพร้อมใช้งาน")
-                else: st.warning("ยังไม่มีข้อมูลในระบบ")
+                else: st.warning("ยังไม่มีข้อมูล")
             except Exception as e: st.error(f"Error: {e}")
         
         if 'df' in st.session_state:
@@ -279,57 +274,44 @@ elif st.session_state['page'] == 'teacher':
 
             st.markdown("---")
 
-            # --- 2. ระบบค้นหา (หลัก) ---
+            # --- 2. ส่วนค้นหาหลัก ---
             st.subheader("🔍 ระบบค้นหาข้อมูล")
-            search_query = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ เพื่อค้นหา", placeholder="เช่น สมชาย...")
+            q = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", key="search_query")
 
-            # --- 3. ระบบตัวกรอง (แยกให้ชัดเจนด้านล่างระบบค้นหา) ---
-            st.markdown('<div class="filter-container">', unsafe_allow_html=True)
-            st.subheader("⚡ ตัวกรองข้อมูลอัจฉริยะ (Smart Filter)")
-            col_f1, col_f2, col_f3 = st.columns(3)
-            
-            filter_risk = col_f1.selectbox(
-                "🚨 เลือกกลุ่มเสี่ยง (กลุ่มที่มีปัญหา):", 
-                ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวกกันน็อค"]
-            )
-            
-            try:
-                # ดึงระดับชั้นที่มีอยู่จริงในระบบ
-                levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
-                filter_level = col_f2.selectbox("📚 เลือกระดับชั้น:", levels)
-            except: filter_level = "ทั้งหมด"
-
-            try:
-                # ดึงยี่ห้อรถที่มีอยู่จริง
-                brands = ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique())))
-                filter_brand = col_f3.selectbox("🏍️ เลือกยี่ห้อรถ:", brands)
-            except: filter_brand = "ทั้งหมด"
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            # --- Logic การรวมผล (Search + Filter) ---
-            fdf = df.copy()
-            
-            # กรองตาม Smart Filter
-            if filter_risk == "❌ ไม่มีใบขับขี่":
-                fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
-            elif filter_risk == "❌ ภาษีขาด":
-                fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
-            elif filter_risk == "❌ ไม่สวมหมวกกันน็อค":
-                fdf = fdf[fdf.iloc[:, 9].astype(str).str.contains("ไม่มี", na=False)]
-            
-            if filter_level != "ทั้งหมด":
-                fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(filter_level, na=False)]
+            # --- 3. ส่วนตัวกรอง (แยกสัดส่วนชัดเจนตามความต้องการ) ---
+            st.markdown("### ⚡ ตัวกรองข้อมูลอัจฉริยะ (Smart Filter)")
+            with st.container():
+                st.write("เลือกเงื่อนไขเพื่อกรองข้อมูลทันที:")
+                col_f1, col_f2, col_f3 = st.columns(3)
                 
-            if filter_brand != "ทั้งหมด":
-                fdf = fdf[fdf.iloc[:, 4] == filter_brand]
+                f_risk = col_f1.selectbox(
+                    "🚨 กรองกลุ่มเสี่ยง:", 
+                    ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"]
+                )
+                
+                try:
+                    levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
+                    f_level = col_f2.selectbox("📚 กรองระดับชั้น:", levels)
+                except: f_level = "ทั้งหมด"
 
-            # กรองตาม Search Query
-            if search_query:
-                fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)]
+                try:
+                    brands = ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique())))
+                    f_brand = col_f3.selectbox("🏍️ กรองยี่ห้อรถ:", brands)
+                except: f_brand = "ทั้งหมด"
+
+            # Logic การรวมผล (Search + Filter)
+            fdf = df.copy()
+            if f_risk == "❌ ไม่มีใบขับขี่": fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
+            elif f_risk == "❌ ภาษีขาด": fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
+            elif f_risk == "❌ ไม่สวมหมวก": fdf = fdf[fdf.iloc[:, 9].astype(str).str.contains("ไม่มี", na=False)]
+            
+            if f_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_level, na=False)]
+            if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
+            if q: fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
 
             # --- 4. แสดงผลลัพธ์ ---
             if fdf.empty:
-                st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไขที่เลือก")
+                st.warning("ไม่พบข้อมูลที่ตรงตามเงื่อนไข")
             else:
                 st.success(f"✅ พบข้อมูล {len(fdf)} รายการ")
                 for i, row in fdf.iterrows():
@@ -343,39 +325,33 @@ elif st.session_state['page'] == 'teacher':
                             if i2: sub2.image(i2, caption="รูปข้างรถ")
                         with c_info:
                             st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
-                            st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
                             st.write(f"**ใบขับขี่:** {v[7]}")
                             st.write(f"**ภาษี/พรบ:** {v[8]}")
                             st.write(f"**หมวกกันน็อค:** {v[9]}")
                             pdf_data = create_pdf(v, i1, i2)
                             st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
-
+            
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือนสำคัญ!")
-                st.markdown("การกดปุ่มนี้จะเปลี่ยนข้อมูลทุกคนแบบถาวร")
                 spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
-                if st.button("🚀 เริ่มการเลื่อนชั้นปี", use_container_width=True):
-                    if spwd == "Patwitnext":
-                        try:
-                            sheet = connect_gsheet()
-                            d = sheet.get_all_values()
-                            h = d[0]; r = d[1:]
-                            new_r = []
-                            for row in r:
-                                ol = row[3]; nl = ol
-                                if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                                elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                                elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                                elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                                elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                                elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                                row[3] = nl
-                                new_r.append(row)
-                            sheet.clear()
-                            sheet.update('A1', [h] + new_r)
-                            st.success("เลื่อนชั้นสำเร็จ!")
-                            if 'df' in st.session_state: del st.session_state.df
-                        except Exception as e: st.error(f"Error: {e}")
-        else:
-            st.info("💡 กรุณากดปุ่ม '🔄 ดึงข้อมูลล่าสุดจากระบบ' ด้านบน เพื่อเริ่มต้นการตรวจสอบ")
+                if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
+                    try:
+                        sheet = connect_gsheet()
+                        d = sheet.get_all_values()
+                        h = d[0]; r = d[1:]
+                        new_r = []
+                        for row in r:
+                            ol = row[3]; nl = ol
+                            if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                            elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                            elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                            elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                            elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                            elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                            row[3] = nl
+                            new_r.append(row)
+                        sheet.clear()
+                        sheet.update('A1', [h] + new_r)
+                        st.success("เลื่อนชั้นสำเร็จ!")
+                        if 'df' in st.session_state: del st.session_state.df
+                    except Exception as e: st.error(f"Error: {e}")
