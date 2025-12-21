@@ -30,7 +30,6 @@ GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLK
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
 
-# ฟังก์ชันแปลงรูปเป็น Base64
 def img_to_b64(img_path):
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
@@ -53,45 +52,25 @@ st.markdown("""
             font-size: 1.5rem; font-weight: bold; color: #ef4444;
             background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
         }
-        /* Style บัตรเสมือนจริง (Clean White Theme) */
         .atm-card {
-            width: 100%;
-            max-width: 450px;
-            aspect-ratio: 1.586; /* อัตราส่วนบัตรมาตรฐาน */
-            background: #ffffff; /* พื้นหลังสีขาว */
-            border-radius: 15px;
-            border: 2px solid #cbd5e1; /* ขอบสีเทาตัด */
+            width: 100%; max-width: 450px; aspect-ratio: 1.586;
+            background: #ffffff; border-radius: 15px; border: 2px solid #cbd5e1;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            position: relative;
-            font-family: 'Sarabun', sans-serif;
-            color: #334155;
-            margin: auto;
+            padding: 20px; position: relative; font-family: 'Sarabun', sans-serif;
+            color: #334155; margin: auto;
         }
-        .atm-header {
-            display: flex; align-items: center; justify-content: space-between;
-            border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px;
-        }
+        .atm-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; }
         .atm-logo { height: 55px; width: auto; }
         .atm-title { text-align: right; }
         .atm-school-name { font-size: 16px; font-weight: bold; color: #1e293b; }
-        .atm-card-name { font-size: 14px; color: #059669; font-weight: bold; } /* สีเขียวเชิงอนุญาต */
+        .atm-card-name { font-size: 14px; color: #059669; font-weight: bold; }
         .atm-body { display: flex; gap: 15px; }
-        .atm-photo {
-            width: 100px; height: 125px; border-radius: 8px; object-fit: cover;
-            border: 1px solid #cbd5e1; background-color: #f1f5f9;
-        }
+        .atm-photo { width: 100px; height: 125px; border-radius: 8px; object-fit: cover; border: 1px solid #cbd5e1; background-color: #f1f5f9; }
         .atm-info { font-size: 14px; line-height: 1.5; flex: 1; color: #334155; }
-        .atm-score-box {
-            position: absolute; bottom: 35px; right: 20px;
-            text-align: right;
-        }
+        .atm-score-box { position: absolute; bottom: 35px; right: 20px; text-align: right; }
         .atm-score-label { font-size: 12px; color: #64748b; }
         .atm-score-val { font-size: 32px; font-weight: 800; line-height: 1; }
-        .atm-disclaimer {
-            position: absolute; bottom: 8px; right: 15px;
-            font-size: 9px; color: #ef4444; opacity: 0.8; font-style: italic;
-        }
+        .atm-disclaimer { position: absolute; bottom: 8px; right: 15px; font-size: 9px; color: #ef4444; opacity: 0.8; font-style: italic; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,6 +78,13 @@ st.markdown("""
 if 'page' not in st.session_state: st.session_state['page'] = 'student'
 if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
+
+# ฟังก์ชันสำหรับรีเซ็ตฟอร์มเฉพาะตอนบันทึกสำเร็จ
+def clear_form_state():
+    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            st.session_state[key] = ""
 
 def reset_results(): st.session_state['search_results_df'] = None
 def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
@@ -179,40 +165,78 @@ st.markdown("---")
 
 if st.session_state['page'] == 'student':
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
-    with st.form("reg_form", clear_on_submit=True):
+    # ใช้ clear_on_submit=False เพื่อไม่ให้ข้อมูลหายถ้ากรอกผิด
+    with st.form("reg_form", clear_on_submit=False):
         sc1, sc2 = st.columns(2)
         with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
-            fname = st.text_input("ชื่อ-นามสกุล")
-        std_id = sc2.text_input("รหัสนักเรียน/รหัสบุคลากร (สำคัญ)")
+            fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
+        std_id = sc2.text_input("รหัสนักเรียน/รหัสบุคลากร (สำคัญ)", key="reg_id")
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง (0-13)")
-        st.write("🔐 **ตั้งค่าความปลอดภัย**"); pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตร)", type="password", max_chars=6)
+        room = st.text_input("ห้อง (0-13)", key="reg_room")
+        
+        st.write("🔐 **ตั้งค่าความปลอดภัย**")
+        pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตร)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
+        
         sc5, sc6 = st.columns(2)
-        brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"]); plate = st.text_input("ทะเบียนรถ")
+        brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
+        color = st.text_input("สีรถ", key="reg_color")
+        plate = st.text_input("ทะเบียนรถ", placeholder="เช่น 1กข 1234", key="reg_plate")
+        
         doc_cols = st.columns(3)
-        ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True); ts = doc_cols[1].radio("ภาษี", ["✅ ปกติ", "❌ ขาด"], horizontal=True); hs = doc_cols[2].radio("หมวก", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
+        hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        
         st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
         up1, up2, up3 = st.columns(3)
         p_face = up1.file_uploader("1. หน้าตรงเจ้าของรถ", type=['jpg','png','jpeg'])
         p_back = up2.file_uploader("2. หลังรถ (เห็นป้าย)", type=['jpg','png','jpeg'])
         p_side = up3.file_uploader("3. ข้างรถ (เต็มคัน)", type=['jpg','png','jpeg'])
+        
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
+
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน"):
-            if fname and std_id and plate and pin and len(pin)==6 and p_face and p_back and pdpa:
+            errors = []
+            # ตรวจสอบข้อมูลทีละจุด
+            if not fname: errors.append("ชื่อ-นามสกุล")
+            if not std_id: errors.append("รหัสประจำตัว")
+            if not plate: errors.append("ทะเบียนรถ")
+            if not p_face: errors.append("รูปถ่ายหน้าตรง")
+            if not p_back: errors.append("รูปถ่ายหลังรถ")
+            
+            # ตรวจสอบ PIN (ห้ามเลขซ้ำกันหมด)
+            if not pin or len(pin) != 6 or not pin.isdigit():
+                errors.append("รหัส PIN ต้องเป็นตัวเลข 6 หลัก")
+            elif len(set(pin)) == 1:
+                errors.append("รหัส PIN ห้ามใช้เลขซ้ำกันทั้งหมด (เช่น 111111)")
+            
+            if not pdpa: errors.append("การยอมรับเงื่อนไข (PDPA)")
+
+            if errors:
+                st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง: {', '.join(errors)}")
+            else:
                 try:
                     sheet = connect_gsheet()
-                    if str(std_id) in sheet.col_values(3): st.error("รหัสนี้เคยลงทะเบียนแล้ว")
+                    if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว ไม่สามารถลงซ้ำได้")
                     else:
-                        with st.spinner("กำลังบันทึก..."):
+                        with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
                             l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
                             l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
                             l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
-                            sheet.append_row([(datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), f"{level}/{room}", brand, color, plate, ls, ts, hs, l_back, l_side, "", "100", l_face, str(pin)])
-                            st.success("สำเร็จ! จำรหัส PIN ไว้โหลดบัตรนะครับ"); st.balloons()
-                except Exception as e: st.error(f"Error: {e}")
-            else: st.warning("กรุณากรอกข้อมูลให้ครบและอัปโหลดรูป")
+                            sheet.append_row([
+                                datetime.now().strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), 
+                                f"{level}/{room}", brand, color, plate, ls, ts, hs, 
+                                l_back, l_side, "", "100", l_face, str(pin)
+                            ])
+                            st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
+                            st.balloons()
+                            clear_form_state() # ล้างค่าเมื่อสำเร็จ
+                            time.sleep(2)
+                            st.rerun()
+                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
     if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
@@ -235,8 +259,6 @@ elif st.session_state['page'] == 'portal':
                         face_url = get_img_link(v[14]) if len(v) > 14 and v[14] else "https://via.placeholder.com/100"
                         score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
                         score_color = "#16a34a" if score >= 80 else ("#ca8a04" if score >= 50 else "#dc2626")
-                        
-                        # --- สร้างบัตร HTML (Clean White Style + Legal Notice) ---
                         card_html = f"""
                         <div class="atm-card">
                             <div class="atm-header">
@@ -260,14 +282,11 @@ elif st.session_state['page'] == 'portal':
                                 <div class="atm-score-label">แต้มวินัยจราจร</div>
                                 <div class="atm-score-val" style="color:{score_color};">{score}</div>
                             </div>
-                            <div class="atm-disclaimer">
-                                *ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย
-                            </div>
+                            <div class="atm-disclaimer">*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย</div>
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
-                        st.write("")
-                        st.info("💡 ให้นักเรียนบันทึกหน้าจอนี้ (Capture) เพื่อแสดงต่อครูเวรหน้าประตูโรงเรียน")
+                        st.write(""); st.info("💡 ให้นักเรียนบันทึกหน้าจอนี้ (Capture) เพื่อแสดงต่อครูเวรหน้าประตูโรงเรียน")
                     else: st.error("❌ ข้อมูลไม่ถูกต้อง")
                 except Exception as e: st.error(f"ระบบขัดข้อง: {e}")
 
