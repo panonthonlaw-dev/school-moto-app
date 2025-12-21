@@ -30,8 +30,18 @@ SESSION_TIMEOUT_MINUTES = 30
 # --- 🔑 ระบบจัดการสิทธิ์ ---
 OFFICER_ACCOUNTS = {
     "Patwit1150": {"name": "แอดมินสูงสุด", "role": "admin"},
-    "T001": {"name": "ครูสมชาย (ปกครอง)", "role": "admin"},
-    "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"}
+    "P001": {"name": "ผู้อำนวยการ", "role": "admin"},
+    "P002": {"name": "รองผู้อำนวยการ(ปกครอง)", "role": "admin"},
+    "Pen001": {"name": "ครูเพ็ญชรีย์(ปกครอง)", "role": "admin"},
+    "chaiya001": {"name": "ครูไชยา(ปกครอง)", "role": "admin"},
+    "J001": {"name": "ยามจักร(รักษาความปลอดภัย)", "role": "admin"},
+    "P003": {"name": "ผู้กำกับ(ตำรวจนักเรียน)", "role": "admin"},
+    "P004": {"name": "รองผู้กำกับจราจร(ตำรวจนักเรียน)", "role": "admin"},
+    "P005": {"name": "รองผู้กำกับสืบสวน(ตำรวจนักเรียน)", "role": "admin"},
+    "P006": {"name": "รองผู้กำกับสอบสวน(ตำรวจนักเรียน)", "role": "admin"},
+    "P007": {"name": "รองผู้กำกับไซเบอร์(ตำรวจนักเรียน)", "role": "admin"},
+    "User01": {"name": "ครูเวร(ตรวจการณ์)", "role": "viewer"},
+    "User02": {"name": "ตำรวจนักเรียน(ตรวจการณ์)", "role": "viewer"}
 }
 
 # --- 2. Setup หน้าเว็บ ---
@@ -98,7 +108,13 @@ def clear_form_state():
         if key in st.session_state:
             st.session_state[key] = ""
 
-def reset_results(): st.session_state['search_results_df'] = None
+def reset_results(): 
+    # ปรับให้ไม่ล้างค่าถ้ารีเฟรชจากการแก้ไขข้อมูล
+    if 'preserve_search' in st.session_state and st.session_state.preserve_search:
+        st.session_state.preserve_search = False
+    else:
+        st.session_state['search_results_df'] = None
+
 def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
 
 def upload_to_drive(file_obj, filename):
@@ -172,7 +188,7 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.drawString(100, sign_y - 20, f"({name})")
 
     if face_url:
-        draw_img_func(face_url, 460, height - 195, 90, 110) # รูปขวาบน
+        draw_img_func(face_url, 450, height - 200, 90, 110)
 
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.drawString(340, sign_y - 20, "(.........................................)")
@@ -442,11 +458,17 @@ elif st.session_state['page'] == 'teacher':
             
             st.markdown("---")
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
-            if st.button("ค้นหา", use_container_width=True, type="primary") and q:
-                with st.spinner("กำลังดึงข้อมูลล่าสุด..."):
-                    load_data()
-                    df = st.session_state.df
-                    st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q, case=False).any(), axis=1)]
+            # ใช้ปุ่มค้นหา หรือถ้ามีข้อความใน q ก็ค้นหาให้เลย (Auto-ReSearch Logic)
+            if q or (st.button("ค้นหา", use_container_width=True, type="primary") and q):
+                # ตรวจสอบว่าต้องโหลดข้อมูลใหม่ไหม (Auto-Refresh)
+                if st.session_state.get('reset_count', 0) > 0:
+                    with st.spinner("กำลังอัปเดตข้อมูล..."):
+                        load_data()
+                
+                df = st.session_state.df
+                st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q, case=False).any(), axis=1)]
+                # ตั้งค่า flag เพื่อไม่ให้ reset_results ล้างค่าเมื่อพิมพ์
+                st.session_state.preserve_search = True 
             
             st.write("")
             col_f1, col_f2, col_f3 = st.columns(3)
