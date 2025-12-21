@@ -55,7 +55,6 @@ st.markdown("""
             background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
             margin-bottom: 10px;
         }
-        /* ATM Card Style */
         .atm-card {
             width: 100%; max-width: 450px; aspect-ratio: 1.586;
             background: #ffffff; border-radius: 15px; border: 2px solid #cbd5e1;
@@ -116,7 +115,8 @@ def get_img_link(url):
     file_id = match.group(1) or match.group(2) if match else None
     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
 
-def create_pdf(vals, img_url1, img_url2):
+# --- ฟังก์ชัน PDF (เพิ่มรูปหน้าเจ้าของรถ) ---
+def create_pdf(vals, img_url1, img_url2, face_url=None):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -127,33 +127,58 @@ def create_pdf(vals, img_url1, img_url2):
         pdfmetrics.registerFont(TTFont('ThaiBold', f_bold))
     logo = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
     if logo: c.drawImage(logo, 50, height - 85, width=50, height=50, mask='auto')
+    
+    # Header
     c.setFont(font_bold, 22); c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 18); c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 85, width - 50, height - 85)
+    
+    # Data extraction
     name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
     lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
     raw_note = str(vals[12]).strip() if len(vals) > 12 else ""
     note_text = raw_note if raw_note and raw_note.lower() != "nan" else "ไม่พบประวัติ"
     score = str(vals[13]) if len(vals) > 13 and str(vals[13]).lower() != "nan" else "100"
-    c.setFont(font_name, 16); c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}"); c.drawString(330, height - 115, f"ยี่ห้อรถ: {brand}")
-    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}"); c.drawString(330, height - 135, f"สีรถ: {color}")
-    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}"); c.setFont(font_bold, 16); c.drawString(330, height - 155, f"ทะเบียน: {plate}")
+    
+    # Text Information
+    c.setFont(font_name, 16)
+    c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}"); c.drawString(300, height - 115, f"ยี่ห้อรถ: {brand}")
+    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}"); c.drawString(300, height - 135, f"สีรถ: {color}")
+    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}"); c.setFont(font_bold, 16); c.drawString(300, height - 155, f"ทะเบียน: {plate}")
+    
     c.setFont(font_bold, 18); color_val = (0.7, 0, 0) if int(score) < 80 else (0, 0.5, 0); c.setFillColorRGB(*color_val)
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
-    def draw_img(url, x, y):
+    
+    # --- Image Drawing Function ---
+    def draw_img_func(url, x, y, w, h):
         try:
             if url and "drive.google.com" in url:
                 res = requests.get(url, timeout=5)
-                c.drawImage(ImageReader(io.BytesIO(res.content)), x, y, width=180, height=180, preserveAspectRatio=True)
+                img_data = ImageReader(io.BytesIO(res.content))
+                c.drawImage(img_data, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
+                c.rect(x, y, w, h) # Draw border
         except: pass
-    draw_img(img_url1, 70, height - 415); draw_img(img_url2, 300, height - 415)
+
+    # Draw Vehicle Images (Bottom)
+    draw_img_func(img_url1, 70, height - 415, 180, 180)
+    draw_img_func(img_url2, 300, height - 415, 180, 180)
+    
+    # Draw Face Image (Top Right)
+    if face_url:
+        draw_img_func(face_url, 450, height - 200, 90, 110)
+        c.setFont(font_name, 12)
+        c.drawCentredString(495, height - 215, "(เจ้าของรถ)")
+
+    # History Section
     note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
     c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
     for line in note_text.split('\n'):
         for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
     c.drawText(text_obj)
+    
+    # Signature
     sign_y = 90; c.setFont(font_name, 16); c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ"); c.drawString(100, sign_y - 20, f"({name})")
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.save(); buffer.seek(0); return buffer
@@ -343,23 +368,13 @@ elif st.session_state['page'] == 'teacher':
         
         if 'df' in st.session_state:
             df = st.session_state.df
-            # --- 📊 แสดง Metrics พร้อม % สีเขียว ---
             total = len(df); lok = df[df.iloc[:,7].str.contains("มี", na=False)].shape[0]; tok = df[df.iloc[:,8].str.contains("ปกติ|✅", na=False)].shape[0]; hok = df[df.iloc[:,9].str.contains("มี", na=False)].shape[0]
-            
             m1, m2, m3, m4 = st.columns(4)
-            with m1:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-percent">100%</div><div class="metric-label">รถทั้งหมด</div></div>', unsafe_allow_html=True)
-            with m2:
-                p = (lok/total*100) if total else 0
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">ใบขับขี่</div></div>', unsafe_allow_html=True)
-            with m3:
-                p = (tok/total*100) if total else 0
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{tok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">ภาษี</div></div>', unsafe_allow_html=True)
-            with m4:
-                p = (hok/total*100) if total else 0
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">หมวก</div></div>', unsafe_allow_html=True)
+            with m1: st.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-percent">100%</div><div class="metric-label">รถทั้งหมด</div></div>', unsafe_allow_html=True)
+            with m2: p = (lok/total*100) if total else 0; st.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">ใบขับขี่</div></div>', unsafe_allow_html=True)
+            with m3: p = (tok/total*100) if total else 0; st.markdown(f'<div class="metric-card"><div class="metric-value">{tok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">ภาษี</div></div>', unsafe_allow_html=True)
+            with m4: p = (hok/total*100) if total else 0; st.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{p:.1f}%</div><div class="metric-label">หมวก</div></div>', unsafe_allow_html=True)
             
-            # --- 🔍 ค้นหาและตัวกรอง ---
             st.markdown("---")
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
             if st.button("ค้นหา", use_container_width=True, type="primary") and q:
@@ -378,23 +393,23 @@ elif st.session_state['page'] == 'teacher':
                 if f_br != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_br]
                 st.session_state.search_results_df = fdf
 
-            # --- แสดงผลการค้นหา ---
             if st.session_state.search_results_df is not None:
-                if st.session_state.search_results_df.empty:
-                    st.warning("❌ ไม่พบข้อมูลที่ค้นหา") # เพิ่มการแจ้งเตือนเมื่อค้นหาไม่เจอ
+                if st.session_state.search_results_df.empty: st.warning("❌ ไม่พบข้อมูลที่ค้นหา")
                 else:
                     for i, row in st.session_state.search_results_df.iterrows():
                         v = row.tolist(); sc = int(v[13]) if len(v)>13 and str(v[13]).isdigit() else 100
+                        # เพิ่มคะแนนแต้มในหัวข้อ Expander
                         with st.expander(f"📍 {v[6]} | {v[1]} (แต้ม: {sc})"):
                             ci, cd = st.columns([1, 2])
                             with ci: 
                                 if len(v)>14 and v[14]: st.image(get_img_link(v[14]), width=120)
                             with cd:
-                                st.download_button("📊PDF", create_pdf(v, get_img_link(v[10]), get_img_link(v[11])), f"{v[6]}.pdf", use_container_width=True)
+                                # ส่ง Face URL ไปให้ PDF
+                                face_url = get_img_link(v[14]) if len(v) > 14 else None
+                                st.download_button("PDF", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url), f"{v[6]}.pdf", use_container_width=True)
                                 if st.button("✏️ แก้ไข", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
-                                
                                 st.write("---")
-                                pts = st.number_input("แต้ม", 1, 50, 5, key=f"p_{i}"); note = st.text_area("บันทึกเหตุผล (จำเป็น)", key=f"n_{i}"); pwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key=f"pw_{i}")
+                                pts = st.number_input("แต้ม", 1, 50, 5, key=f"p_{i}"); note = st.text_area("บันทึกเหตุผล (จำเป็น)", key=f"n_{i}"); pwd = st.text_input("รหัสยืนยัน", type="password", key=f"pw_{i}")
                                 b1, b2 = st.columns(2)
                                 if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
                                     if note and pwd==UPGRADE_PASSWORD:
@@ -414,8 +429,8 @@ elif st.session_state['page'] == 'teacher':
                                     
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน"):
-                st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ") # เพิ่มคำเตือนก่อนเลื่อนชั้น
-                up_pwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key="prom_pwd")
+                st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
+                up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
                 if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
                     s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
                     for row in r:
