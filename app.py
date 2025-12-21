@@ -38,8 +38,8 @@ st.markdown("""
 # --- 3. ฟังก์ชันระบบ ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 'student'
-if 'search_results' not in st.session_state:
-    st.session_state['search_results'] = None
+if 'search_results_df' not in st.session_state:
+    st.session_state['search_results_df'] = None
 
 def go_to_teacher():
     st.session_state['page'] = 'teacher'
@@ -94,7 +94,6 @@ def create_pdf(vals, img_url1, img_url2):
         font_name = 'THSarabunNew'
     except: font_name = 'Helvetica'
     
-    # หัวกระดาษ
     c.setFont(font_name, 24)
     c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 20)
@@ -102,8 +101,9 @@ def create_pdf(vals, img_url1, img_url2):
     c.line(50, height - 90, width - 50, height - 90)
     
     c.setFont(font_name, 16)
+    # v: 0:Time, 1:Name, 2:ID, 3:Class, 4:Brand, 5:Color, 6:Plate, 7:Lic, 8:Tax, 9:Helmet, 10:Img1, 11:Img2
     name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
-    lic_status, tax_status, helmet_status = str(vals[7]), str(vals[8]), str(vals[9])
+    lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
     
     c.drawString(60, height - 130, f"ชื่อ-นามสกุล: {name}")
     c.drawString(320, height - 130, f"ยี่ห้อ: {brand}")
@@ -114,9 +114,9 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(320, height - 180, f"ทะเบียน: {plate}")
     
     c.setFont(font_name, 16)
-    lic_mark = "(/)" if "มี" in lic_status else "( )"
-    tax_mark = "(/)" if "ปกติ" in tax_status or "✅" in tax_status else "( )"
-    helmet_mark = "(/)" if "มี" in helmet_status else "( )"
+    lic_mark = "(/)" if "มี" in lic_s else "( )"
+    tax_mark = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"
+    helmet_mark = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร: {lic_mark} ใบขับขี่  {tax_mark} พรบ./ภาษี  {helmet_mark} หมวกกันน็อค")
     
     c.setFont(font_name, 16)
@@ -130,7 +130,6 @@ def create_pdf(vals, img_url1, img_url2):
                     img = ImageReader(io.BytesIO(res.content))
                     c.drawImage(img, x, y, width=170, height=170, preserveAspectRatio=True)
         except: pass
-    
     draw_img(img_url1, 80, img_y)
     draw_img(img_url2, 310, img_y)
 
@@ -150,8 +149,8 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(300, y_sign, "ลงชื่อ ....................................................... ครูผู้ตรวจสอบ")
     c.drawString(330, y_sign - 20, "(.......................................................)")
     
-    c.setFont(font_name, 10)
     thai_now = datetime.now() + timedelta(hours=7)
+    c.setFont(font_name, 10)
     c.drawRightString(width - 30, 20, f"พิมพ์เมื่อ: {thai_now.strftime('%d/%m/%Y %H:%M')}")
     c.save()
     buffer.seek(0)
@@ -228,7 +227,20 @@ elif st.session_state['page'] == 'teacher':
             try:
                 all_vals = connect_gsheet().get_all_values()
                 if len(all_vals) > 1:
-                    st.session_state.df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+                    # ป้องกัน ValueError: DataFrame columns must be unique
+                    headers = [h if h else f"Col_{i}" for i, h in enumerate(all_vals[0])]
+                    # ตรวจสอบชื่อหัวตารางซ้ำ
+                    seen = {}
+                    new_headers = []
+                    for h in headers:
+                        if h in seen:
+                            seen[h] += 1
+                            new_headers.append(f"{h}_{seen[h]}")
+                        else:
+                            seen[h] = 0
+                            new_headers.append(h)
+                    
+                    st.session_state.df = pd.DataFrame(all_vals[1:], columns=new_headers)
                     st.success("โหลดข้อมูลสำเร็จ!")
                 else: st.warning("ยังไม่มีข้อมูลในระบบ")
             except Exception as e: st.error(f"Error: {e}")
@@ -254,7 +266,7 @@ elif st.session_state['page'] == 'teacher':
             st.subheader("🔎 ส่วนการตรวจสอบข้อมูล")
             q_text = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="เช่น สมชาย...")
             
-            st.write("⚡ **ตัวกรองข้อมูลอัจฉริยะ**")
+            st.write("⚡ **ตัวกรอกข้อมูลอัจฉริยะ**")
             col_f1, col_f2, col_f3 = st.columns(3)
             f_risk = col_f1.selectbox("🚨 กลุ่มเสี่ยง:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"])
             try: levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
@@ -272,14 +284,14 @@ elif st.session_state['page'] == 'teacher':
                 if f_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_level, na=False)]
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
                 if q_text: fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
-                st.session_state.search_results = fdf.to_json() # เก็บผลลัพธ์ลง session เพื่อไม่ให้หายเวลาดาวน์โหลด
+                st.session_state.search_results_df = fdf # เก็บเป็น DataFrame โดยตรง ไม่ใช้ JSON
 
-            if st.session_state.search_results:
-                fdf = pd.read_json(st.session_state.search_results)
-                if fdf.empty: st.warning("ไม่พบข้อมูล")
+            if st.session_state.search_results_df is not None:
+                res_df = st.session_state.search_results_df
+                if res_df.empty: st.warning("ไม่พบข้อมูล")
                 else:
-                    st.success(f"✅ พบข้อมูลทั้งหมด {len(fdf)} รายการ")
-                    for i, row in fdf.iterrows():
+                    st.success(f"✅ พบข้อมูลทั้งหมด {len(res_df)} รายการ")
+                    for i, row in res_df.iterrows():
                         v = row.tolist()
                         with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
                             c_img, c_info = st.columns([2, 1])
@@ -291,15 +303,8 @@ elif st.session_state['page'] == 'teacher':
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ใบขับขี่:** {v[7]} | **ภาษี:** {v[8]} | **หมวก:** {v[9]}")
-                                # ส่วนแก้ปัญหา PDF บนมือถือ: สร้าง buffer รอไว้เลย
                                 pdf_data = create_pdf(v, i1, i2)
-                                st.download_button(
-                                    label="⬇️ โหลด PDF",
-                                    data=pdf_data,
-                                    file_name=f"Profile_{v[6]}.pdf",
-                                    mime="application/pdf",
-                                    key=f"dl_{i}"
-                                )
+                                st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}", mime="application/pdf")
             else: st.info("💡 กรุณาระบุเงื่อนไขแล้วกดปุ่ม 'เริ่มต้นค้นหา'")
             
             st.markdown("---")
