@@ -28,15 +28,13 @@ GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLK
 SESSION_TIMEOUT_MINUTES = 30 
 
 # --- 🔑 ระบบจัดการสิทธิ์ ---
-# role: 'admin' = แก้ไขได้ทุกอย่าง, 'viewer' = ดูได้อย่างเดียว
 OFFICER_ACCOUNTS = {
     "Patwit1150": {"name": "แอดมินสูงสุด", "role": "admin"},
     "Pencharee001": {"name": "ครูเพ็ญชรีย์ (ปกครอง)", "role": "admin"},
-    "chaiya001": {"name": "ครูไชยา(ปกครอง)", "role": "admin"},
-    "P001": {"name": "รองผู้อำนวยการ(ปกครอง)", "role": "admin"},
+    "Chaiya001": {"name": "ครูไชยา(ปกครอง)", "role": "admin"},
+    "Jak001": {"name": "ยามจักร (รปภ.)", "role": "admin"},
     "User02": {"name": "ผู้กำกับ(ตำรวจนักเรียน)", "role": "admin"},
     "User03": {"name": "รองผู้กำกับจราจร(ตำรวจนักเรียน)", "role": "admin"},
-    "Jak001": {"name": "ยามจักร (รปภ.)", "role": "admin"},
     "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"},
     "User05": {"name": "ตำรวจนักเรียน", "role": "viewer"}
 }
@@ -51,7 +49,7 @@ if 'search_results_df' not in st.session_state: st.session_state['search_results
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 if 'officer_name' not in st.session_state: st.session_state['officer_name'] = "" 
 if 'officer_role' not in st.session_state: st.session_state['officer_role'] = ""
-if 'current_user_pwd' not in st.session_state: st.session_state['current_user_pwd'] = "" # ใช้เก็บว่าล็อกอินด้วย user id อะไร
+if 'current_user_pwd' not in st.session_state: st.session_state['current_user_pwd'] = ""
 if 'last_active' not in st.session_state: st.session_state['last_active'] = time.time()
 
 def check_session_timeout():
@@ -249,7 +247,7 @@ if st.session_state.get('logged_in'):
     with st.sidebar:
         st.write(f"👤 **{st.session_state.officer_name}**")
         st.caption(f"สถานะ: {st.session_state.officer_role}")
-        if st.button("🚪 ออกจากระบบ (Sidebar)", type="secondary", use_container_width=True):
+        if st.button("🚪 ออกจากระบบ", type="secondary", use_container_width=True):
             logout()
 
 if st.session_state['page'] == 'student':
@@ -265,10 +263,10 @@ if st.session_state['page'] == 'student':
         with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
             fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
-        std_id = sc2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520", key="reg_id")
+        std_id = sc2.text_input("รหัสนักเรียน/รหัสบุคลากร (สำคัญ)", key="reg_id")
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง(0-13)หากไม่ใช่นักเรียนกรอก 0", key="reg_room")
+        room = st.text_input("ห้อง (0-13)", key="reg_room")
         st.write("🔐 **ตั้งค่าความปลอดภัย**")
         pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตร)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
         sc5, sc6 = st.columns(2)
@@ -414,6 +412,7 @@ elif st.session_state['page'] == 'teacher':
     if not st.session_state.get('logged_in'):
         with st.form("login_form"):
             st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
+            # ระบบล็อกอินแบบใหม่ ใช้ Dictionary เช็คสิทธิ์
             pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
             if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
                 if pwd in OFFICER_ACCOUNTS:
@@ -421,8 +420,8 @@ elif st.session_state['page'] == 'teacher':
                     st.session_state.logged_in = True
                     st.session_state.officer_name = user_info["name"]
                     st.session_state.officer_role = user_info["role"]
-                    st.session_state.current_user_pwd = pwd
-                    st.session_state.last_active = time.time()
+                    st.session_state.current_user_pwd = pwd # จำรหัสไว้เช็คตอนยืนยันการหักแต้ม
+                    st.session_state.last_active = time.time() # เริ่มนับเวลา session
                     st.rerun()
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
@@ -480,19 +479,52 @@ elif st.session_state['page'] == 'teacher':
                         v = row.tolist(); sc = int(v[13]) if len(v)>13 and str(v[13]).isdigit() else 100
                         sc_color = "#22c55e" if sc >= 80 else ("#eab308" if sc >= 50 else "#ef4444")
                         
+                        # เริ่มส่วนการแสดงผลแบบใหม่ (Profile Card)
                         with st.expander(f"📍 {v[6]} | {v[1]}"):
+                            # 1. Header & Badges (สวยงาม)
+                            c1, c2 = st.columns([1.5, 1])
+                            with c1:
+                                st.markdown(f"### 👤 {v[1]}")
+                                st.caption(f"🆔 รหัส: {v[2]} | 📚 ชั้น: {v[3]}")
+                            with c2:
+                                st.markdown(f"### 🏍️ {v[6]}")
+                                st.caption(f"{v[4]} ({v[5]})")
+
+                            # 2. Document Status Badges
+                            lic_ok = "มี" in str(v[7])
+                            tax_ok = "ปกติ" in str(v[8]) or "✅" in str(v[8])
+                            helm_ok = "มี" in str(v[9])
+                            
                             st.markdown(f"""
-                                <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; margin-bottom: 15px; background: #f8fafc;">
-                                    <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 5px;">
-                                        <span style="font-weight: bold; color: #64748b;">สถานะคะแนนความประพฤติ</span>
-                                        <span style="font-size: 1.5rem; font-weight: 800; color: {sc_color};">{sc} / 100</span>
+                                <div style="display: flex; gap: 10px; margin: 10px 0;">
+                                    <span style="background:{'#dcfce7' if lic_ok else '#fee2e2'}; color:{'#166534' if lic_ok else '#991b1b'}; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold;">
+                                        {'✅' if lic_ok else '❌'} ใบขับขี่
+                                    </span>
+                                    <span style="background:{'#dcfce7' if tax_ok else '#fee2e2'}; color:{'#166534' if tax_ok else '#991b1b'}; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold;">
+                                        {'✅' if tax_ok else '❌'} ภาษี
+                                    </span>
+                                    <span style="background:{'#dcfce7' if helm_ok else '#fee2e2'}; color:{'#166534' if helm_ok else '#991b1b'}; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold;">
+                                        {'✅' if helm_ok else '❌'} หมวก
+                                    </span>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                            # 3. Score Bar
+                            st.markdown(f"""
+                                <div style="margin-top: 10px; margin-bottom: 5px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: end;">
+                                        <span style="font-weight: bold; color: #64748b; font-size: 14px;">คะแนนความประพฤติ</span>
+                                        <span style="font-size: 1.2rem; font-weight: 800; color: {sc_color};">{sc} / 100</span>
                                     </div>
-                                    <div style="width: 100%; height: 12px; background-color: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                                        <div style="width: {sc}%; height: 100%; background-color: {sc_color}; border-radius: 6px; transition: width 0.5s;"></div>
+                                    <div style="width: 100%; height: 10px; background-color: #e2e8f0; border-radius: 5px; overflow: hidden;">
+                                        <div style="width: {sc}%; height: 100%; background-color: {sc_color}; border-radius: 5px;"></div>
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
                             
+                            st.divider()
+
+                            # 4. Images
                             c_img1, c_img2, c_img3 = st.columns(3)
                             with c_img1:
                                 st.caption("👤 เจ้าของรถ")
@@ -507,14 +539,14 @@ elif st.session_state['page'] == 'teacher':
                             
                             face_url = get_img_link(v[14]) if len(v) > 14 else None
                             
-                            # ตรวจสอบสิทธิ์ก่อนแสดงปุ่มโหลด PDF
+                            # 5. Actions (Admin Only)
                             if st.session_state.officer_role == "admin":
-                                st.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url, st.session_state.officer_name), f"{v[6]}.pdf", use_container_width=True)
-                                if st.button("✏️ แก้ไขข้อมูล", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
+                                col_act1, col_act2 = st.columns(2)
+                                col_act1.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url, st.session_state.officer_name), f"{v[6]}.pdf", use_container_width=True)
+                                if col_act2.button("✏️ แก้ไขข้อมูล", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
                                 
                                 st.write("---")
                                 st.caption("จัดการคะแนน:")
-                                # ใช้ st.form แก้ปัญหาหน้าจอพับเองเมื่อพิมพ์
                                 with st.form(key=f"score_form_{i}"):
                                     pts = st.number_input("จำนวนแต้ม", 1, 50, 5)
                                     note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)")
@@ -558,7 +590,7 @@ elif st.session_state['page'] == 'teacher':
             if st.session_state.current_user_pwd == "Patwit1150":
                 with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน (Super Admin Only)"):
                     st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
-                    up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
+                    up_pwd = st.text_input("รหัสเลื่อนชั้น (Patwitnext)", type="password", key="prom_pwd")
                     if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
                         s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
                         for row in r:
