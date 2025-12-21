@@ -33,13 +33,6 @@ st.markdown("""
         footer { visibility: hidden !important; height: 0px !important; }
         [data-testid="stSidebar"] { display: none; }
         .block-container { padding-top: 2rem; }
-        .search-area {
-            background-color: #f8f9fa;
-            padding: 25px;
-            border-radius: 15px;
-            border: 1px solid #dee2e6;
-            margin-bottom: 25px;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -249,14 +242,13 @@ elif st.session_state['page'] == 'teacher':
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
         
-        # --- ดึงข้อมูลล่าสุด ---
         if st.button("🔄 ดึงข้อมูลล่าสุดจากระบบ", use_container_width=True):
             try:
                 all_vals = connect_gsheet().get_all_values()
                 if len(all_vals) > 1:
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                    st.success("โหลดข้อมูลสำเร็จ! พร้อมสำหรับการค้นหา")
-                else: st.warning("ยังไม่มีข้อมูล")
+                    st.success("โหลดข้อมูลสำเร็จ!")
+                else: st.warning("ยังไม่มีข้อมูลในระบบ")
             except Exception as e: st.error(f"Error: {e}")
         
         if 'df' in st.session_state:
@@ -278,50 +270,34 @@ elif st.session_state['page'] == 'teacher':
 
             st.markdown("---")
 
-            # --- ส่วนการค้นหาและตัวกรอง (จะแสดงข้อมูลเฉพาะเมื่อกดปุ่ม) ---
+            # --- ส่วนการค้นหา (ไม่มีแถบเทาแล้ว) ---
             st.subheader("🔎 ส่วนการตรวจสอบข้อมูล")
-            st.markdown('<div class="search-area">', unsafe_allow_html=True)
+            q_text = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="เช่น สมชาย...")
             
-            # รับค่า input
-            q_text = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="เช่น สมชาย...", key="search_box")
-            
-            st.write("---")
             st.write("⚡ **ตัวกรองข้อมูลอัจฉริยะ**")
             col_f1, col_f2, col_f3 = st.columns(3)
             f_risk = col_f1.selectbox("🚨 กลุ่มเสี่ยง:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"])
-            
             try: levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
             except: levels = ["ทั้งหมด"]
             f_level = col_f2.selectbox("📚 ระดับชั้น:", levels)
-            
             try: brands = ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique())))
             except: brands = ["ทั้งหมด"]
             f_brand = col_f3.selectbox("🏍️ ยี่ห้อรถ:", brands)
             
-            # ปุ่มกดยืนยันการค้นหา (หัวใจสำคัญ)
             do_search = st.button("🔍 เริ่มต้นค้นหาและแสดงผลตามเงื่อนไข", use_container_width=True, type="primary")
-            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Logic การแสดงผล: จะทำงานเฉพาะเมื่อกดปุ่ม do_search เท่านั้น
             if do_search:
                 fdf = df.copy()
-                
-                # 1. กรองตาม Risk
                 if f_risk == "❌ ไม่มีใบขับขี่": fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
                 elif f_risk == "❌ ภาษีขาด": fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
                 elif f_risk == "❌ ไม่สวมหมวก": fdf = fdf[fdf.iloc[:, 9].astype(str).str.contains("ไม่มี", na=False)]
                 
-                # 2. กรองตามชั้นและยี่ห้อ
                 if f_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_level, na=False)]
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
-                
-                # 3. กรองตามข้อความที่พิมพ์
-                if q_text:
-                    fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
+                if q_text: fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
 
-                # การแสดงผลข้อมูลที่กรองแล้ว
                 if fdf.empty:
-                    st.warning(f"ไม่พบข้อมูลที่ตรงกับเงื่อนไขที่ท่านเลือก")
+                    st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไขที่เลือก")
                 else:
                     st.success(f"✅ พบข้อมูลทั้งหมด {len(fdf)} รายการ")
                     for i, row in fdf.iterrows():
@@ -335,14 +311,11 @@ elif st.session_state['page'] == 'teacher':
                                 if i2: sub2.image(i2, caption="รูปข้างรถ")
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
-                                st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
-                                st.write(f"**ใบขับขี่:** {v[7]}")
-                                st.write(f"**ภาษี/พรบ:** {v[8]}")
-                                st.write(f"**หมวกกันน็อค:** {v[9]}")
+                                st.write(f"**ใบขับขี่:** {v[7]} | **ภาษี:** {v[8]} | **หมวก:** {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
             else:
-                st.info("💡 กรุณาระบุเงื่อนไขที่ต้องการแล้วกดปุ่ม **'เริ่มต้นค้นหา'** ด้านบนเพื่อแสดงรายชื่อ")
+                st.info("💡 กรุณาระบุเงื่อนไขแล้วกดปุ่ม **'เริ่มต้นค้นหา'**")
             
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
