@@ -16,7 +16,6 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
-from reportlab.lib import colors
 
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
@@ -39,6 +38,8 @@ st.markdown("""
 # --- 3. ฟังก์ชันระบบ ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 'student'
+if 'search_results' not in st.session_state:
+    st.session_state['search_results'] = None
 
 def go_to_teacher():
     st.session_state['page'] = 'teacher'
@@ -62,9 +63,6 @@ def connect_gsheet():
     return client.open(SHEET_NAME).sheet1
 
 def upload_to_drive(file_obj, filename):
-    if "script.google.com" not in GAS_APP_URL:
-        st.error("🚨 กรุณาใส่ URL Web App")
-        return None
     try:
         file_content = file_obj.getvalue()
         base64_str = base64.b64encode(file_content).decode('utf-8')
@@ -95,9 +93,8 @@ def create_pdf(vals, img_url1, img_url2):
         pdfmetrics.registerFont(TTFont('THSarabunNew', 'THSarabunNew.ttf'))
         font_name = 'THSarabunNew'
     except: font_name = 'Helvetica'
-    try: c.drawImage("logo", 50, height - 85, width=50, height=50, mask='auto')
-    except: pass 
     
+    # หัวกระดาษ
     c.setFont(font_name, 24)
     c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 20)
@@ -132,8 +129,7 @@ def create_pdf(vals, img_url1, img_url2):
                 if res.status_code == 200:
                     img = ImageReader(io.BytesIO(res.content))
                     c.drawImage(img, x, y, width=170, height=170, preserveAspectRatio=True)
-                else: c.drawString(x, y + 80, "โหลดรูปไม่ได้")
-        except: c.drawString(x, y + 80, "Error รูปภาพ")
+        except: pass
     
     draw_img(img_url1, 80, img_y)
     draw_img(img_url2, 310, img_y)
@@ -178,21 +174,17 @@ if st.session_state['page'] == 'student':
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
         std_id = c2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520")
-        
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
         room_input = c4.text_input("ห้อง หากไม่ใช่นักเรียนกรอก 0(ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
-        
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = c6.text_input("สีรถ")
         plate = st.text_input("ทะเบียน")
-        
         doc_c1, doc_c2, doc_c3 = st.columns(3)
-        license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
-        helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        
+        lic_s = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        tax_s = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
+        hel_s = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
         photo2 = st.file_uploader("รูปข้างรถ", type=['jpg','png','jpeg'])
         
@@ -208,26 +200,17 @@ if st.session_state['page'] == 'student':
             elif fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
-                    if str(std_id) in sheet.col_values(3): 
-                        st.error("❌ รหัสนี้เคยลงทะเบียนไปแล้ว!")
+                    if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนไปแล้ว!")
                     else:
                         with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
                             l1 = upload_to_drive(photo1, f"{std_id}_F.jpg")
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
                             thai_now = datetime.now() + timedelta(hours=7)
                             full_name = f"{prefix}{fname}"
-                            sheet.append_row([
-                                thai_now.strftime('%d/%m/%Y %H:%M'), 
-                                full_name, str(std_id), f"{level}/{room_input}", 
-                                brand, color, plate, 
-                                license_status, tax_status, helmet_status, 
-                                l1, l2
-                            ])
-                            st.balloons()
-                            st.success("✅ ลงทะเบียนสำเร็จ!")
+                            sheet.append_row([thai_now.strftime('%d/%m/%Y %H:%M'), full_name, str(std_id), f"{level}/{room_input}", brand, color, plate, lic_s, tax_s, hel_s, l1, l2])
+                            st.balloons(); st.success("✅ ลงทะเบียนสำเร็จ!")
                 except Exception as e: st.error(f"Error: {e}")
-            else:
-                st.warning("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน")
+            else: st.warning("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน")
 
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True):
         go_to_teacher(); st.rerun()
@@ -241,7 +224,6 @@ elif st.session_state['page'] == 'teacher':
             else: st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
-        
         if st.button("🔄 ดึงข้อมูลล่าสุดจากระบบ", use_container_width=True):
             try:
                 all_vals = connect_gsheet().get_all_values()
@@ -269,8 +251,6 @@ elif st.session_state['page'] == 'teacher':
             c4.metric("⛑️ หมวกกันน็อค", f"{hel_c} คน", f"{hel_p:.1f}%")
 
             st.markdown("---")
-
-            # --- ส่วนการค้นหา (ไม่มีแถบเทาแล้ว) ---
             st.subheader("🔎 ส่วนการตรวจสอบข้อมูล")
             q_text = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="เช่น สมชาย...")
             
@@ -284,20 +264,19 @@ elif st.session_state['page'] == 'teacher':
             except: brands = ["ทั้งหมด"]
             f_brand = col_f3.selectbox("🏍️ ยี่ห้อรถ:", brands)
             
-            do_search = st.button("🔍 เริ่มต้นค้นหาและแสดงผลตามเงื่อนไข", use_container_width=True, type="primary")
-
-            if do_search:
+            if st.button("🔍 เริ่มต้นค้นหาและแสดงผลตามเงื่อนไข", use_container_width=True, type="primary"):
                 fdf = df.copy()
                 if f_risk == "❌ ไม่มีใบขับขี่": fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
                 elif f_risk == "❌ ภาษีขาด": fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
                 elif f_risk == "❌ ไม่สวมหมวก": fdf = fdf[fdf.iloc[:, 9].astype(str).str.contains("ไม่มี", na=False)]
-                
                 if f_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_level, na=False)]
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
                 if q_text: fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
+                st.session_state.search_results = fdf.to_json() # เก็บผลลัพธ์ลง session เพื่อไม่ให้หายเวลาดาวน์โหลด
 
-                if fdf.empty:
-                    st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไขที่เลือก")
+            if st.session_state.search_results:
+                fdf = pd.read_json(st.session_state.search_results)
+                if fdf.empty: st.warning("ไม่พบข้อมูล")
                 else:
                     st.success(f"✅ พบข้อมูลทั้งหมด {len(fdf)} รายการ")
                     for i, row in fdf.iterrows():
@@ -312,20 +291,24 @@ elif st.session_state['page'] == 'teacher':
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ใบขับขี่:** {v[7]} | **ภาษี:** {v[8]} | **หมวก:** {v[9]}")
+                                # ส่วนแก้ปัญหา PDF บนมือถือ: สร้าง buffer รอไว้เลย
                                 pdf_data = create_pdf(v, i1, i2)
-                                st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
-            else:
-                st.info("💡 กรุณาระบุเงื่อนไขแล้วกดปุ่ม **'เริ่มต้นค้นหา'**")
+                                st.download_button(
+                                    label="⬇️ โหลด PDF",
+                                    data=pdf_data,
+                                    file_name=f"Profile_{v[6]}.pdf",
+                                    mime="application/pdf",
+                                    key=f"dl_{i}"
+                                )
+            else: st.info("💡 กรุณาระบุเงื่อนไขแล้วกดปุ่ม 'เริ่มต้นค้นหา'")
             
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
                 spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
                 if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
                     try:
-                        sheet = connect_gsheet()
-                        d = sheet.get_all_values()
-                        h = d[0]; r = d[1:]
-                        new_r = []
+                        sheet = connect_gsheet(); d = sheet.get_all_values()
+                        h = d[0]; r = d[1:]; new_r = []
                         for row in r:
                             ol = row[3]; nl = ol
                             if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
@@ -334,10 +317,7 @@ elif st.session_state['page'] == 'teacher':
                             elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
                             elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
                             elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                            row[3] = nl
-                            new_r.append(row)
-                        sheet.clear()
-                        sheet.update('A1', [h] + new_r)
-                        st.success("เลื่อนชั้นสำเร็จ!")
-                        if 'df' in st.session_state: del st.session_state.df
+                            row[3] = nl; new_r.append(row)
+                        sheet.clear(); sheet.update('A1', [h] + new_r)
+                        st.success("เลื่อนชั้นสำเร็จ!"); del st.session_state.df
                     except Exception as e: st.error(f"Error: {e}")
