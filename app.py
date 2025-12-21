@@ -177,11 +177,11 @@ if st.session_state['page'] == 'student':
             sub_c1, sub_c2 = st.columns([1.2, 2])
             prefix = sub_c1.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = sub_c2.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 12092530")
+        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room_input = c4.text_input("ห้องที่ กรณีไม่ใช่นักเรียนกรอก 0 (ใส่เฉพาะเลข 0-13)", help="ตัวอย่าง: หากอยู่ห้อง 5 ให้ใส่เลข 5")
+        room_input = c4.text_input("ห้อง (ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
         
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
@@ -254,22 +254,22 @@ elif st.session_state['page'] == 'teacher':
             df = st.session_state.df
             total = len(df)
             try:
-                lic_count = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                tax_count = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
-                hel_count = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                lic_p, tax_p, hel_p = (lic_count/total)*100, (tax_count/total)*100, (hel_count/total)*100
-            except: lic_count, tax_count, hel_count, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
+                lic_c = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                tax_c = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
+                hel_c = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                lic_p, tax_p, hel_p = (lic_c/total)*100, (tax_c/total)*100, (hel_c/total)*100
+            except: lic_c, tax_c, hel_c, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
             
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic_count} คน", f"{lic_p:.1f}%")
-            c3.metric("📝 ภาษีปกติ", f"{tax_count} คัน", f"{tax_p:.1f}%")
-            c4.metric("⛑️ หมวกกันน็อค", f"{hel_count} คน", f"{hel_p:.1f}%")
+            c2.metric("🪪 มีใบขับขี่", f"{lic_c} คน", f"{lic_p:.1f}%")
+            c3.metric("📝 ภาษีปกติ", f"{tax_c} คัน", f"{tax_p:.1f}%")
+            c4.metric("⛑️ หมวกกันน็อค", f"{hel_c} คน", f"{hel_p:.1f}%")
 
             st.markdown("---")
             
-            # --- ส่วน SMART FILTER (ระบบกรองข้อมูลอัจฉริยะ) ---
-            with st.expander("⚡ ตัวกรองข้อมูลอัจฉริยะ (Smart Filter)"):
+            # --- ส่วน SMART FILTER (ปรับปรุงให้แสดงผลทันทีและไม่กระทบข้อความเดิม) ---
+            with st.expander("⚡ ตัวกรองข้อมูลอัจฉริยะ (Smart Filter)", expanded=True):
                 col_f1, col_f2, col_f3 = st.columns(3)
                 filter_risk = col_f1.selectbox("🚨 เลือกกลุ่มเสี่ยง:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"])
                 try: all_levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
@@ -287,10 +287,9 @@ elif st.session_state['page'] == 'teacher':
             if filter_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(filter_level, na=False)]
             if filter_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == filter_brand]
 
-            # --- ส่วนค้นหาปกติ (ข้อความเหมือนเดิมเป๊ะ) ---
+            # --- ส่วนค้นหาปกติ (ข้อความเดิม 100%) ---
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", key="search_query")
             
-            # ใช้ Smart Filter ร่วมกับคำค้นหา
             if q:
                 fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
 
@@ -319,9 +318,9 @@ elif st.session_state['page'] == 'teacher':
             
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและย้อนกลับไม่ได้")
-                spwd = st.text_input("รหัสยืนยันของเจ้าหน้าที่ระดับสูง", type="password", key="upgrade_pwd")
-                if st.button("ตกลงเลื่อนชั้นปี") and spwd == "Patwitnext":
+                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและแก้ไขไม่ได้")
+                spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
+                if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
                     try:
                         sheet = connect_gsheet()
                         d = sheet.get_all_values()
