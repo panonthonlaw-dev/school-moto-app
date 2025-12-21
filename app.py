@@ -135,7 +135,7 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.save(); buffer.seek(0); return buffer
 
-# --- 4. Logic หน้าเว็บ ---
+# --- 4. หน้าเว็บ ---
 if st.session_state['page'] == 'student':
     st.info("📝 ลงทะเบียนรถจักรยานยนต์นักเรียน")
     with st.form("reg_form", clear_on_submit=True):
@@ -164,31 +164,40 @@ if st.session_state['page'] == 'student':
                     l2 = upload_to_drive(p2, f"{std_id}_S.jpg") if p2 else ""
                     sheet.append_row([(datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), f"{level}/{room}", brand, color, plate, ls, ts, hs, l1, l2, "", "100"])
                     st.success("✅ ลงทะเบียนสำเร็จ คะแนนเริ่มต้น 100 แต้ม"); st.balloons()
+            else: st.warning("กรุณากรอกข้อมูลให้ครบ")
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_page('teacher')
 
 elif st.session_state['page'] == 'dashboard':
     if st.button("⬅️ กลับหน้าจัดการ"): go_to_page('teacher')
-    st.subheader("📊 รายงานวิเคราะห์วินัยจราจร")
+    st.subheader("📊 รายงานวิเคราะห์วินัยจราจรและสถิติภาพรวม")
     if 'df' in st.session_state:
         df = st.session_state.df.copy()
-        # บังคับชื่อคอลัมน์ให้ไม่ซ้ำกัน
         df.columns = [f"Col_{i}_{name}" for i, name in enumerate(df.columns)]
         
-        # แปลงคะแนนใน Column 13 เป็นตัวเลข
         score_col = df.columns[13]
         class_col = df.columns[3]
         df[score_col] = pd.to_numeric(df[score_col], errors='coerce').fillna(100)
         df['LV'] = df[class_col].apply(lambda x: str(x).split('/')[0])
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 สถานะใบขับขี่รวม", hole=0.3), use_container_width=True)
-            # แก้ไข AttributeError โดยการเลือกคอลัมน์ก่อนจับกลุ่ม
+        # --- แถวที่ 1: แผนภูมิวงกลม 3 ส่วนสำคัญ ---
+        st.markdown("#### 🏍️ สัดส่วนวินัยจราจร")
+        p_col1, p_col2, p_col3 = st.columns(3)
+        with p_col1:
+            st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 สถานะใบขับขี่รวม", hole=0.3, color_discrete_sequence=['#2ecc71', '#e74c3c']), use_container_width=True)
+        with p_col2:
+            st.plotly_chart(px.pie(df, names=df.columns[8], title="📝 สถานะภาษี/พรบ.รวม", hole=0.3, color_discrete_sequence=['#3498db', '#f39c12']), use_container_width=True)
+        with p_col3:
+            st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ การสวมหมวกกันน็อค", hole=0.3, color_discrete_sequence=['#9b59b6', '#bdc3c7']), use_container_width=True)
+        
+        # --- แถวที่ 2: แผนภูมิแท่งวิเคราะห์เชิงลึก ---
+        st.markdown("---")
+        b_col1, b_col2 = st.columns(2)
+        with b_col1:
             avg_score = df[['LV', score_col]].groupby('LV').mean().reset_index()
-            st.plotly_chart(px.bar(avg_score, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยแยกชั้น", color_discrete_sequence=['#10b981']), use_container_width=True)
-        with c2:
-            st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ การสวมหมวกกันน็อค", hole=0.3), use_container_width=True)
-            st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามชั้น"), use_container_width=True)
+            st.plotly_chart(px.bar(avg_score, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยรายระดับชั้น", color_discrete_sequence=['#10b981']), use_container_width=True)
+        with b_col2:
+            st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามระดับชั้น", color_discrete_sequence=['#6366f1']), use_container_width=True)
+    else: st.warning("กรุณากดดึงข้อมูลล่าสุดที่หน้าเจ้าหน้าที่ก่อน")
 
 elif st.session_state['page'] == 'edit':
     st.subheader("✏️ แก้ไขข้อมูล")
@@ -210,7 +219,7 @@ elif st.session_state['page'] == 'edit':
     if st.button("ยกเลิก"): go_to_page('teacher')
 
 elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าหลัก"): go_to_page('student')
+    if st.button("🏠 หน้าหลัก"): go_to_page('student')
     if not st.session_state.get('logged_in'):
         pwd = st.text_input("รหัสผ่านเจ้าหน้าที่", type="password")
         if st.button("เข้าสู่ระบบ"):
@@ -221,11 +230,7 @@ elif st.session_state['page'] == 'teacher':
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
             vals = connect_gsheet().get_all_values()
             if len(vals) > 1:
-                headers = []
-                for i, h in enumerate(vals[0]):
-                    name = h if h else f"Empty_{i}"
-                    headers.append(name)
-                st.session_state.df = pd.DataFrame(vals[1:], columns=headers)
+                st.session_state.df = pd.DataFrame(vals[1:], columns=[h if h else f"Empty_{i}" for i, h in enumerate(vals[0])])
                 st.session_state.search_results_df = None
         if c2.button("📊 รายงานสถิติ (Dashboard)", use_container_width=True): go_to_page('dashboard')
 
