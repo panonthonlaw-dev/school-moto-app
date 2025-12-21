@@ -32,7 +32,7 @@ OFFICER_ACCOUNTS = {
     "Patwit1150": {"name": "แอดมินสูงสุด", "role": "admin"},
     "Pencharee001": {"name": "ครูเพ็ญชรีย์ (ปกครอง)", "role": "admin"},
     "Jak001": {"name": "ยามจักร (เจ้าหน้าที่รักษาความปลอดภัย)", "role": "admin"},
-    "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"}
+    "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"},
     "User05": {"name": "ตำรวจนักเรียน (ตรวจการณ์)", "role": "viewer"}
 }
 
