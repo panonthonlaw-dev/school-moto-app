@@ -23,15 +23,15 @@ from reportlab.lib.utils import ImageReader
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
-UPGRADE_PASSWORD = "Patwitnext" # รหัสเลื่อนชั้น (คงเดิม)
+UPGRADE_PASSWORD = "Patwitnext" 
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
+SESSION_TIMEOUT_MINUTES = 30 # กำหนดเวลาตัดระบบอัตโนมัติ
 
-# --- 🔑 ระบบจัดการสิทธิ์ (Role-Based Access) ---
-# role: 'admin' = แก้ไขได้ทุกอย่าง, 'viewer' = ดูได้อย่างเดียว
+# --- 🔑 ระบบจัดการสิทธิ์ ---
 OFFICER_ACCOUNTS = {
     "Patwit1150": {"name": "แอดมินสูงสุด", "role": "admin"},
-    "T001": {"name": "ครูสมชาย (ปกครอง)", "role": "admin"},  # สิทธิ์แก้คะแนนได้
-    "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"} # สิทธิ์ดูอย่างเดียว
+    "T001": {"name": "ครูสมชาย (ปกครอง)", "role": "admin"},
+    "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"}
 }
 
 # --- 2. Setup หน้าเว็บ ---
@@ -45,6 +45,29 @@ if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 if 'officer_name' not in st.session_state: st.session_state['officer_name'] = "" 
 if 'officer_role' not in st.session_state: st.session_state['officer_role'] = ""
 if 'current_user_pwd' not in st.session_state: st.session_state['current_user_pwd'] = ""
+# ตัวแปรเก็บเวลาล่าสุด
+if 'last_active' not in st.session_state: st.session_state['last_active'] = time.time()
+
+# --- ฟังก์ชันจัดการ Session (Auto Logout & Manual Logout) ---
+def check_session_timeout():
+    if st.session_state.get('logged_in'):
+        current_time = time.time()
+        # เช็คว่าเกิน 30 นาทีหรือไม่ (30 * 60 วินาที)
+        if current_time - st.session_state['last_active'] > (SESSION_TIMEOUT_MINUTES * 60):
+            logout()
+            st.warning(f"⏳ หมดเวลาการเชื่อมต่อ (เกิน {SESSION_TIMEOUT_MINUTES} นาที) กรุณาเข้าสู่ระบบใหม่")
+            st.stop() # หยุดการทำงานทันที
+        else:
+            # ถ้ายังไม่เกิน ให้อัปเดตเวลาล่าสุด
+            st.session_state['last_active'] = current_time
+
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.officer_name = ""
+    st.session_state.officer_role = ""
+    st.session_state.current_user_pwd = ""
+    st.session_state.page = "teacher" # กลับไปหน้า Login
+    st.rerun()
 
 def img_to_b64(img_path):
     if os.path.exists(img_path):
@@ -209,6 +232,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 4. Main UI ---
+# เรียกฟังก์ชันตรวจสอบ Session ทุกครั้งที่หน้าเว็บรัน
+check_session_timeout()
+
 c_logo, c_title = st.columns([1, 8])
 logo_path = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
 with c_logo:
@@ -216,6 +242,14 @@ with c_logo:
     else: st.write("🏍️")
 with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
 st.markdown("---")
+
+# Sidebar สำหรับ Logout (แสดงเฉพาะตอน Login)
+if st.session_state.get('logged_in'):
+    with st.sidebar:
+        st.write(f"👤 **{st.session_state.officer_name}**")
+        st.caption(f"สถานะ: {st.session_state.officer_role}")
+        if st.button("🚪 ออกจากระบบ (Log Out)", type="secondary", use_container_width=True):
+            logout()
 
 if st.session_state['page'] == 'student':
     if st.session_state.get("reg_success", False):
@@ -388,6 +422,7 @@ elif st.session_state['page'] == 'teacher':
                     st.session_state.officer_name = user_info["name"]
                     st.session_state.officer_role = user_info["role"]
                     st.session_state.current_user_pwd = pwd # จำรหัสไว้เช็คตอนยืนยันการหักแต้ม
+                    st.session_state.last_active = time.time() # เริ่มนับเวลา session
                     st.rerun()
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
