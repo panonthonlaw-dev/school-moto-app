@@ -204,7 +204,7 @@ if st.session_state['page'] == 'student':
             except ValueError: pass
 
             if not valid_room:
-                st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (ใส่เฉพาะตัวเลข 0 ถึง 13 เท่านั้น)")
+                st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (เลข 0 ถึง 13 เท่านั้น)")
             elif fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
@@ -241,13 +241,16 @@ elif st.session_state['page'] == 'teacher':
             else: st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
-        if st.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
+        
+        # ส่วนควบคุมหลัก
+        st.subheader("🛠️ การจัดการข้อมูล")
+        if st.button("🔄 ดึงข้อมูลล่าสุด (กดก่อนค้นหาหรือกรอง)", use_container_width=True):
             try:
                 all_vals = connect_gsheet().get_all_values()
                 if len(all_vals) > 1:
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                    st.success("โหลดข้อมูลสำเร็จ")
-                else: st.warning("ยังไม่มีข้อมูล")
+                    st.success("โหลดข้อมูลสำเร็จแล้ว! ท่านสามารถใช้ตัวกรองด้านล่างได้ทันที")
+                else: st.warning("ยังไม่มีข้อมูลในระบบ")
             except Exception as e: st.error(f"Error: {e}")
         
         if 'df' in st.session_state:
@@ -260,6 +263,8 @@ elif st.session_state['page'] == 'teacher':
                 lic_p, tax_p, hel_p = (lic_c/total)*100, (tax_c/total)*100, (hel_c/total)*100
             except: lic_c, tax_c, hel_c, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
             
+            # สรุปสถิติ
+            st.markdown("### 📊 สรุปภาพรวมสถิติ")
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
             c2.metric("🪪 มีใบขับขี่", f"{lic_c} คน", f"{lic_p:.1f}%")
@@ -268,8 +273,9 @@ elif st.session_state['page'] == 'teacher':
 
             st.markdown("---")
             
-            # --- ส่วน SMART FILTER (ปรับปรุงให้แสดงผลทันทีและไม่กระทบข้อความเดิม) ---
-            with st.expander("⚡ ตัวกรองข้อมูลอัจฉริยะ (Smart Filter)", expanded=True):
+            # --- ส่วน SMART FILTER (ปรากฏทันทีเมื่อมีข้อมูล) ---
+            st.subheader("⚡ ตัวกรองข้อมูลอัจฉริยะ (Smart Filter)")
+            with st.expander("เปิด/ปิด เมนูการกรองข้อมูลอัจฉริยะ", expanded=True):
                 col_f1, col_f2, col_f3 = st.columns(3)
                 filter_risk = col_f1.selectbox("🚨 เลือกกลุ่มเสี่ยง:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"])
                 try: all_levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
@@ -277,7 +283,7 @@ elif st.session_state['page'] == 'teacher':
                 filter_level = col_f2.selectbox("📚 เลือกระดับชั้น:", all_levels)
                 try: all_brands = ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique())))
                 except: all_brands = ["ทั้งหมด"]
-                filter_brand = col_f3.selectbox("🏍️ เลือกยี่ห้อ:", all_brands)
+                filter_brand = col_f3.selectbox("🏍️ เลือกยี่ห้อรถ:", all_brands)
 
             # Logic การกรอง
             fdf = df.copy()
@@ -287,57 +293,66 @@ elif st.session_state['page'] == 'teacher':
             if filter_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(filter_level, na=False)]
             if filter_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == filter_brand]
 
-            # --- ส่วนค้นหาปกติ (ข้อความเดิม 100%) ---
-            q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", key="search_query")
-            
+            # ส่วนการค้นหาด้วยพิมพ์ข้อความ
+            q = st.text_input("🔍 ค้นหาเพิ่มเติมด้วยข้อความ (ชื่อ/รหัส/ทะเบียน)", key="search_query")
             if q:
                 fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
 
-            if st.button("เริ่มการค้นหา") or (filter_risk!="ทั้งหมด" or filter_level!="ทั้งหมด" or filter_brand!="ทั้งหมด"):
-                if fdf.empty:
-                    st.warning("ไม่พบข้อมูล")
-                else:
-                    st.success(f"✅ พบ {len(fdf)} รายการ")
-                    for i, row in fdf.iterrows():
-                        v = row.tolist()
-                        with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
-                            c_img, c_info = st.columns([2, 1])
-                            with c_img:
-                                i1, i2 = get_img_link(v[10]), get_img_link(v[11])
-                                sub1, sub2 = st.columns(2)
-                                if i1: sub1.image(i1, caption="รูปหลังรถ")
-                                if i2: sub2.image(i2, caption="รูปข้างรถ")
-                            with c_info:
-                                st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
-                                st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
-                                st.write(f"**ใบขับขี่:** {v[7]}")
-                                st.write(f"**ภาษี/พรบ:** {v[8]}")
-                                st.write(f"**หมวกกันน็อค:** {v[9]}")
-                                pdf_data = create_pdf(v, i1, i2)
-                                st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
+            # แสดงผลลัพธ์ (กรองอัตโนมัติ ไม่ต้องกดเริ่มการค้นหา)
+            if fdf.empty:
+                st.warning("ไม่พบข้อมูลที่ตรงตามเงื่อนไขที่เลือก")
+            else:
+                st.success(f"✅ พบข้อมูลที่ตรงกัน {len(fdf)} รายการ")
+                for i, row in fdf.iterrows():
+                    v = row.tolist()
+                    with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
+                        c_img, c_info = st.columns([2, 1])
+                        with c_img:
+                            i1, i2 = get_img_link(v[10]), get_img_link(v[11])
+                            sub1, sub2 = st.columns(2)
+                            if i1: sub1.image(i1, caption="รูปหลังรถ")
+                            if i2: sub2.image(i2, caption="รูปข้างรถ")
+                        with c_info:
+                            st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
+                            st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
+                            st.write(f"**ใบขับขี่:** {v[7]}")
+                            st.write(f"**ภาษี/พรบ:** {v[8]}")
+                            st.write(f"**หมวกกันน็อค:** {v[9]}")
+                            pdf_data = create_pdf(v, i1, i2)
+                            st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}")
             
             st.markdown("---")
-            with st.expander("⚙️ เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและแก้ไขไม่ได้")
-                spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
-                if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
-                    try:
-                        sheet = connect_gsheet()
-                        d = sheet.get_all_values()
-                        h = d[0]; r = d[1:]
-                        new_r = []
-                        for row in r:
-                            ol = row[3]; nl = ol
-                            if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                            elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                            elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                            elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                            elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                            elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                            row[3] = nl
-                            new_r.append(row)
-                        sheet.clear()
-                        sheet.update('A1', [h] + new_r)
-                        st.success("เลื่อนชั้นสำเร็จ!")
-                        if 'df' in st.session_state: del st.session_state.df
-                    except Exception as e: st.error(f"Error: {e}")
+            with st.expander("⚙️ ตั้งค่าระบบ: เลื่อนชั้นปี"):
+                st.error("### ⚠️ คำเตือนสำคัญ!")
+                st.markdown("การกดปุ่มนี้จะเป็นการแก้ไขข้อมูลนักเรียนทุกคนในระบบ **'แบบถาวร'** ไม่สามารถกู้คืนได้")
+                spwd = st.text_input("รหัสยืนยันการเลื่อนชั้น", type="password", key="upgrade_pwd")
+                if st.button("🚀 เริ่มการเลื่อนชั้นปี", use_container_width=True):
+                    if spwd == "Patwitnext":
+                        try:
+                            sheet = connect_gsheet()
+                            d = sheet.get_all_values()
+                            h = d[0]; r = d[1:]
+                            new_r = []
+                            chg = 0
+                            for row in r:
+                                ol = row[3]; nl = ol
+                                if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                                elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                                elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                                elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                                elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                                elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                                if ol != nl:
+                                    row[3] = nl
+                                    chg += 1
+                                new_r.append(row)
+                            if chg > 0:
+                                sheet.clear()
+                                sheet.update('A1', [h] + new_r)
+                                st.success(f"ดำเนินการสำเร็จ {chg} รายการ!")
+                                if 'df' in st.session_state: del st.session_state.df
+                            else: st.info("ไม่มีข้อมูลเปลี่ยนแปลง")
+                        except Exception as e: st.error(f"Error: {e}")
+                    else: st.error("รหัสผิด")
+        else:
+            st.info("💡 กรุณากดปุ่ม '🔄 ดึงข้อมูลล่าสุด' ด้านบน เพื่อเริ่มต้นการค้นหาและใช้ตัวกรอง")
