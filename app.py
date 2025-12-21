@@ -135,19 +135,28 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.save(); buffer.seek(0); return buffer
 
-# --- 4. หน้าเว็บ ---
+# --- 4. Main App UI ---
+# ส่วนหัวที่จะแสดงในทุกหน้า
+c_logo, c_title = st.columns([1, 8])
+with c_logo:
+    logo_file = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
+    if logo_file: st.image(logo_file, width=90)
+    else: st.write("🏍️")
+with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
+st.markdown("---")
+
 if st.session_state['page'] == 'student':
     st.info("📝 ลงทะเบียนรถจักรยานยนต์นักเรียน")
     with st.form("reg_form", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1:
+        sc1, sc2 = st.columns(2)
+        with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = st.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520")
-        c3, c4 = st.columns(2)
+        std_id = sc2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520")
+        sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง หากไม่ใช่นักเรียนกรอก 0(ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
-        c5, c6 = st.columns(2)
+        room = st.text_input("ห้อง(0-13)หากไม่ใช่นักเรียนกรอก 0", help="หากอยู่ห้อง 5 ให้ใส่เลข 5)")
+        sc5, sc6 = st.columns(2)
         brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = st.text_input("สีรถ"); plate = st.text_input("ทะเบียนรถ")
         doc_cols = st.columns(3)
@@ -164,40 +173,30 @@ if st.session_state['page'] == 'student':
                     l2 = upload_to_drive(p2, f"{std_id}_S.jpg") if p2 else ""
                     sheet.append_row([(datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), f"{level}/{room}", brand, color, plate, ls, ts, hs, l1, l2, "", "100"])
                     st.success("✅ ลงทะเบียนสำเร็จ คะแนนเริ่มต้น 100 แต้ม"); st.balloons()
-            else: st.warning("กรุณากรอกข้อมูลให้ครบ")
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_page('teacher')
 
 elif st.session_state['page'] == 'dashboard':
     if st.button("⬅️ กลับหน้าจัดการ"): go_to_page('teacher')
-    st.subheader("📊 รายงานวิเคราะห์วินัยจราจรและสถิติภาพรวม")
+    st.subheader("📊 รายงานวิเคราะห์วินัยจราจร")
     if 'df' in st.session_state:
         df = st.session_state.df.copy()
         df.columns = [f"Col_{i}_{name}" for i, name in enumerate(df.columns)]
-        
-        score_col = df.columns[13]
-        class_col = df.columns[3]
+        score_col = df.columns[13]; class_col = df.columns[3]
         df[score_col] = pd.to_numeric(df[score_col], errors='coerce').fillna(100)
         df['LV'] = df[class_col].apply(lambda x: str(x).split('/')[0])
         
-        # --- แถวที่ 1: แผนภูมิวงกลม 3 ส่วนสำคัญ ---
         st.markdown("#### 🏍️ สัดส่วนวินัยจราจร")
         p_col1, p_col2, p_col3 = st.columns(3)
-        with p_col1:
-            st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 สถานะใบขับขี่รวม", hole=0.3, color_discrete_sequence=['#2ecc71', '#e74c3c']), use_container_width=True)
-        with p_col2:
-            st.plotly_chart(px.pie(df, names=df.columns[8], title="📝 สถานะภาษี/พรบ.รวม", hole=0.3, color_discrete_sequence=['#3498db', '#f39c12']), use_container_width=True)
-        with p_col3:
-            st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ การสวมหมวกกันน็อค", hole=0.3, color_discrete_sequence=['#9b59b6', '#bdc3c7']), use_container_width=True)
+        with p_col1: st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 ใบขับขี่รวม", hole=0.3, color_discrete_sequence=['#2ecc71', '#e74c3c']), use_container_width=True)
+        with p_col2: st.plotly_chart(px.pie(df, names=df.columns[8], title="📝 ภาษี/พรบ.รวม", hole=0.3, color_discrete_sequence=['#3498db', '#f39c12']), use_container_width=True) # เพิ่มแผนภูมิภาษี
+        with p_col3: st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ หมวกกันน็อค", hole=0.3, color_discrete_sequence=['#9b59b6', '#bdc3c7']), use_container_width=True)
         
-        # --- แถวที่ 2: แผนภูมิแท่งวิเคราะห์เชิงลึก ---
-        st.markdown("---")
         b_col1, b_col2 = st.columns(2)
         with b_col1:
             avg_score = df[['LV', score_col]].groupby('LV').mean().reset_index()
-            st.plotly_chart(px.bar(avg_score, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยรายระดับชั้น", color_discrete_sequence=['#10b981']), use_container_width=True)
+            st.plotly_chart(px.bar(avg_score, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยแยกชั้น", color_discrete_sequence=['#10b981']), use_container_width=True)
         with b_col2:
-            st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามระดับชั้น", color_discrete_sequence=['#6366f1']), use_container_width=True)
-    else: st.warning("กรุณากดดึงข้อมูลล่าสุดที่หน้าเจ้าหน้าที่ก่อน")
+            st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามชั้น"), use_container_width=True)
 
 elif st.session_state['page'] == 'edit':
     st.subheader("✏️ แก้ไขข้อมูล")
@@ -226,13 +225,13 @@ elif st.session_state['page'] == 'teacher':
             if pwd == ADMIN_PASSWORD: st.session_state.logged_in = True; st.rerun()
             else: st.error("รหัสไม่ถูกต้อง")
     else:
-        c1, c2 = st.columns(2)
-        if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
+        tc1, tc2 = st.columns(2)
+        if tc1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
             vals = connect_gsheet().get_all_values()
             if len(vals) > 1:
                 st.session_state.df = pd.DataFrame(vals[1:], columns=[h if h else f"Empty_{i}" for i, h in enumerate(vals[0])])
                 st.session_state.search_results_df = None
-        if c2.button("📊 รายงานสถิติ (Dashboard)", use_container_width=True): go_to_page('dashboard')
+        if tc2.button("📊 รายงานสถิติ", use_container_width=True): go_to_page('dashboard')
 
         if 'df' in st.session_state:
             df = st.session_state.df; total = len(df)
@@ -249,7 +248,7 @@ elif st.session_state['page'] == 'teacher':
 
             st.markdown("---")
             q_txt = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
-            if st.button("กดเพื่อค้นหาบุคคล", use_container_width=True) and q_txt:
+            if st.button("กดเพื่อค้นหา", use_container_width=True) and q_txt:
                 st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q_txt, case=False).any(), axis=1)]
             
             st.write("---")
@@ -271,8 +270,7 @@ elif st.session_state['page'] == 'teacher':
                 if res.empty: st.warning("ไม่พบข้อมูล")
                 else:
                     for i, row in res.iterrows():
-                        v = row.tolist()
-                        curr_score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
+                        v = row.tolist(); curr_score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
                         with st.expander(f"📍 {v[6]} | {v[1]} (คงเหลือ: {curr_score} แต้ม)", expanded=True):
                             c_im, c_in = st.columns([2, 1])
                             with c_im:
@@ -290,23 +288,19 @@ elif st.session_state['page'] == 'teacher':
                                 col_sc1, col_sc2 = st.columns(2)
                                 if col_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}"):
                                     if apwd == UPGRADE_PASSWORD:
-                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
-                                        new_s = max(0, curr_score - points)
+                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = max(0, curr_score - points)
                                         sheet.update_acell(f'N{cell.row}', str(new_s)); st.success("หักแต้มแล้ว!"); time.sleep(1); st.rerun()
                                     else: st.error("รหัสไม่ถูกต้อง")
                                 if col_sc2.button(f"🟢 เพิ่ม {points} แต้ม", key=f"add_{i}"):
                                     if apwd == UPGRADE_PASSWORD:
-                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
-                                        new_s = min(100, curr_score + points)
+                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = min(100, curr_score + points)
                                         sheet.update_acell(f'N{cell.row}', str(new_s)); st.success("เพิ่มแต้มแล้ว!"); time.sleep(1); st.rerun()
                                     else: st.error("รหัสไม่ถูกต้อง")
                                 st.write("📝 **บันทึกเจ้าหน้าที่**")
-                                cn = str(v[12]).strip() if len(v)>12 and str(v[12]).lower()!="nan" else ""
-                                nn = st.text_area("บันทึก...", value=cn, key=f"n_{i}")
+                                cn = str(v[12]).strip() if len(v)>12 and str(v[12]).lower()!="nan" else ""; nn = st.text_area("บันทึก...", value=cn, key=f"n_{i}")
                                 if st.button("💾 บันทึกข้อความ", key=f"s_{i}"):
                                     if apwd == UPGRADE_PASSWORD:
-                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
-                                        sheet.update_acell(f'M{cell.row}', nn); st.success("บันทึกแล้ว!")
+                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2])); sheet.update_acell(f'M{cell.row}', nn); st.success("บันทึกแล้ว!")
                                     else: st.error("รหัสผิด")
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียนประจำปี"):
