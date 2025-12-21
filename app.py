@@ -80,6 +80,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. ฟังก์ชันระบบ ---
+# Initialize session state for reset counter
+if 'reset_count' not in st.session_state: st.session_state['reset_count'] = 0
 if 'page' not in st.session_state: st.session_state['page'] = 'student'
 if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
@@ -127,7 +129,7 @@ def get_img_link(url):
     file_id = match.group(1) or match.group(2) if match else None
     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
 
-# --- ฟังก์ชัน PDF ---
+# --- ฟังก์ชัน PDF (แก้ตำแหน่งรูป + วันที่) ---
 def create_pdf(vals, img_url1, img_url2, face_url=None):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -173,15 +175,18 @@ def create_pdf(vals, img_url1, img_url2, face_url=None):
                 c.rect(x, y, w, h)
         except: pass
 
+    # Draw Vehicle Images (Middle)
     draw_img_func(img_url1, 70, height - 415, 180, 180)
     draw_img_func(img_url2, 300, height - 415, 180, 180)
 
+    # History Section
     note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
     c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
     for line in note_text.split('\n'):
         for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
     c.drawText(text_obj)
     
+    # Signature Section
     sign_y = 180 
     c.setFont(font_name, 16)
     c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ")
@@ -451,11 +456,11 @@ elif st.session_state['page'] == 'teacher':
                             
                             st.write("---")
                             st.caption("จัดการคะแนน:")
-                            pts = st.number_input("จำนวนแต้ม", 1, 50, 5, key=f"p_{i}")
-                            # ตรวจสอบค่า note เพื่อเคลียร์ค่าอัตโนมัติ
-                            default_note = st.session_state.get(f"n_{i}", "")
-                            note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", value=default_note, key=f"n_widget_{i}")
-                            pwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"pw_{i}")
+                            # --- Dynamic Key Generation to Fix Clear Input Error ---
+                            k_suffix = st.session_state.reset_count
+                            pts = st.number_input("จำนวนแต้ม", 1, 50, 5, key=f"p_{i}_{k_suffix}")
+                            note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}_{k_suffix}")
+                            pwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"pw_{i}_{k_suffix}")
                             
                             b1, b2 = st.columns(2)
                             if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
@@ -465,11 +470,8 @@ elif st.session_state['page'] == 'teacher':
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
                                     s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts} คะแนน: {note}", str(ns)]])
                                     
-                                    # Clear Inputs
-                                    st.session_state[f"n_{i}"] = "" 
-                                    st.session_state[f"pw_{i}"] = ""
-                                    st.session_state[f"p_{i}"] = 5
-                                    
+                                    # Force Reset Inputs by incrementing suffix
+                                    st.session_state.reset_count += 1
                                     load_data()
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                 else: st.error("ข้อมูลไม่ครบ/รหัสผิด")
@@ -480,11 +482,7 @@ elif st.session_state['page'] == 'teacher':
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
                                     s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note}", str(ns)]])
                                     
-                                    # Clear Inputs
-                                    st.session_state[f"n_{i}"] = ""
-                                    st.session_state[f"pw_{i}"] = ""
-                                    st.session_state[f"p_{i}"] = 5
-                                    
+                                    st.session_state.reset_count += 1
                                     load_data()
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                     
