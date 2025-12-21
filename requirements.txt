@@ -4,3 +4,5 @@ gspread
 oauth2client
 requests
 reportlab
+plotly
+openpyxl
