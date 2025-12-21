@@ -23,15 +23,15 @@ from reportlab.lib.utils import ImageReader
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
-UPGRADE_PASSWORD = "Patwitnext" # รหัสยืนยันการทำรายการ (Safety PIN)
+UPGRADE_PASSWORD = "Patwitnext" # รหัสเลื่อนชั้น (คงเดิม)
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 
-# --- 🔑 กำหนดรายชื่อเจ้าหน้าที่และรหัสผ่าน (เพิ่มได้เรื่อยๆ) ---
+# --- 🔑 ระบบจัดการสิทธิ์ (Role-Based Access) ---
+# role: 'admin' = แก้ไขได้ทุกอย่าง, 'viewer' = ดูได้อย่างเดียว
 OFFICER_ACCOUNTS = {
-    "Patwit1150": "แอดมินสูงสุด",
-    "T001": "ครูสมชาย (ฝ่ายปกครอง)",
-    "T002": "ครูสมหญิง (ฝ่ายทะเบียน)",
-    "Director": "ท่านผู้อำนวยการ"
+    "Patwit1150": {"name": "แอดมินสูงสุด", "role": "admin"},
+    "T001": {"name": "ครูสมชาย (ปกครอง)", "role": "admin"},  # สิทธิ์แก้คะแนนได้
+    "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"} # สิทธิ์ดูอย่างเดียว
 }
 
 # --- 2. Setup หน้าเว็บ ---
@@ -43,6 +43,8 @@ if 'page' not in st.session_state: st.session_state['page'] = 'student'
 if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 if 'officer_name' not in st.session_state: st.session_state['officer_name'] = "" 
+if 'officer_role' not in st.session_state: st.session_state['officer_role'] = ""
+if 'current_user_pwd' not in st.session_state: st.session_state['current_user_pwd'] = ""
 
 def img_to_b64(img_path):
     if os.path.exists(img_path):
@@ -107,12 +109,10 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     logo = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
     if logo: c.drawImage(logo, 50, height - 85, width=50, height=50, mask='auto')
     
-    # Header
     c.setFont(font_bold, 22); c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 18); c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 85, width - 50, height - 85)
     
-    # Data
     name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
     lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
     raw_note = str(vals[12]).strip() if len(vals) > 12 else ""
@@ -153,17 +153,14 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.drawString(100, sign_y - 20, f"({name})")
 
     if face_url:
-        draw_img_func(face_url, 450, height - 200, 90, 110) # รูปขวาบน
-        c.setFont(font_name, 12); c.drawCentredString(495, height - 215, "(เจ้าของรถ)")
+        draw_img_func(face_url, 450, height - 200, 90, 110)
 
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.drawString(340, sign_y - 20, "(.........................................)")
     
-    # --- แสดงชื่อผู้พิมพ์ (Footer) ---
     c.setFont(font_name, 10)
     c.setFillColorRGB(0.5, 0.5, 0.5)
     print_time = (datetime.now() + timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
-    # แสดงชื่อเจ้าหน้าที่ที่ Login เข้ามา
     c.drawRightString(width - 30, 20, f"พิมพ์โดย: {printed_by} | เมื่อ: {print_time}")
     
     c.save(); buffer.seek(0); return buffer
@@ -382,20 +379,22 @@ elif st.session_state['page'] == 'teacher':
     if not st.session_state.get('logged_in'):
         with st.form("login_form"):
             st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
-            # ช่องกรอกรหัสผ่านเจ้าหน้าที่ (เช็คจาก Dictionary)
+            # ระบบล็อกอินแบบใหม่ ใช้ Dictionary เช็คสิทธิ์
             pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
             if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
                 if pwd in OFFICER_ACCOUNTS:
+                    user_info = OFFICER_ACCOUNTS[pwd]
                     st.session_state.logged_in = True
-                    st.session_state.officer_name = OFFICER_ACCOUNTS[pwd]
+                    st.session_state.officer_name = user_info["name"]
+                    st.session_state.officer_role = user_info["role"]
+                    st.session_state.current_user_pwd = pwd # จำรหัสไว้เช็คตอนยืนยันการหักแต้ม
                     st.rerun()
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if 'df' not in st.session_state: load_data()
 
-        # แสดงชื่อเจ้าหน้าที่ที่ Login อยู่
-        st.info(f"👤 ผู้ใช้งาน: {st.session_state.officer_name}")
+        st.info(f"👤 ผู้ใช้งาน: {st.session_state.officer_name} (สิทธิ์: {st.session_state.officer_role})")
 
         c1, c2 = st.columns(2)
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
@@ -466,59 +465,65 @@ elif st.session_state['page'] == 'teacher':
                                 st.image(get_img_link(v[11]), use_container_width=True)
                             
                             face_url = get_img_link(v[14]) if len(v) > 14 else None
-                            # ส่งชื่อเจ้าหน้าที่ที่ Login ไปพิมพ์ใน PDF
-                            st.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url, st.session_state.officer_name), f"{v[6]}.pdf", use_container_width=True)
                             
-                            if st.button("✏️ แก้ไขข้อมูล", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
-                            
-                            st.write("---")
-                            st.caption("จัดการคะแนน:")
-                            k_suffix = st.session_state.reset_count
-                            pts = st.number_input("จำนวนแต้ม", 1, 50, 5, key=f"p_{i}_{k_suffix}")
-                            note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}_{k_suffix}")
-                            pwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"pw_{i}_{k_suffix}")
-                            
-                            b1, b2 = st.columns(2)
-                            if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
-                                if note and pwd==UPGRADE_PASSWORD:
-                                    s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
-                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
-                                    old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    # บันทึกชื่อเจ้าหน้าที่ลงไปใน Log
-                                    editor = st.session_state.officer_name
-                                    new_log = f"{old}\n[{tn}] หัก {pts} คะแนน: {note} (โดย: {editor})"
-                                    s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
-                                    
-                                    st.session_state.reset_count += 1
-                                    load_data()
-                                    st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
-                                else: st.error("ข้อมูลไม่ครบ/รหัสผิด")
-                            if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
-                                if note and pwd==UPGRADE_PASSWORD:
-                                    s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
-                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
-                                    old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    editor = st.session_state.officer_name
-                                    new_log = f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note} (โดย: {editor})"
-                                    s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
-                                    
-                                    st.session_state.reset_count += 1
-                                    load_data()
-                                    st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
+                            # ตรวจสอบสิทธิ์ก่อนแสดงปุ่มโหลด PDF
+                            if st.session_state.officer_role == "admin":
+                                st.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url, st.session_state.officer_name), f"{v[6]}.pdf", use_container_width=True)
+                                if st.button("✏️ แก้ไขข้อมูล", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
+                                
+                                st.write("---")
+                                st.caption("จัดการคะแนน:")
+                                k_suffix = st.session_state.reset_count
+                                pts = st.number_input("จำนวนแต้ม", 1, 50, 5, key=f"p_{i}_{k_suffix}")
+                                note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}_{k_suffix}")
+                                # ให้ใส่รหัสผ่านตัวเองเพื่อยืนยัน
+                                pwd = st.text_input("ใส่รหัสผ่านของท่านเพื่อยืนยัน", type="password", key=f"pw_{i}_{k_suffix}")
+                                
+                                b1, b2 = st.columns(2)
+                                if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
+                                    # เช็คว่ารหัสที่ใส่ ตรงกับรหัสที่ล็อกอินเข้ามาหรือไม่
+                                    if note and pwd == st.session_state.current_user_pwd:
+                                        s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
+                                        tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
+                                        old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
+                                        editor = st.session_state.officer_name
+                                        new_log = f"{old}\n[{tn}] หัก {pts} คะแนน: {note} (โดย: {editor})"
+                                        s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
+                                        
+                                        st.session_state.reset_count += 1
+                                        load_data()
+                                        st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
+                                    else: st.error("ข้อมูลไม่ครบ หรือ รหัสผ่านยืนยันไม่ถูกต้อง")
+                                if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
+                                    if note and pwd == st.session_state.current_user_pwd:
+                                        s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
+                                        tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
+                                        old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
+                                        editor = st.session_state.officer_name
+                                        new_log = f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note} (โดย: {editor})"
+                                        s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
+                                        
+                                        st.session_state.reset_count += 1
+                                        load_data()
+                                        st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
+                            else:
+                                st.info("🔒 ท่านไม่มีสิทธิ์แก้ไขข้อมูลหรือดาวน์โหลดเอกสาร")
                                     
             st.markdown("---")
-            with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน"):
-                st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
-                up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
-                if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
-                    s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
-                    for row in r:
-                        ol = str(row[3]); nl = ol
-                        if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
-                        elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
-                        elif "ม.3" in ol: nl="จบการศึกษา 🎓"
-                        elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
-                        elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
-                        elif "ม.6" in ol: nl="จบการศึกษา 🎓"
-                        row[3] = nl; nr.append(row)
-                    s.clear(); s.update('A1', [h] + nr); st.success("สำเร็จ!"); del st.session_state.df
+            # ระบบเลื่อนชั้น (สงวนสิทธิ์เฉพาะ admin)
+            if st.session_state.officer_role == "admin":
+                with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน (Admin Only)"):
+                    st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
+                    up_pwd = st.text_input("รหัสเลื่อนชั้น (Patwitnext)", type="password", key="prom_pwd")
+                    if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
+                        s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
+                        for row in r:
+                            ol = str(row[3]); nl = ol
+                            if "ม.1" in ol: nl=ol.replace("ม.1","ม.2")
+                            elif "ม.2" in ol: nl=ol.replace("ม.2","ม.3")
+                            elif "ม.3" in ol: nl="จบการศึกษา 🎓"
+                            elif "ม.4" in ol: nl=ol.replace("ม.4","ม.5")
+                            elif "ม.5" in ol: nl=ol.replace("ม.5","ม.6")
+                            elif "ม.6" in ol: nl="จบการศึกษา 🎓"
+                            row[3] = nl; nr.append(row)
+                        s.clear(); s.update('A1', [h] + nr); st.success("สำเร็จ!"); del st.session_state.df
