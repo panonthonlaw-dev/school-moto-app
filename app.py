@@ -335,7 +335,7 @@ elif st.session_state['page'] == 'teacher':
                                 if st.button("✏️ แก้ไขข้อมูล", key=f"e_{i}"): st.session_state.edit_data = v; go_to_page('edit')
                                 st.write("---"); current_n = str(v[12]).strip() if len(v) > 12 and str(v[12]).lower() != "nan" else ""
                                 new_n = st.text_area("บันทึกเจ้าหน้าที่...", value=current_n, key=f"n_{i}")
-                                apwd = st.text_input("รหัส Patwitnext", type="password", key=f"apwd_{i}")
+                                apwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key=f"apwd_{i}")
                                 if st.button("💾 บันทึก", key=f"s_{i}"):
                                     if apwd == UPGRADE_PASSWORD:
                                         sheet = connect_gsheet(); cell = sheet.find(str(v[2])); sheet.update_acell(f'M{cell.row}', new_n); st.success("บันทึกแล้ว!")
