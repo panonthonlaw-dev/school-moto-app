@@ -42,7 +42,6 @@ if 'page' not in st.session_state:
 if 'search_results_df' not in st.session_state:
     st.session_state['search_results_df'] = None
 
-# ฟังก์ชันล้างผลลัพธ์ทันทีที่มีการขยับเงื่อนไข
 def reset_results():
     st.session_state['search_results_df'] = None
 
@@ -90,7 +89,6 @@ def get_img_link(url):
     if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
     return url
 
-# --- ฟังก์ชันสร้าง PDF (แก้ไข NameError เรียบร้อย) ---
 def create_pdf(vals, img_url1, img_url2):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -125,7 +123,7 @@ def create_pdf(vals, img_url1, img_url2):
     
     lic_mark = "(/)" if "มี" in lic_s else "( )"
     tax_mark = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"
-    helmet_mark = "(/)" if "มี" in hel_s else "( )" # แก้ไขจุดที่เคยผิดพลาด
+    helmet_mark = "(/)" if "มี" in hel_s else "( )"
     
     c.setFont(font_name, 16)
     c.drawString(60, height - 210, f"สถานะเอกสาร: {lic_mark} ใบขับขี่  {tax_mark} พรบ./ภาษี  {helmet_mark} หมวกกันน็อค")
@@ -170,7 +168,6 @@ with c_logo:
 with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
 st.markdown("---")
 
-# --- หน้านักเรียน ---
 if st.session_state['page'] == 'student':
     st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
     with st.form("reg_form", clear_on_submit=True):
@@ -219,7 +216,6 @@ if st.session_state['page'] == 'student':
 
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_teacher(); st.rerun()
 
-# --- หน้าเจ้าหน้าที่ ---
 elif st.session_state['page'] == 'teacher':
     if st.button("🏠 กลับหน้าหลัก"): go_to_student(); st.rerun()
     if not st.session_state.get('logged_in'):
@@ -240,7 +236,7 @@ elif st.session_state['page'] == 'teacher':
                         else: seen[h]=0; new_headers.append(h)
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=new_headers)
                     st.session_state.search_results_df = None
-                    st.success("โหลดข้อมูลล่าสุดแล้ว!")
+                    st.success("โหลดข้อมูลล่าสุดสำเร็จ!")
                 else: st.warning("ยังไม่มีข้อมูล")
             except Exception as e: st.error(f"Error: {e}")
         
@@ -263,13 +259,14 @@ elif st.session_state['page'] == 'teacher':
 
             st.markdown("---")
 
-            # --- ส่วนที่ 1: ค้นหาจากข้อความ ---
-            st.subheader("🔍 1. ค้นหาประวัติรายบุคคล")
-            q_text = st.text_input("พิมพ์ชื่อ, รหัส หรือ ทะเบียน", placeholder="ค้นหาคน...", key="txt_search", on_change=reset_results)
-            btn_search = st.button("🔍 กดเพื่อค้นหาจากข้อความ", use_container_width=True)
+            # --- ส่วนที่ 1: ค้นหาจากข้อความ (ปรับปรุงความแม่นยำ) ---
+            st.subheader("🔍 1. ค้นหาประวัติรายบุคคล (ชื่อ/รหัส/ทะเบียน)")
+            q_text = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="พิมพ์ที่นี่...", key="txt_search", on_change=reset_results)
+            btn_search = st.button("🔍 กดเพื่อค้นหา", use_container_width=True)
 
             if btn_search and q_text:
-                st.session_state.search_results_df = df[df.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
+                # ค้นหาเฉพาะคอลัมน์ 1 (ชื่อ), 2 (รหัส), และ 6 (ทะเบียน) เพื่อความแม่นยำ
+                st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
             elif btn_search and not q_text:
                 st.warning("⚠️ กรุณากรอกข้อความก่อนค้นหา")
 
@@ -286,7 +283,7 @@ elif st.session_state['page'] == 'teacher':
             except: brands = ["ทั้งหมด"]
             f_brand = col_f3.selectbox("🏍️ ยี่ห้อรถ:", brands, on_change=reset_results)
             
-            btn_filter = st.button("⚡ กดเพื่อกรองข้อมูลตามเงื่อนไข", use_container_width=True, type="primary")
+            btn_filter = st.button("⚡ กดเพื่อกรองข้อมูล", use_container_width=True, type="primary")
 
             if btn_filter:
                 fdf = df.copy()
@@ -301,7 +298,7 @@ elif st.session_state['page'] == 'teacher':
             st.markdown("---")
             if st.session_state.search_results_df is not None:
                 res_df = st.session_state.search_results_df
-                if res_df.empty: st.warning("ไม่พบข้อมูลที่ตรงตามเงื่อนไข")
+                if res_df.empty: st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไข")
                 else:
                     st.success(f"✅ พบข้อมูลทั้งหมด {len(res_df)} รายการ")
                     for i, row in res_df.iterrows():
