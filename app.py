@@ -93,6 +93,18 @@ def create_pdf(vals, img_url1, img_url2):
         pdfmetrics.registerFont(TTFont('THSarabunNew', 'THSarabunNew.ttf'))
         font_name = 'THSarabunNew'
     except: font_name = 'Helvetica'
+        # --- เพิ่มส่วนการวาดโลโก้ลงใน PDF ---
+    # ตรวจสอบว่ามีไฟล์ชื่อ logo.png หรือ logo หรือไม่
+    logo_file = None
+    for f in ["logo.png", "logo.jpg", "logo"]:
+        if os.path.exists(f):
+            logo_file = f
+            break
+    
+    if logo_file:
+        try:
+            c.drawImage(logo_file, 50, height - 85, width=50, height=50, mask='auto')
+        except: pass
     
     c.setFont(font_name, 24)
     c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
