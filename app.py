@@ -10,6 +10,7 @@ import time
 import io
 import re
 import os
+import plotly.express as px
 
 # --- ส่วนของ PDF Library ---
 from reportlab.pdfgen import canvas
@@ -41,15 +42,15 @@ if 'page' not in st.session_state:
     st.session_state['page'] = 'student'
 if 'search_results_df' not in st.session_state:
     st.session_state['search_results_df'] = None
+if 'edit_data' not in st.session_state:
+    st.session_state['edit_data'] = None
 
 def reset_results():
     st.session_state['search_results_df'] = None
 
-def go_to_teacher():
-    st.session_state['page'] = 'teacher'
-
-def go_to_student():
-    st.session_state['page'] = 'student'
+def go_to_page(page_name):
+    st.session_state['page'] = page_name
+    st.rerun()
 
 def get_creds():
     key_content = st.secrets["textkey"]["json_content"]
@@ -168,6 +169,7 @@ with c_logo:
 with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
 st.markdown("---")
 
+# --- หน้านักเรียน (เดิม) ---
 if st.session_state['page'] == 'student':
     st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
     with st.form("reg_form", clear_on_submit=True):
@@ -214,10 +216,64 @@ if st.session_state['page'] == 'student':
                 except Exception as e: st.error(f"Error: {e}")
             else: st.warning("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน")
 
-    if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_teacher(); st.rerun()
+    if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_page('teacher')
 
+# --- หน้าแดชบอร์ด (เพิ่มใหม่) ---
+elif st.session_state['page'] == 'dashboard':
+    if st.button("⬅️ กลับหน้าจัดการข้อมูล"): go_to_page('teacher')
+    st.subheader("📊 แดชบอร์ดวิเคราะห์ข้อมูล")
+    
+    if 'df' in st.session_state:
+        df = st.session_state.df
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig_brand = px.pie(df, names=df.columns[4], title="📊 สัดส่วนยี่ห้อรถจักรยานยนต์")
+            st.plotly_chart(fig_brand, use_container_width=True)
+            
+            fig_lic = px.pie(df, names=df.columns[7], title="🪪 สถานะใบขับขี่", color_discrete_sequence=['#2ecc71', '#e74c3c'])
+            st.plotly_chart(fig_lic, use_container_width=True)
+
+        with col2:
+            fig_helmet = px.pie(df, names=df.columns[9], title="⛑️ การสวมหมวกกันน็อค", color_discrete_sequence=['#3498db', '#f1c40f'])
+            st.plotly_chart(fig_helmet, use_container_width=True)
+            
+            # กราฟแท่งแยกตามชั้น
+            df['Level_Group'] = df.iloc[:, 3].apply(lambda x: str(x).split('/')[0])
+            fig_level = px.bar(df.groupby('Level_Group').size().reset_index(name='จำนวน'), x='Level_Group', y='จำนวน', title="📚 จำนวนรถแยกตามระดับชั้น")
+            st.plotly_chart(fig_level, use_container_width=True)
+    else:
+        st.warning("กรุณากดดึงข้อมูลล่าสุดที่หน้าเจ้าหน้าที่ก่อน")
+
+# --- หน้าแก้ไขข้อมูล (เพิ่มใหม่) ---
+elif st.session_state['page'] == 'edit':
+    st.subheader("✏️ แก้ไขข้อมูล")
+    v = st.session_state.edit_data
+    with st.form("edit_form"):
+        new_name = st.text_input("ชื่อ-นามสกุล", value=v[1])
+        new_level_room = st.text_input("ชั้น/ห้อง", value=v[3])
+        new_brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], index=["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"].index(v[4]) if v[4] in ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"] else 0)
+        new_color = st.text_input("สีรถ", value=v[5])
+        new_plate = st.text_input("ทะเบียน", value=v[6])
+        new_lic = st.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], index=0 if "มี" in v[7] else 1, horizontal=True)
+        new_tax = st.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], index=0 if "ปกติ" in v[8] or "✅" in v[8] else 1, horizontal=True)
+        new_hel = st.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], index=0 if "มี" in v[9] else 1, horizontal=True)
+        
+        if st.form_submit_button("💾 บันทึกการแก้ไข"):
+            try:
+                sheet = connect_gsheet()
+                cell = sheet.find(str(v[2])) # ค้นหาจากรหัสเดิม
+                row_num = cell.row
+                sheet.update(f'B{row_num}:J{row_num}', [[new_name, v[2], new_level_room, new_brand, new_color, new_plate, new_lic, new_tax, new_hel]])
+                st.success("แก้ไขข้อมูลสำเร็จ!")
+                st.session_state.df = pd.DataFrame(sheet.get_all_values()[1:]) # อัปเดต df ในเครื่อง
+                go_to_page('teacher')
+            except Exception as e: st.error(f"Error: {e}")
+    if st.button("ยกเลิก"): go_to_page('teacher')
+
+# --- หน้าเจ้าหน้าที่ (เดิม + ฟีเจอร์ใหม่) ---
 elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าหลัก"): go_to_student(); st.rerun()
+    if st.button("🏠 กลับหน้าหลัก"): go_to_page('student')
     if not st.session_state.get('logged_in'):
         pwd = st.text_input("รหัสผ่าน", type="password")
         if st.button("เข้าสู่ระบบ"):
@@ -225,57 +281,48 @@ elif st.session_state['page'] == 'teacher':
             else: st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
-        if st.button("🔄 ดึงข้อมูลล่าสุดจากระบบ", use_container_width=True):
-            try:
-                all_vals = connect_gsheet().get_all_values()
-                if len(all_vals) > 1:
-                    headers = [h if h else f"Col_{i}" for i, h in enumerate(all_vals[0])]
-                    seen = {}; new_headers = []
-                    for h in headers:
-                        if h in seen: seen[h]+=1; new_headers.append(f"{h}_{seen[h]}")
-                        else: seen[h]=0; new_headers.append(h)
-                    st.session_state.df = pd.DataFrame(all_vals[1:], columns=new_headers)
-                    st.session_state.search_results_df = None
-                    st.success("โหลดข้อมูลล่าสุดสำเร็จ!")
-                else: st.warning("ยังไม่มีข้อมูล")
-            except Exception as e: st.error(f"Error: {e}")
         
+        # --- แถบเครื่องมือใหม่ ---
+        c_tool1, c_tool2 = st.columns(2)
+        with c_tool1:
+            if st.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
+                try:
+                    all_vals = connect_gsheet().get_all_values()
+                    if len(all_vals) > 1:
+                        headers = [h if h else f"Col_{i}" for i, h in enumerate(all_vals[0])]
+                        seen = {}; new_headers = []
+                        for h in headers:
+                            if h in seen: seen[h]+=1; new_headers.append(f"{h}_{seen[h]}")
+                            else: seen[h]=0; new_headers.append(h)
+                        st.session_state.df = pd.DataFrame(all_vals[1:], columns=new_headers)
+                        st.session_state.search_results_df = None
+                        st.success("โหลดข้อมูลล่าสุดแล้ว!")
+                    else: st.warning("ยังไม่มีข้อมูล")
+                except Exception as e: st.error(f"Error: {e}")
+        with c_tool2:
+            if st.button("📊 ดูรายงานสถิติ (Dashboard)", use_container_width=True): go_to_page('dashboard')
+
         if 'df' in st.session_state:
             df = st.session_state.df
+            # Metrics (เดิม)
             total = len(df)
-            try:
-                lic_c = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                tax_c = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
-                hel_c = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                lic_p, tax_p, hel_p = (lic_c/total)*100, (tax_c/total)*100, (hel_c/total)*100
-            except: lic_c, tax_c, hel_c, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
+            lic_c = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
+            tax_c = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅", na=False)].shape[0]
+            hel_c = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
             
             st.markdown("### 📊 สรุปภาพรวมสถิติ")
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic_c} คน", f"{lic_p:.1f}%")
-            c3.metric("📝 ภาษีปกติ", f"{tax_c} คัน", f"{tax_p:.1f}%")
-            c4.metric("⛑️ หมวกกันน็อค", f"{hel_c} คน", f"{hel_p:.1f}%")
+            c2.metric("🪪 มีใบขับขี่", f"{lic_c} คน")
+            c3.metric("📝 ภาษีปกติ", f"{tax_c} คัน")
+            c4.metric("⛑️ หมวกกันน็อค", f"{hel_c} คน")
 
             st.markdown("---")
-
-            # --- ส่วนที่ 1: ค้นหาจากข้อความ (ปรับปรุงความแม่นยำ) ---
-            st.subheader("🔍 1. ค้นหาประวัติรายบุคคล (ชื่อ/รหัส/ทะเบียน)")
-            q_text = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="พิมพ์ที่นี่...", key="txt_search", on_change=reset_results)
-            btn_search = st.button("🔍 กดเพื่อค้นหา", use_container_width=True)
-
-            if btn_search and q_text:
-                # ค้นหาเฉพาะคอลัมน์ 1 (ชื่อ), 2 (รหัส), และ 6 (ทะเบียน) เพื่อความแม่นยำ
-                st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
-            elif btn_search and not q_text:
-                st.warning("⚠️ กรุณากรอกข้อความก่อนค้นหา")
-
-            st.write("")
-
-            # --- ส่วนที่ 2: กรองข้อมูลอัจฉริยะ ---
-            st.subheader("⚡ 2. กรองข้อมูลอัจฉริยะ (Smart Filter)")
+            st.subheader("🔎 ส่วนการตรวจสอบข้อมูล")
+            
+            q_text = st.text_input("พิมพ์ชื่อ, รหัส หรือ ทะเบียน", key="search_box", on_change=reset_results)
             col_f1, col_f2, col_f3 = st.columns(3)
-            f_risk = col_f1.selectbox("🚨 กลุ่มที่มีปัญหา:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=reset_results)
+            f_risk = col_f1.selectbox("🚨 กลุ่มเสี่ยง:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=reset_results)
             try: levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
             except: levels = ["ทั้งหมด"]
             f_level = col_f2.selectbox("📚 ระดับชั้น:", levels, on_change=reset_results)
@@ -283,40 +330,59 @@ elif st.session_state['page'] == 'teacher':
             except: brands = ["ทั้งหมด"]
             f_brand = col_f3.selectbox("🏍️ ยี่ห้อรถ:", brands, on_change=reset_results)
             
-            btn_filter = st.button("⚡ กดเพื่อกรองข้อมูล", use_container_width=True, type="primary")
-
-            if btn_filter:
+            if st.button("🔍 เริ่มต้นค้นหา", use_container_width=True, type="primary"):
                 fdf = df.copy()
                 if f_risk == "❌ ไม่มีใบขับขี่": fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
                 elif f_risk == "❌ ภาษีขาด": fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
                 elif f_risk == "❌ ไม่สวมหมวก": fdf = fdf[fdf.iloc[:, 9].astype(str).str.contains("ไม่มี", na=False)]
                 if f_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_level, na=False)]
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
+                if q_text: fdf = fdf[df.iloc[:, [1, 2, 6]].apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
                 st.session_state.search_results_df = fdf
 
-            # --- ส่วนแสดงผลลัพธ์ ---
-            st.markdown("---")
             if st.session_state.search_results_df is not None:
                 res_df = st.session_state.search_results_df
-                if res_df.empty: st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไข")
+                if res_df.empty: st.warning("ไม่พบข้อมูล")
                 else:
-                    st.success(f"✅ พบข้อมูลทั้งหมด {len(res_df)} รายการ")
+                    # --- ปุ่มดาวน์โหลด Excel (ฟีเจอร์ใหม่) ---
+                    buffer_excel = io.BytesIO()
+                    with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+                        res_df.to_excel(writer, index=False, sheet_name='Search_Results')
+                    st.download_button(label="📥 ดาวน์โหลดรายการนี้เป็น Excel", data=buffer_excel.getvalue(), file_name=f"Motorcycle_Report_{datetime.now().strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+                    st.success(f"✅ พบ {len(res_df)} รายการ")
                     for i, row in res_df.iterrows():
                         v = row.tolist()
                         with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
                             c_img, c_info = st.columns([2, 1])
                             with c_img:
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
-                                s1, s2 = st.columns(2)
-                                if i1: s1.image(i1, caption="รูปหลังรถ")
-                                if i2: s2.image(i2, caption="รูปข้างรถ")
+                                sub1, sub2 = st.columns(2)
+                                if i1: sub1.image(i1, caption="รูปหลังรถ")
+                                if i2: sub2.image(i2, caption="รูปข้างรถ")
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ใบขับขี่:** {v[7]} | **ภาษี:** {v[8]} | **หมวก:** {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}", mime="application/pdf")
-            else:
-                st.info("💡 กรุณาใช้ส่วนการค้นหาหรือตัวกรองด้านบน แล้วกดปุ่มเพื่อแสดงข้อมูล")
+                                
+                                # --- ปุ่มแก้ไขและลบ (ฟีเจอร์ใหม่) ---
+                                st.write("---")
+                                if st.button("✏️ แก้ไขข้อมูล", key=f"ed_{i}"):
+                                    st.session_state.edit_data = v
+                                    go_to_page('edit')
+                                
+                                if st.button("🗑️ ลบข้อมูล", key=f"del_{i}"):
+                                    if st.warning(f"ยืนยันการลบข้อมูลของ {v[1]}?"):
+                                        try:
+                                            sheet = connect_gsheet()
+                                            cell = sheet.find(str(v[2]))
+                                            sheet.delete_rows(cell.row)
+                                            st.success("ลบข้อมูลสำเร็จ!")
+                                            time.sleep(1)
+                                            st.rerun()
+                                        except: st.error("ไม่สามารถลบได้")
+            else: st.info("💡 กรุณาระบุเงื่อนไขแล้วกดปุ่ม 'เริ่มต้นค้นหา'")
 
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
