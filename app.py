@@ -188,10 +188,10 @@ if st.session_state['page'] == 'student':
         with c1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = st.text_input("ชื่อ-นามสกุล")
-        std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
+        std_id = c2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520")
         c3, c4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room_input = c4.text_input("ห้อง (ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
+        room_input = c4.text_input("ห้อง หากไม่ใช่นักเรียนกรอก 0(ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
         c5, c6 = st.columns(2)
         brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = c6.text_input("สีรถ"); plate = st.text_input("ทะเบียนรถ")
@@ -345,8 +345,8 @@ elif st.session_state['page'] == 'teacher':
             # --- ⚙️ ระบบเลื่อนชั้นเรียน (ย้ายมาไว้ล่างสุดตามคำขอ) ---
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียนประจำปี"):
-                st.warning("⚠️ คำเตือน: ระบบจะเปลี่ยน ม.1 -> ม.2, ม.2 -> ม.3... และชั้นสูงสุดจะจบการศึกษา")
-                up_pwd = st.text_input("รหัสยืนยันการเลื่อนชั้น", type="password", key="prom_pwd")
+                st.warning("⚠️ คำเตือน:เป็นการแก้ไขถาวรไม่สามารถย้อนกลับได้")
+                up_pwd = st.text_input("รหัสยืนยันเจ้าหน้าที่ระดับสูง", type="password", key="prom_pwd")
                 if st.button("ยืนยันเลื่อนชั้นนักเรียนทั้งระบบ"):
                     if up_pwd == UPGRADE_PASSWORD:
                         try:
