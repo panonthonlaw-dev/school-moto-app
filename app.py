@@ -272,7 +272,7 @@ if st.session_state['page'] == 'student':
         sc5, sc6 = st.columns(2)
         brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
         color = st.text_input("สีรถ", key="reg_color")
-        plate = st.text_input("ทะเบียนรถ", placeholder="เช่น 1กข 1234", key="reg_plate")
+        plate = st.text_input("ทะเบียนรถ", placeholder="เช่น 1กข 1234ร้อยเอ็ด", key="reg_plate")
         doc_cols = st.columns(3)
         ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
