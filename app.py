@@ -115,7 +115,7 @@ def get_img_link(url):
     file_id = match.group(1) or match.group(2) if match else None
     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
 
-# --- ฟังก์ชัน PDF (รูปอยู่ขวาบน) ---
+# --- ฟังก์ชัน PDF (แก้ตำแหน่งรูป + วันที่) ---
 def create_pdf(vals, img_url1, img_url2, face_url=None):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -140,15 +140,11 @@ def create_pdf(vals, img_url1, img_url2, face_url=None):
     note_text = raw_note if raw_note and raw_note.lower() != "nan" else "ไม่พบประวัติ"
     score = str(vals[13]) if len(vals) > 13 and str(vals[13]).lower() != "nan" else "100"
     
-    # Text Information (ขยับข้อความไปซ้ายหน่อย เพื่อเว้นที่ให้รูปขวาบน)
+    # Text Information
     c.setFont(font_name, 16)
-    c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}")
-    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}")
-    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}")
-    
-    c.drawString(280, height - 115, f"ยี่ห้อรถ: {brand}")
-    c.drawString(280, height - 135, f"สีรถ: {color}")
-    c.setFont(font_bold, 16); c.drawString(280, height - 155, f"ทะเบียน: {plate}")
+    c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}"); c.drawString(300, height - 115, f"ยี่ห้อรถ: {brand}")
+    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}"); c.drawString(300, height - 135, f"สีรถ: {color}")
+    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}"); c.setFont(font_bold, 16); c.drawString(300, height - 155, f"ทะเบียน: {plate}")
     
     c.setFont(font_bold, 18); color_val = (0.7, 0, 0) if int(score) < 80 else (0, 0.5, 0); c.setFillColorRGB(*color_val)
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
@@ -165,26 +161,29 @@ def create_pdf(vals, img_url1, img_url2, face_url=None):
                 c.rect(x, y, w, h)
         except: pass
 
-    # 1. Face Image (Top Right)
-    if face_url:
-        draw_img_func(face_url, 460, height - 195, 90, 110)
-        c.setFont(font_name, 12)
-        c.drawCentredString(505, height - 210, "(เจ้าของรถ)")
-
-    # 2. Vehicle Images (Middle)
+    # Draw Vehicle Images (Middle)
     draw_img_func(img_url1, 70, height - 415, 180, 180)
     draw_img_func(img_url2, 300, height - 415, 180, 180)
 
-    # 3. History
+    # History Section
     note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
     c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
     for line in note_text.split('\n'):
         for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
     c.drawText(text_obj)
     
-    # 4. Signature
-    sign_y = 90; c.setFont(font_name, 16); c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ"); c.drawString(100, sign_y - 20, f"({name})")
+    # Signature Section
+    sign_y = 180 
+    c.setFont(font_name, 16)
+    c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ")
+    c.drawString(100, sign_y - 20, f"({name})")
+
+    if face_url:
+        draw_img_func(face_url, 90, 50, 80, 100) # รูปหน้าคนอยู่ใต้ลายเซ็น
+
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
+    c.drawString(340, sign_y - 20, "(.........................................)")
+    
     c.save(); buffer.seek(0); return buffer
 
 # --- 4. Main UI ---
@@ -443,17 +442,17 @@ elif st.session_state['page'] == 'teacher':
                             if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
                                 if note and pwd==UPGRADE_PASSWORD:
                                     s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
-                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
+                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts}: {note}", str(ns)]])
+                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts} คะแนน: {note}", str(ns)]])
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                 else: st.error("ข้อมูลไม่ครบ/รหัสผิด")
                             if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
                                 if note and pwd==UPGRADE_PASSWORD:
                                     s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
-                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
+                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts}: {note}", str(ns)]])
+                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note}", str(ns)]])
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                     
             st.markdown("---")
