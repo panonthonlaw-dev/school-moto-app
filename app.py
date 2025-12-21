@@ -115,7 +115,7 @@ def get_img_link(url):
     file_id = match.group(1) or match.group(2) if match else None
     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
 
-# --- ฟังก์ชัน PDF (เพิ่มรูปหน้าเจ้าของรถ) ---
+# --- ฟังก์ชัน PDF ---
 def create_pdf(vals, img_url1, img_url2, face_url=None):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -158,18 +158,12 @@ def create_pdf(vals, img_url1, img_url2, face_url=None):
                 res = requests.get(url, timeout=5)
                 img_data = ImageReader(io.BytesIO(res.content))
                 c.drawImage(img_data, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
-                c.rect(x, y, w, h) # Draw border
+                c.rect(x, y, w, h)
         except: pass
 
-    # Draw Vehicle Images (Bottom)
+    # Draw Vehicle Images
     draw_img_func(img_url1, 70, height - 415, 180, 180)
     draw_img_func(img_url2, 300, height - 415, 180, 180)
-    
-    # Draw Face Image (Top Right)
-    if face_url:
-        draw_img_func(face_url, 450, height - 200, 90, 110)
-        c.setFont(font_name, 12)
-        c.drawCentredString(495, height - 215, "(เจ้าของรถ)")
 
     # History Section
     note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
@@ -178,9 +172,18 @@ def create_pdf(vals, img_url1, img_url2, face_url=None):
         for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
     c.drawText(text_obj)
     
-    # Signature
-    sign_y = 90; c.setFont(font_name, 16); c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ"); c.drawString(100, sign_y - 20, f"({name})")
+    # Signature Section
+    sign_y = 180 
+    c.setFont(font_name, 16)
+    c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ")
+    c.drawString(100, sign_y - 20, f"({name})")
+
+    if face_url:
+        draw_img_func(face_url, 90, 50, 80, 100) # รูปหน้าคนอยู่ใต้ลายเซ็น
+
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
+    c.drawString(340, sign_y - 20, "(.........................................)")
+    
     c.save(); buffer.seek(0); return buffer
 
 # --- 4. Main UI ---
@@ -398,34 +401,64 @@ elif st.session_state['page'] == 'teacher':
                 else:
                     for i, row in st.session_state.search_results_df.iterrows():
                         v = row.tolist(); sc = int(v[13]) if len(v)>13 and str(v[13]).isdigit() else 100
-                        # เพิ่มคะแนนแต้มในหัวข้อ Expander
-                        with st.expander(f"📍 {v[6]} | {v[1]} (แต้ม: {sc})"):
-                            ci, cd = st.columns([1, 2])
-                            with ci: 
-                                if len(v)>14 and v[14]: st.image(get_img_link(v[14]), width=120)
-                            with cd:
-                                # ส่ง Face URL ไปให้ PDF
-                                face_url = get_img_link(v[14]) if len(v) > 14 else None
-                                st.download_button("PDF", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url), f"{v[6]}.pdf", use_container_width=True)
-                                if st.button("✏️ แก้ไข", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
-                                st.write("---")
-                                pts = st.number_input("แต้ม", 1, 50, 5, key=f"p_{i}"); note = st.text_area("บันทึกเหตุผล (จำเป็น)", key=f"n_{i}"); pwd = st.text_input("รหัสยืนยัน", type="password", key=f"pw_{i}")
-                                b1, b2 = st.columns(2)
-                                if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
-                                    if note and pwd==UPGRADE_PASSWORD:
-                                        s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
-                                        tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
-                                        old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                        s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts}: {note}", str(ns)]])
-                                        st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
-                                    else: st.error("ต้องใส่บันทึกและรหัสให้ถูกต้อง")
-                                if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
-                                    if note and pwd==UPGRADE_PASSWORD:
-                                        s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
-                                        tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
-                                        old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                        s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts}: {note}", str(ns)]])
-                                        st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
+                        sc_color = "#22c55e" if sc >= 80 else ("#eab308" if sc >= 50 else "#ef4444")
+                        
+                        # หัวข้อ Expander จะยังคงเดิม แต่ข้างในจะจัดเต็มกราฟิก
+                        with st.expander(f"📍 {v[6]} | {v[1]}"):
+                            
+                            # --- 1. Graphic Score Section ---
+                            st.markdown(f"""
+                                <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; margin-bottom: 15px; background: #f8fafc;">
+                                    <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 5px;">
+                                        <span style="font-weight: bold; color: #64748b;">สถานะคะแนนความประพฤติ</span>
+                                        <span style="font-size: 1.5rem; font-weight: 800; color: {sc_color};">{sc} / 100</span>
+                                    </div>
+                                    <div style="width: 100%; height: 12px; background-color: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                                        <div style="width: {sc}%; height: 100%; background-color: {sc_color}; border-radius: 6px; transition: width 0.5s;"></div>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # --- 2. Image Gallery Section ---
+                            c_img1, c_img2, c_img3 = st.columns(3)
+                            with c_img1:
+                                st.caption("👤 เจ้าของรถ")
+                                if len(v)>14 and v[14]: st.image(get_img_link(v[14]), use_container_width=True)
+                                else: st.info("ไม่มีรูป")
+                            with c_img2:
+                                st.caption("🏍️ ด้านหลัง")
+                                st.image(get_img_link(v[10]), use_container_width=True)
+                            with c_img3:
+                                st.caption("🏍️ ด้านข้าง")
+                                st.image(get_img_link(v[11]), use_container_width=True)
+                            
+                            # --- 3. Actions Section ---
+                            face_url = get_img_link(v[14]) if len(v) > 14 else None
+                            st.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url), f"{v[6]}.pdf", use_container_width=True)
+                            if st.button("✏️ แก้ไขข้อมูล", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
+                            
+                            st.write("---")
+                            st.caption("จัดการคะแนน:")
+                            pts = st.number_input("จำนวนแต้ม", 1, 50, 5, key=f"p_{i}")
+                            note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}")
+                            pwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"pw_{i}")
+                            
+                            b1, b2 = st.columns(2)
+                            if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
+                                if note and pwd==UPGRADE_PASSWORD:
+                                    s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
+                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
+                                    old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
+                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts}: {note}", str(ns)]])
+                                    st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
+                                else: st.error("ข้อมูลไม่ครบ/รหัสผิด")
+                            if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
+                                if note and pwd==UPGRADE_PASSWORD:
+                                    s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
+                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
+                                    old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
+                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts}: {note}", str(ns)]])
+                                    st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                     
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน"):
