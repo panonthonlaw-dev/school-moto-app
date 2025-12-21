@@ -171,16 +171,21 @@ elif st.session_state['page'] == 'dashboard':
     st.subheader("📊 รายงานวิเคราะห์วินัยจราจร")
     if 'df' in st.session_state:
         df = st.session_state.df.copy()
-        # บังคับชื่อคอลัมน์ให้ไม่ซ้ำกันเพื่อป้องกัน Duplicate Error ใน Plotly
+        # บังคับชื่อคอลัมน์ให้ไม่ซ้ำกัน
         df.columns = [f"Col_{i}_{name}" for i, name in enumerate(df.columns)]
         
-        df.iloc[:, 13] = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(100)
-        df['LV'] = df.iloc[:, 3].apply(lambda x: str(x).split('/')[0])
+        # แปลงคะแนนใน Column 13 เป็นตัวเลข
+        score_col = df.columns[13]
+        class_col = df.columns[3]
+        df[score_col] = pd.to_numeric(df[score_col], errors='coerce').fillna(100)
+        df['LV'] = df[class_col].apply(lambda x: str(x).split('/')[0])
+        
         c1, c2 = st.columns(2)
         with c1:
             st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 สถานะใบขับขี่รวม", hole=0.3), use_container_width=True)
-            avg_score = df.groupby('LV').iloc[:, 13].mean().reset_index()
-            st.plotly_chart(px.bar(avg_score, x='LV', y=avg_score.columns[1], title="⭐ คะแนนวินัยเฉลี่ยแยกชั้น", color_discrete_sequence=['#10b981']), use_container_width=True)
+            # แก้ไข AttributeError โดยการเลือกคอลัมน์ก่อนจับกลุ่ม
+            avg_score = df[['LV', score_col]].groupby('LV').mean().reset_index()
+            st.plotly_chart(px.bar(avg_score, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยแยกชั้น", color_discrete_sequence=['#10b981']), use_container_width=True)
         with c2:
             st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ การสวมหมวกกันน็อค", hole=0.3), use_container_width=True)
             st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามชั้น"), use_container_width=True)
@@ -216,11 +221,10 @@ elif st.session_state['page'] == 'teacher':
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
             vals = connect_gsheet().get_all_values()
             if len(vals) > 1:
-                # แก้ไขหัวตารางให้ไม่ซ้ำกันตั้งแต่ตอนโหลด
                 headers = []
                 for i, h in enumerate(vals[0]):
                     name = h if h else f"Empty_{i}"
-                    headers.append(f"C{i}_{name}")
+                    headers.append(name)
                 st.session_state.df = pd.DataFrame(vals[1:], columns=headers)
                 st.session_state.search_results_df = None
         if c2.button("📊 รายงานสถิติ (Dashboard)", use_container_width=True): go_to_page('dashboard')
@@ -236,7 +240,6 @@ elif st.session_state['page'] == 'teacher':
             m1.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-percent">100%</div><div class="metric-label">🏍️ รถทั้งหมด</div></div>', unsafe_allow_html=True)
             m2.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-percent">{(lok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">🪪 มีใบขับขี่</div></div>', unsafe_allow_html=True)
             m3.markdown(f'<div class="metric-card"><div class="metric-value">{tok}</div><div class="metric-percent">{(tok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">📝 ภาษีปกติ</div></div>', unsafe_allow_html=True)
-            # แก้ไขสัญลักษณ์หมวกตามความต้องการ
             m4.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{(hok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">⛑️ มีหมวก</div></div>', unsafe_allow_html=True)
 
             st.markdown("---")
@@ -278,7 +281,7 @@ elif st.session_state['page'] == 'teacher':
                                 if st.button("✏️ แก้ไขข้อมูลเบื้องต้น", key=f"e_{i}"): st.session_state.edit_data = v; go_to_page('edit')
                                 st.write("---"); st.write("🛡️ **จัดการคะแนนวินัยจราจร**")
                                 points = st.number_input("จำนวนคะแนนที่จะปรับ", min_value=1, max_value=50, value=5, key=f"pts_{i}")
-                                apwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"apwd_{i}")
+                                apwd = st.text_input("รหัสยืนยันการทำรายการ (Patwitnext)", type="password", key=f"apwd_{i}")
                                 col_sc1, col_sc2 = st.columns(2)
                                 if col_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}"):
                                     if apwd == UPGRADE_PASSWORD:
