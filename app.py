@@ -33,10 +33,10 @@ OFFICER_ACCOUNTS = {
     "Pencharee001": {"name": "ครูเพ็ญชรีย์ (ปกครอง)", "role": "admin"},
     "Chaiya001": {"name": "ครูไชยา(ปกครอง)", "role": "admin"},
     "Jak001": {"name": "ยามจักร (รปภ.)", "role": "admin"},
-    "User02": {"name": "ผู้กำกับ(ตำรวจนักเรียน)", "role": "admin"},
-    "User03": {"name": "รองผู้กำกับจราจร(ตำรวจนักเรียน)", "role": "admin"},
-    "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"},
-    "User05": {"name": "ตำรวจนักเรียน", "role": "viewer"}
+    "User01": {"name": "ผู้กำกับ(ตำรวจนักเรียน)", "role": "admin"},
+    "User02": {"name": "รองผู้กำกับจราจร(ตำรวจนักเรียน)", "role": "admin"},
+    "User03": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"},
+    "User04": {"name": "ตำรวจนักเรียน", "role": "viewer"}
 }
 
 # --- 2. Setup หน้าเว็บ ---
