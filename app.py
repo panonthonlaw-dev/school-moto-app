@@ -146,7 +146,7 @@ with c_title: st.title("ระบบลงทะเบียนรถจัก�
 st.markdown("---")
 
 if st.session_state['page'] == 'student':
-    st.info("📝 ลงทะเบียนรถจักรยานยนต์นักเรียน")
+    st.info("📝 ลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
     with st.form("reg_form", clear_on_submit=True):
         sc1, sc2 = st.columns(2)
         with sc1:
