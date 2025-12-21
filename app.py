@@ -261,11 +261,10 @@ if st.session_state['page'] == 'student':
         with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
             fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
-        std_id = sc2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520", key="reg_id")
+        std_id = sc2.text_input("รหัสนักเรียน/รหัสบุคลากร (สำคัญ)", key="reg_id")
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง(0-13)หากไม่ใช่นักเรียนกรอก 0"
-", key="reg_room")
+        room = st.text_input("ห้อง (0-13)", key="reg_room")
         st.write("🔐 **ตั้งค่าความปลอดภัย**")
         pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตร)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
         sc5, sc6 = st.columns(2)
