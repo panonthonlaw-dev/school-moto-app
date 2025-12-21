@@ -23,6 +23,7 @@ from reportlab.lib.utils import ImageReader
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
 ADMIN_PASSWORD = "Patwit1150" 
+UPGRADE_PASSWORD = "Patwitnext" # รหัสสำหรับการแก้ไข ลบ และเลื่อนชั้น
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 
 # --- 2. Setup หน้าเว็บ ---
@@ -125,7 +126,6 @@ def create_pdf(vals, img_url1, img_url2):
     lic_mark = "(/)" if "มี" in lic_s else "( )"
     tax_mark = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"
     helmet_mark = "(/)" if "มี" in hel_s else "( )"
-    
     c.setFont(font_name, 16)
     c.drawString(60, height - 210, f"สถานะเอกสาร: {lic_mark} ใบขับขี่  {tax_mark} พรบ./ภาษี  {helmet_mark} หมวกกันน็อค")
     
@@ -206,7 +206,7 @@ if st.session_state['page'] == 'student':
                     sheet = connect_gsheet()
                     if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนไปแล้ว!")
                     else:
-                        with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
+                        with st.spinner("⏳ บันทึกข้อมูล..."):
                             l1 = upload_to_drive(photo1, f"{std_id}_F.jpg")
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
                             thai_now = datetime.now() + timedelta(hours=7)
@@ -232,13 +232,13 @@ elif st.session_state['page'] == 'dashboard':
             st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ การสวมหมวกกันน็อค"), use_container_width=True)
             df['Level_Group'] = df.iloc[:, 3].apply(lambda x: str(x).split('/')[0])
             st.plotly_chart(px.bar(df.groupby('Level_Group').size().reset_index(name='จำนวน'), x='Level_Group', y='จำนวน', title="📚 แยกตามระดับชั้น"), use_container_width=True)
-    else: st.warning("กรุณากดดึงข้อมูลล่าสุดก่อน")
 
-# --- หน้าแก้ไขข้อมูล ---
+# --- หน้าแก้ไขข้อมูล (ปรับปรุงใหม่ให้แนบรูปได้) ---
 elif st.session_state['page'] == 'edit':
-    st.subheader("✏️ แก้ไขข้อมูล")
+    st.subheader("✏️ แก้ไขข้อมูลรายบุคคล")
     v = st.session_state.edit_data
     with st.form("edit_form"):
+        st.write(f"กำลังแก้ไขข้อมูลของ: **{v[1]} (รหัส: {v[2]})**")
         n_name = st.text_input("ชื่อ-นามสกุล", value=v[1])
         n_class = st.text_input("ชั้น/ห้อง", value=v[3])
         n_brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], index=0)
@@ -247,13 +247,34 @@ elif st.session_state['page'] == 'edit':
         n_lic = st.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], index=0 if "มี" in v[7] else 1, horizontal=True)
         n_tax = st.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], index=0 if "ปกติ" in v[8] or "✅" in v[8] else 1, horizontal=True)
         n_hel = st.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], index=0 if "มี" in v[9] else 1, horizontal=True)
-        if st.form_submit_button("💾 บันทึก"):
+        
+        st.write("---")
+        st.write("📸 **หากต้องการเปลี่ยนรูป ให้แนบไฟล์ใหม่ด้านล่าง (ถ้าไม่แนบจะใช้รูปเดิม)**")
+        n_photo1 = st.file_uploader("เปลี่ยนรูปหลังรถ", type=['jpg','png','jpeg'])
+        n_photo2 = st.file_uploader("เปลี่ยนรูปข้างรถ", type=['jpg','png','jpeg'])
+        
+        if st.form_submit_button("💾 บันทึกการเปลี่ยนแปลงและอัปเดตรูปภาพ"):
             try:
-                sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
-                sheet.update(f'B{cell.row}:J{cell.row}', [[n_name, v[2], n_class, n_brand, n_color, n_plate, n_lic, n_tax, n_hel]])
-                st.success("แก้ไขสำเร็จ!"); time.sleep(1); go_to_page('teacher')
+                with st.spinner("⏳ กำลังบันทึกและอัปโหลดรูปภาพ..."):
+                    sheet = connect_gsheet()
+                    cell = sheet.find(str(v[2]))
+                    row_idx = cell.row
+                    
+                    # จัดการเรื่องลิงก์รูปภาพ
+                    l1 = v[10] # ลิงก์เดิม
+                    l2 = v[11] # ลิงก์เดิม
+                    if n_photo1: l1 = upload_to_drive(n_photo1, f"{v[2]}_F_new.jpg")
+                    if n_photo2: l2 = upload_to_drive(n_photo2, f"{v[2]}_S_new.jpg")
+                    
+                    # อัปเดตข้อมูลทุกคอลัมน์ (B ถึง L)
+                    sheet.update(f'B{row_idx}:L{row_idx}', [[n_name, v[2], n_class, n_brand, n_color, n_plate, n_lic, n_tax, n_hel, l1, l2]])
+                    
+                    st.success("✅ อัปเดตข้อมูลและรูปภาพสำเร็จ!")
+                    time.sleep(1.5)
+                    del st.session_state.df # ล้างแคชเพื่อให้โหลดข้อมูลใหม่
+                    go_to_page('teacher')
             except Exception as e: st.error(f"Error: {e}")
-    if st.button("ยกเลิก"): go_to_page('teacher')
+    if st.button("❌ ยกเลิกการแก้ไข"): go_to_page('teacher')
 
 # --- หน้าเจ้าหน้าที่ ---
 elif st.session_state['page'] == 'teacher':
@@ -268,7 +289,7 @@ elif st.session_state['page'] == 'teacher':
         
         c_tool1, c_tool2 = st.columns(2)
         with c_tool1:
-            if st.button("🔄 ดึงข้อมูลล่าสุดจากระบบ", use_container_width=True):
+            if st.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
                 try:
                     all_vals = connect_gsheet().get_all_values()
                     if len(all_vals) > 1:
@@ -288,19 +309,13 @@ elif st.session_state['page'] == 'teacher':
             df = st.session_state.df
             st.markdown(f"### 📊 สถิติเบื้องต้น (ทั้งหมด {len(df)} คัน)")
             
-            # --- บล็อกที่ 1: ระบบค้นหาข้อความ (แยกปุ่มชัดเจน) ---
             st.subheader("🔍 1. ค้นหาประวัติรายบุคคล")
             q_txt = st.text_input("พิมพ์ ชื่อ, รหัส หรือ ทะเบียนรถ", key="q_txt", on_change=reset_results)
-            btn_search = st.button("🔍 กดเพื่อค้นหาจากข้อความ", use_container_width=True)
+            btn_search = st.button("🔍 กดเพื่อค้นหา", use_container_width=True)
+            if btn_search and q_txt:
+                st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q_txt, case=False).any(), axis=1)]
             
-            if btn_search:
-                if q_txt:
-                    st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q_txt, case=False).any(), axis=1)]
-                else: st.warning("กรุณากรอกข้อความ")
-
             st.write("---")
-
-            # --- บล็อกที่ 2: ระบบตัวกรองอัจฉริยะ (แยกปุ่มชัดเจน) ---
             st.subheader("⚡ 2. กรองข้อมูลอัจฉริยะ (Smart Filter)")
             col_f1, col_f2, col_f3 = st.columns(3)
             f_risk = col_f1.selectbox("🚨 กลุ่มที่มีปัญหา:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=reset_results)
@@ -310,9 +325,7 @@ elif st.session_state['page'] == 'teacher':
             try: brands = ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique())))
             except: brands = ["ทั้งหมด"]
             f_brand = col_f3.selectbox("🏍️ ยี่ห้อรถ:", brands, on_change=reset_results)
-            btn_filter = st.button("⚡ กดเพื่อกรองข้อมูลตามเงื่อนไข", use_container_width=True, type="primary")
-
-            if btn_filter:
+            if st.button("⚡ กดเพื่อกรองข้อมูล", use_container_width=True, type="primary"):
                 fdf = df.copy()
                 if f_risk == "❌ ไม่มีใบขับขี่": fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
                 elif f_risk == "❌ ภาษีขาด": fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
@@ -321,11 +334,9 @@ elif st.session_state['page'] == 'teacher':
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
                 st.session_state.search_results_df = fdf
 
-            # --- ส่วนแสดงผล ---
             if st.session_state.search_results_df is not None:
                 res_df = st.session_state.search_results_df
-                if res_df.empty: st.warning("ไม่พบข้อมูล")
-                else:
+                if not res_df.empty:
                     # Export Excel
                     buf = io.BytesIO()
                     with pd.ExcelWriter(buf, engine='openpyxl') as w: res_df.to_excel(w, index=False)
@@ -344,19 +355,32 @@ elif st.session_state['page'] == 'teacher':
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}\n**ใบขับขี่:** {v[7]}\n**ภาษี:** {v[8]}\n**หมวก:** {v[9]}")
                                 st.download_button("⬇️ PDF", create_pdf(v, i1, i2), f"Profile_{v[6]}.pdf", key=f"pdf_{i}", mime="application/pdf")
+                                
+                                st.write("---")
+                                st.write("🔐 **ยืนยันรหัสผ่านเพื่อ แก้ไข/ลบ**")
+                                action_pwd = st.text_input(f"ใส่รหัสยืนยันของ {v[1]}", type="password", key=f"apwd_{i}")
                                 col_ed1, col_ed2 = st.columns(2)
-                                if col_ed1.button("✏️ แก้ไข", key=f"e_{i}"): st.session_state.edit_data = v; go_to_page('edit')
-                                if col_ed2.button("🗑️ ลบ", key=f"d_{i}"):
-                                    try:
-                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
-                                        sheet.delete_rows(cell.row); st.success("ลบแล้ว!"); time.sleep(1); st.rerun()
-                                    except: st.error("ลบไม่ได้")
-            else: st.info("💡 กรุณาเลือกใช้ปุ่ม 'ค้นหา' หรือ 'ตัวกรอง' ด้านบน")
+                                if col_ed1.button("✏️ แก้ไขข้อมูล", key=f"e_{i}"):
+                                    if action_pwd == UPGRADE_PASSWORD:
+                                        st.session_state.edit_data = v
+                                        go_to_page('edit')
+                                    else: st.error("รหัสผ่านไม่ถูกต้อง")
+                                
+                                if col_ed2.button("🗑️ ลบข้อมูล", key=f"d_{i}"):
+                                    if action_pwd == UPGRADE_PASSWORD:
+                                        try:
+                                            sheet = connect_gsheet()
+                                            cell = sheet.find(str(v[2]))
+                                            sheet.delete_rows(cell.row)
+                                            st.success("ลบข้อมูลสำเร็จ!"); time.sleep(1); st.rerun()
+                                        except: st.error("ลบไม่ได้")
+                                    else: st.error("รหัสผ่านไม่ถูกต้อง")
+            else: st.info("💡 กรุณาใช้ส่วนการค้นหาหรือตัวกรองด้านบน")
             
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
-                spwd = st.text_input("รหัสยืนยัน", type="password")
-                if st.button("ตกลงเลื่อนชั้น") and spwd == "Patwitnext":
+                spwd = st.text_input("รหัสยืนยันการเลื่อนชั้น", type="password")
+                if st.button("ตกลงเลื่อนชั้น") and spwd == UPGRADE_PASSWORD:
                     try:
                         sheet = connect_gsheet(); d = sheet.get_all_values(); h = d[0]; r = d[1:]; new_r = []
                         for row in r:
