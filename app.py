@@ -42,8 +42,7 @@ if 'page' not in st.session_state:
 if 'search_results_df' not in st.session_state:
     st.session_state['search_results_df'] = None
 
-# ฟังก์ชันสำหรับล้างข้อมูลการค้นหา (เพื่อให้ข้อมูลเก่าหายไปทันทีที่เปลี่ยนเงื่อนไข)
-def clear_search_results():
+def reset_results():
     st.session_state['search_results_df'] = None
 
 def go_to_teacher():
@@ -99,7 +98,6 @@ def create_pdf(vals, img_url1, img_url2):
         font_name = 'THSarabunNew'
     except: font_name = 'Helvetica'
     
-    # วาดโลโก้
     logo_file = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
     if logo_file:
         try: c.drawImage(logo_file, 50, height - 85, width=50, height=50, mask='auto')
@@ -127,7 +125,7 @@ def create_pdf(vals, img_url1, img_url2):
     tax_mark = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"
     hel_mark = "(/)" if "มี" in hel_s else "( )"
     c.setFont(font_name, 16)
-    c.drawString(60, height - 210, f"สถานะเอกสาร: {lic_mark} ใบขับขี่  {tax_mark} พรบ./ภาษี  {hel_mark} หมวกกันน็อค")
+    c.drawString(60, height - 210, f"สถานะเอกสาร: {lic_mark} ใบขับขี่  {tax_mark} พรบ./ภาษี  {helmet_mark} หมวกกันน็อค")
     
     c.drawString(60, height - 250, "หลักฐานภาพถ่าย:")
     img_y = height - 430 
@@ -226,7 +224,9 @@ elif st.session_state['page'] == 'teacher':
             else: st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
-        if st.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
+        
+        # --- ดึงข้อมูล ---
+        if st.button("🔄 ดึงข้อมูลล่าสุดจากระบบ", use_container_width=True):
             try:
                 all_vals = connect_gsheet().get_all_values()
                 if len(all_vals) > 1:
@@ -236,7 +236,8 @@ elif st.session_state['page'] == 'teacher':
                         if h in seen: seen[h]+=1; new_headers.append(f"{h}_{seen[h]}")
                         else: seen[h]=0; new_headers.append(h)
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=new_headers)
-                    st.success("โหลดข้อมูลสำเร็จ!")
+                    st.session_state.search_results_df = None
+                    st.success("โหลดข้อมูลล่าสุดแล้ว!")
                 else: st.warning("ยังไม่มีข้อมูล")
             except Exception as e: st.error(f"Error: {e}")
         
@@ -253,39 +254,52 @@ elif st.session_state['page'] == 'teacher':
             st.markdown("### 📊 สรุปภาพรวมสถิติ")
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 ใบขับขี่", f"{lic_c} คน", f"{lic_p:.1f}%")
+            c2.metric("🪪 มีใบขับขี่", f"{lic_c} คน", f"{lic_p:.1f}%")
             c3.metric("📝 ภาษีปกติ", f"{tax_c} คัน", f"{tax_p:.1f}%")
             c4.metric("⛑️ หมวกกันน็อค", f"{hel_c} คน", f"{hel_p:.1f}%")
 
             st.markdown("---")
-            st.subheader("🔎 ส่วนการตรวจสอบข้อมูล")
-            
-            # เมื่อมีการพิมพ์หรือเปลี่ยนตัวเลือก ระบบจะเรียกฟังก์ชัน clear_search_results ทันที
-            q_text = st.text_input("พิมพ์ชื่อ, รหัส หรือ ทะเบียน", placeholder="เช่น สมชาย...", key="search_box", on_change=clear_search_results)
-            
-            st.write("⚡ **ตัวกรอกข้อมูลอัจฉริยะ**")
+
+            # --- ส่วนที่ 1: ค้นหาจากข้อความ (มีปุ่มของตัวเอง) ---
+            st.subheader("🔍 1. ค้นหาประวัติรายบุคคล")
+            q_text = st.text_input("พิมพ์ชื่อ, รหัสนักเรียน หรือ ทะเบียนรถ", placeholder="พิมพ์เพื่อค้นหา...", key="txt_search", on_change=reset_results)
+            btn_search = st.button("🔍 กดเพื่อค้นหาจากข้อความ", use_container_width=True)
+
+            if btn_search and q_text:
+                st.session_state.search_results_df = df[df.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
+            elif btn_search and not q_text:
+                st.warning("⚠️ กรุณากรอกข้อความที่ต้องการค้นหา")
+
+            st.write("") # เว้นวรรค
+
+            # --- ส่วนที่ 2: กรองข้อมูลอัจฉริยะ (มีปุ่มของตัวเอง) ---
+            st.subheader("⚡ 2. กรองข้อมูลอัจฉริยะ (Smart Filter)")
             col_f1, col_f2, col_f3 = st.columns(3)
-            f_risk = col_f1.selectbox("🚨 กลุ่มเสี่ยง:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=clear_search_results)
+            f_risk = col_f1.selectbox("🚨 กลุ่มที่มีปัญหา:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=reset_results)
             try: levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
             except: levels = ["ทั้งหมด"]
-            f_level = col_f2.selectbox("📚 ระดับชั้น:", levels, on_change=clear_search_results)
+            f_level = col_f2.selectbox("📚 ระดับชั้น:", levels, on_change=reset_results)
             try: brands = ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique())))
             except: brands = ["ทั้งหมด"]
-            f_brand = col_f3.selectbox("🏍️ ยี่ห้อรถ:", brands, on_change=clear_search_results)
+            f_brand = col_f3.selectbox("🏍️ ยี่ห้อรถ:", brands, on_change=reset_results)
             
-            if st.button("🔍 เริ่มต้นค้นหาและแสดงผลตามเงื่อนไข", use_container_width=True, type="primary"):
+            btn_filter = st.button("⚡ กดเพื่อกรองข้อมูลตามเงื่อนไข", use_container_width=True, type="primary")
+
+            if btn_filter:
                 fdf = df.copy()
                 if f_risk == "❌ ไม่มีใบขับขี่": fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
                 elif f_risk == "❌ ภาษีขาด": fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
                 elif f_risk == "❌ ไม่สวมหมวก": fdf = fdf[fdf.iloc[:, 9].astype(str).str.contains("ไม่มี", na=False)]
                 if f_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_level, na=False)]
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
-                if q_text: fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
                 st.session_state.search_results_df = fdf
 
+            # --- ส่วนแสดงผลลัพธ์ (จะแสดงเมื่อกดปุ่มใดปุ่มหนึ่งข้างต้นเท่านั้น) ---
+            st.markdown("---")
             if st.session_state.search_results_df is not None:
                 res_df = st.session_state.search_results_df
-                if res_df.empty: st.warning("ไม่พบข้อมูล")
+                if res_df.empty: 
+                    st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไข")
                 else:
                     st.success(f"✅ พบข้อมูลทั้งหมด {len(res_df)} รายการ")
                     for i, row in res_df.iterrows():
@@ -294,16 +308,17 @@ elif st.session_state['page'] == 'teacher':
                             c_img, c_info = st.columns([2, 1])
                             with c_img:
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
-                                sub1, sub2 = st.columns(2)
-                                if i1: sub1.image(i1, caption="รูปหลังรถ")
-                                if i2: sub2.image(i2, caption="รูปข้างรถ")
+                                s1, s2 = st.columns(2)
+                                if i1: s1.image(i1, caption="รูปหลังรถ")
+                                if i2: s2.image(i2, caption="รูปข้างรถ")
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ใบขับขี่:** {v[7]} | **ภาษี:** {v[8]} | **หมวก:** {v[9]}")
                                 pdf_data = create_pdf(v, i1, i2)
                                 st.download_button("⬇️ โหลด PDF", pdf_data, f"Profile_{v[6]}.pdf", key=f"dl_{i}", mime="application/pdf")
-            else: st.info("💡 กรุณาระบุเงื่อนไขแล้วกดปุ่ม 'เริ่มต้นค้นหา' (ข้อมูลเก่าจะถูกล้างทุกครั้งที่ท่านเปลี่ยนเงื่อนไข)")
-            
+            else:
+                st.info("💡 กรุณาใช้ส่วนการค้นหาหรือตัวกรองด้านบน แล้วกดปุ่มเพื่อแสดงข้อมูล")
+
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
                 spwd = st.text_input("รหัสยืนยัน", type="password", key="upgrade_pwd")
