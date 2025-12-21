@@ -92,21 +92,28 @@ def get_img_link(url):
     if file_id: return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
     return url
 
-# --- ฟังก์ชันสร้าง PDF (แก้ไขปัญหาภาษาไทย) ---
+# --- ฟังก์ชันตรวจสอบฟอนต์และสร้าง PDF ---
 def create_pdf(vals, img_url1, img_url2):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    # ลงทะเบียนฟอนต์ (ต้องมีไฟล์อยู่ใน GitHub)
+    # พยายามโหลดฟอนต์ไทย
+    font_name = 'Helvetica'
+    font_bold = 'Helvetica-Bold'
+    
     try:
-        pdfmetrics.registerFont(TTFont('ThaiFont', 'THSarabunNew.ttf'))
-        pdfmetrics.registerFont(TTFont('ThaiFontBold', 'THSarabunNewBold.ttf'))
-        font_name = 'ThaiFont'
-        font_bold = 'ThaiFontBold'
+        # ระบุ Path ให้ชัดเจน
+        f_reg = "THSarabunNew.ttf"
+        f_bold = "THSarabunNewBold.ttf"
+        
+        if os.path.exists(f_reg) and os.path.exists(f_bold):
+            pdfmetrics.registerFont(TTFont('ThaiFont', f_reg))
+            pdfmetrics.registerFont(TTFont('ThaiFontBold', f_bold))
+            font_name = 'ThaiFont'
+            font_bold = 'ThaiFontBold'
     except:
-        font_name = 'Helvetica'
-        font_bold = 'Helvetica-Bold'
+        pass
     
     # วาดโลโก้
     logo_file = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
@@ -120,7 +127,6 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 85, width - 50, height - 85)
     
-    # ข้อมูลส่วนตัว
     c.setFont(font_name, 16)
     name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
     lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
@@ -134,7 +140,6 @@ def create_pdf(vals, img_url1, img_url2):
     c.setFont(font_bold, 16)
     c.drawString(330, height - 170, f"เลขทะเบียน: {plate}")
     
-    # สถานะเอกสาร
     c.setFont(font_name, 16)
     lic_m = "(/)" if "มี" in lic_s else "( )"
     tax_m = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"
@@ -143,7 +148,6 @@ def create_pdf(vals, img_url1, img_url2):
     
     c.drawString(60, height - 235, "หลักฐานภาพถ่ายรถ:")
     
-    # วาดรูป
     def draw_img(url, x, y):
         try:
             if url:
@@ -156,11 +160,10 @@ def create_pdf(vals, img_url1, img_url2):
     draw_img(img_url1, 70, height - 420)
     draw_img(img_url2, 300, height - 420)
 
-    # ส่วนบันทึกข้อความ (แก้ไขให้แสดงภาษาไทย)
+    # ส่วนบันทึก
     note_y = height - 460
     c.setFont(font_bold, 16)
     c.drawString(60, note_y, "บันทึกข้อความเพิ่มเติมโดยเจ้าหน้าที่:")
-    
     c.setDash(1, 2)
     for i in range(5):
         c.line(60, note_y - 25 - (i*25), 530, note_y - 25 - (i*25))
@@ -175,7 +178,6 @@ def create_pdf(vals, img_url1, img_url2):
             text_obj.textLine(line)
         c.drawText(text_obj)
 
-    # ส่วนลงชื่อ
     sign_y = 100
     c.setFont(font_name, 16)
     c.drawString(60, sign_y, "ลงชื่อ ....................................................... เจ้าของรถ")
@@ -211,7 +213,7 @@ if st.session_state['page'] == 'student':
         std_id = c2.text_input("รหัสนักเรียน/รหัสเจ้าหน้าที่")
         c3, c4 = st.columns(2)
         level = c3.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room_input = c4.text_input("ห้อง (ใส่เฉพาะเลข 0-13)", help="ตัวอย่าง: หากอยู่ห้อง 5 ให้ใส่เลข 5")
+        room_input = c4.text_input("ห้อง (ใส่เฉพาะเลข 0-13)", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
         c5, c6 = st.columns(2)
         brand = c5.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = c6.text_input("สีรถ")
@@ -250,18 +252,18 @@ if st.session_state['page'] == 'student':
 
 # --- หน้าแดชบอร์ด ---
 elif st.session_state['page'] == 'dashboard':
-    if st.button("⬅️ กลับหน้าหลัก"): go_to_page('teacher')
+    if st.button("⬅️ กลับหน้าจัดการข้อมูล"): go_to_page('teacher')
     st.subheader("📊 แดชบอร์ดวิเคราะห์ข้อมูล")
     if 'df' in st.session_state:
         df = st.session_state.df
         col1, col2 = st.columns(2)
         with col1:
-            st.plotly_chart(px.pie(df, names=df.columns[4], title="📊 ยี่ห้อรถที่นักเรียนใช้"), use_container_width=True)
-            st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 สถานะใบขับขี่", color_discrete_sequence=['#2ecc71', '#e74c3c']), use_container_width=True)
+            st.plotly_chart(px.pie(df, names=df.columns[4], title="📊 ยี่ห้อรถ"), use_container_width=True)
+            st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 ใบขับขี่", color_discrete_sequence=['#2ecc71', '#e74c3c']), use_container_width=True)
         with col2:
-            st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ สัดส่วนการสวมหมวกกันน็อค"), use_container_width=True)
+            st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ หมวกกันน็อค"), use_container_width=True)
             df['L_Group'] = df.iloc[:, 3].apply(lambda x: str(x).split('/')[0])
-            st.plotly_chart(px.bar(df.groupby('L_Group').size().reset_index(name='จำนวน'), x='L_Group', y='จำนวน', title="📚 จำนวนรถแยกตามระดับชั้น"), use_container_width=True)
+            st.plotly_chart(px.bar(df.groupby('L_Group').size().reset_index(name='จำนวน'), x='L_Group', y='จำนวน', title="📚 แยกตามระดับชั้น"), use_container_width=True)
 
 # --- หน้าแก้ไขข้อมูล ---
 elif st.session_state['page'] == 'edit':
@@ -300,6 +302,11 @@ elif st.session_state['page'] == 'teacher':
     else:
         if st.button("🚪 ออกจากระบบ"): st.session_state.logged_in = False; st.rerun()
         
+        # --- Diagnostic Check สำหรับคุณครู ---
+        st.sidebar.subheader("🛠️ ระบบตรวจสอบฟอนต์")
+        if os.path.exists("THSarabunNew.ttf"): st.sidebar.success("✅ พบไฟล์ฟอนต์ THSarabunNew.ttf")
+        else: st.sidebar.error("❌ ไม่พบไฟล์ฟอนต์ THSarabunNew.ttf (PDF จะเป็นกล่องดำ)")
+        
         c_tool1, c_tool2 = st.columns(2)
         with c_tool1:
             if st.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
@@ -308,7 +315,7 @@ elif st.session_state['page'] == 'teacher':
                     if len(all_vals) > 1:
                         headers = [h if h else f"Col_{i}" for i, h in enumerate(all_vals[0])]
                         st.session_state.df = pd.DataFrame(all_vals[1:], columns=headers[:len(all_vals[1])])
-                        st.session_state.search_results_df = None; st.success("ดึงข้อมูลสำเร็จ!")
+                        st.session_state.search_results_df = None; st.success("โหลดข้อมูลสำเร็จ!")
                 except Exception as e: st.error(f"Error: {e}")
         with c_tool2:
             if st.button("📊 ดูรายงานแดชบอร์ด", use_container_width=True): go_to_page('dashboard')
@@ -317,14 +324,12 @@ elif st.session_state['page'] == 'teacher':
             df = st.session_state.df
             st.markdown("---")
             
-            # --- บล็อกที่ 1: ค้นหาจากข้อความ ---
             st.subheader("🔍 1. ค้นหาประวัติ (ชื่อ/รหัส/ทะเบียน)")
-            q_txt = st.text_input("ระบุข้อมูลที่จะค้นหา...", key="q_txt", on_change=reset_results)
+            q_txt = st.text_input("ระบุข้อมูล...", key="q_txt", on_change=reset_results)
             if st.button("🔍 เริ่มค้นหาบุคคล", use_container_width=True) and q_txt:
                 st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q_txt, case=False).any(), axis=1)]
             
             st.write("")
-            # --- บล็อกที่ 2: ตัวกรองอัจฉริยะ ---
             st.subheader("⚡ 2. ตัวกรองข้อมูลอัจฉริยะ")
             col_f1, col_f2, col_f3 = st.columns(3)
             f_risk = col_f1.selectbox("🚨 กลุ่มปัญหา:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=reset_results)
@@ -343,12 +348,10 @@ elif st.session_state['page'] == 'teacher':
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
                 st.session_state.search_results_df = fdf
 
-            # --- การแสดงผลลัพธ์ ---
             if st.session_state.search_results_df is not None:
                 res_df = st.session_state.search_results_df
                 if res_df.empty: st.warning("ไม่พบข้อมูล")
                 else:
-                    st.success(f"✅ พบข้อมูล {len(res_df)} รายการ")
                     for i, row in res_df.iterrows():
                         v = row.tolist()
                         with st.expander(f"📍 {v[6]} | {v[1]}", expanded=True):
@@ -374,7 +377,7 @@ elif st.session_state['page'] == 'teacher':
                                         try:
                                             sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
                                             sheet.update_acell(f'M{cell.row}', new_n)
-                                            st.success("บันทึกแล้ว! กรุณากดดึงข้อมูลล่าสุดอีกครั้ง"); time.sleep(1)
+                                            st.success("บันทึกแล้ว! กดดึงข้อมูลล่าสุดเพื่อดูผลใน PDF"); time.sleep(1)
                                         except: st.error("บันทึกไม่ได้")
                                     else: st.error("รหัสผิด")
             else: st.info("💡 กรุณาใช้ส่วนการค้นหาหรือตัวกรอง")
