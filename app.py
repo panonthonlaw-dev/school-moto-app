@@ -279,9 +279,9 @@ if st.session_state['page'] == 'student':
         hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
         up1, up2, up3 = st.columns(3)
-        p_face = up1.file_uploader("1. หน้าตรงเจ้าของรถ", type=['jpg','png','jpeg'])
-        p_back = up2.file_uploader("2. หลังรถ (เห็นป้าย)", type=['jpg','png','jpeg'])
-        p_side = up3.file_uploader("3. ข้างรถ (เต็มคัน)", type=['jpg','png','jpeg'])
+        p_face = up1.file_uploader("1. รูปเจ้าของรถ", type=['jpg','png','jpeg'])
+        p_back = up2.file_uploader("2. รูปด้านหลังรถจักรยานยนต์(เห็นป้าย)", type=['jpg','png','jpeg'])
+        p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นเต็มคัน)", type=['jpg','png','jpeg'])
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
