@@ -45,13 +45,16 @@ st.markdown("""
         .metric-card {
             background-color: #ffffff; padding: 15px; border-radius: 10px;
             border: 1px solid #e2e8f0; text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         .metric-value { font-size: 2.2rem; font-weight: bold; color: #1e293b; }
         .metric-percent { font-size: 1.1rem; color: #16a34a; font-weight: bold; }
+        .metric-label { font-size: 1rem; color: #64748b; margin-top: 5px; }
         .score-display {
             font-size: 1.5rem; font-weight: bold; color: #ef4444;
             background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
         }
+        /* ATM Card Style */
         .atm-card {
             width: 100%; max-width: 450px; aspect-ratio: 1.586;
             background: #ffffff; border-radius: 15px; border: 2px solid #cbd5e1;
@@ -78,6 +81,13 @@ st.markdown("""
 if 'page' not in st.session_state: st.session_state['page'] = 'student'
 if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
+
+# ฟังก์ชันรีเซ็ตฟอร์ม (ย้ายมาไว้ข้างบนเพื่อความปลอดภัย)
+def clear_form_state():
+    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            st.session_state[key] = ""
 
 def reset_results(): st.session_state['search_results_df'] = None
 def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
@@ -158,19 +168,14 @@ st.markdown("---")
 
 if st.session_state['page'] == 'student':
     
-    # --- ส่วนการจัดการ State (ป้องกัน Error และล้างค่าเมื่อสำเร็จ) ---
     if st.session_state.get("reg_success", False):
         st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
         st.balloons()
-        # ล้างค่าใน Session State หลังจากแสดงข้อความสำเร็จ
-        keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
-        for k in keys_to_clear:
-            if k in st.session_state: del st.session_state[k]
-        st.session_state.reg_success = False # รีเซ็ตสถานะ
+        clear_form_state() # ล้างค่าฟอร์มตรงนี้
+        st.session_state.reg_success = False
 
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
     
-    # ใช้ clear_on_submit=False เพื่อไม่ให้ข้อมูลหายถ้ากรอกผิด
     with st.form("reg_form", clear_on_submit=False):
         sc1, sc2 = st.columns(2)
         with sc1:
@@ -180,54 +185,42 @@ if st.session_state['page'] == 'student':
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
         room = st.text_input("ห้อง (0-13)", key="reg_room")
-        
         st.write("🔐 **ตั้งค่าความปลอดภัย**")
         pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตร)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
-        
         sc5, sc6 = st.columns(2)
         brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
         color = st.text_input("สีรถ", key="reg_color")
         plate = st.text_input("ทะเบียนรถ", placeholder="เช่น 1กข 1234", key="reg_plate")
-        
         doc_cols = st.columns(3)
         ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
         hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        
         st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
         up1, up2, up3 = st.columns(3)
         p_face = up1.file_uploader("1. หน้าตรงเจ้าของรถ", type=['jpg','png','jpeg'])
         p_back = up2.file_uploader("2. หลังรถ (เห็นป้าย)", type=['jpg','png','jpeg'])
         p_side = up3.file_uploader("3. ข้างรถ (เต็มคัน)", type=['jpg','png','jpeg'])
-        
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
-        # ปุ่ม Submit จะถูกจัดการโดย st.form ซึ่งจะ Disable ขณะทำงานให้อัตโนมัติ
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน"):
             errors = []
-            # ตรวจสอบข้อมูลทีละจุดและแจ้งเตือนสีแดง
             if not fname: errors.append("ชื่อ-นามสกุล")
             if not std_id: errors.append("รหัสประจำตัว")
             if not plate: errors.append("ทะเบียนรถ")
             if not p_face: errors.append("รูปถ่ายหน้าตรง")
             if not p_back: errors.append("รูปถ่ายหลังรถ")
-            
-            # ตรวจสอบ PIN (ห้ามเลขซ้ำกันหมด)
-            if not pin or len(pin) != 6 or not pin.isdigit():
-                errors.append("รหัส PIN ต้องเป็นตัวเลข 6 หลัก")
-            elif len(set(pin)) == 1:
-                errors.append("รหัส PIN ห้ามใช้เลขซ้ำกันทั้งหมด (เช่น 111111)")
-            
+            if not pin or len(pin) != 6 or not pin.isdigit(): errors.append("รหัส PIN ต้องเป็นตัวเลข 6 หลัก")
+            elif len(set(pin)) == 1: errors.append("รหัส PIN ห้ามใช้เลขซ้ำกันทั้งหมด")
             if not pdpa: errors.append("การยอมรับเงื่อนไข (PDPA)")
 
             if errors:
-                st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง: {', '.join(errors)}")
+                st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
             else:
                 try:
                     sheet = connect_gsheet()
-                    if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว ไม่สามารถลงซ้ำได้")
+                    if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว")
                     else:
-                        with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่ (ห้ามปิดหน้าจอ)"):
+                        with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
                             l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
                             l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
                             l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
@@ -236,7 +229,6 @@ if st.session_state['page'] == 'student':
                                 f"{level}/{room}", brand, color, plate, ls, ts, hs, 
                                 l_back, l_side, "", "100", l_face, str(pin)
                             ])
-                            # ตั้งค่าสถานะสำเร็จ เพื่อไปแสดงผลและล้างค่าในรอบการรันถัดไป
                             st.session_state.reg_success = True
                             st.rerun()
                 except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
@@ -331,18 +323,38 @@ elif st.session_state['page'] == 'teacher':
         if st.button("Login") and st.text_input("Password", type="password") == ADMIN_PASSWORD: st.session_state.logged_in = True; st.rerun()
     else:
         c1, c2 = st.columns(2)
-        if c1.button("🔄 ดึงข้อมูล"): vals = connect_gsheet().get_all_values(); st.session_state.df = pd.DataFrame(vals[1:], columns=[f"C{i}" for i, h in enumerate(vals[0])]) if len(vals)>1 else None; st.session_state.search_results_df = None
-        if c2.button("📊 สถิติ"): go_to_page('dashboard')
+        if c1.button("🔄 ดึงข้อมูลล่าสุด"): vals = connect_gsheet().get_all_values(); st.session_state.df = pd.DataFrame(vals[1:], columns=[f"C{i}" for i, h in enumerate(vals[0])]) if len(vals)>1 else None; st.session_state.search_results_df = None
+        if c2.button("📊 รายงานสถิติ"): go_to_page('dashboard')
         if 'df' in st.session_state:
             df = st.session_state.df
-            t = len(df); l = df[df.iloc[:,7].str.contains("มี", na=False)].shape[0]; tx = df[df.iloc[:,8].str.contains("ปกติ|✅", na=False)].shape[0]; h = df[df.iloc[:,9].str.contains("มี", na=False)].shape[0]
+            # --- 📊 กู้คืนส่วนแสดงผล Metrics ที่หายไป ---
+            total = len(df); lok = df[df.iloc[:,7].str.contains("มี", na=False)].shape[0]; tok = df[df.iloc[:,8].str.contains("ปกติ|✅", na=False)].shape[0]; hok = df[df.iloc[:,9].str.contains("มี", na=False)].shape[0]
+            st.markdown("### 📊 สรุปผลวินัยจราจร")
             m1, m2, m3, m4 = st.columns(4)
-            m1.markdown(f'<div class="metric-card"><div class="metric-value">{t}</div><div class="metric-label">รถทั้งหมด</div></div>', unsafe_allow_html=True)
-            m2.markdown(f'<div class="metric-card"><div class="metric-value">{l}</div><div class="metric-label">ใบขับขี่</div></div>', unsafe_allow_html=True)
-            m3.markdown(f'<div class="metric-card"><div class="metric-value">{tx}</div><div class="metric-label">ภาษี</div></div>', unsafe_allow_html=True)
-            m4.markdown(f'<div class="metric-card"><div class="metric-value">{h}</div><div class="metric-label">หมวก</div></div>', unsafe_allow_html=True)
-            q = st.text_input("ค้นหา", on_change=reset_results)
-            if st.button("ค้นหา") and q: st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q, case=False).any(), axis=1)]
+            m1.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-label">รถทั้งหมด</div></div>', unsafe_allow_html=True)
+            m2.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-label">ใบขับขี่</div></div>', unsafe_allow_html=True)
+            m3.markdown(f'<div class="metric-card"><div class="metric-value">{tok}</div><div class="metric-label">ภาษี</div></div>', unsafe_allow_html=True)
+            m4.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-label">หมวก</div></div>', unsafe_allow_html=True)
+            
+            # --- 🔍 กู้คืนส่วนค้นหาและตัวกรอง ---
+            st.markdown("---")
+            q_txt = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
+            if st.button("กดเพื่อค้นหาบุคคล", use_container_width=True) and q_txt:
+                st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q_txt, case=False).any(), axis=1)]
+            
+            st.write("---")
+            col_f1, col_f2, col_f3 = st.columns(3)
+            f_risk = col_f1.selectbox("🚨 กรองกลุ่มปัญหา:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=reset_results)
+            f_lv = col_f2.selectbox("📚 ระดับชั้น:", ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()]))), on_change=reset_results)
+            f_br = col_f3.selectbox("🏍️ ยี่ห้อรถ:", ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique()))), on_change=reset_results)
+            
+            if st.button("⚡ กรองตามเงื่อนไข", use_container_width=True, type="primary"):
+                fdf = df.copy()
+                if f_risk != "ทั้งหมด": idx = 7 if "ใบขับขี่" in f_risk else (8 if "ภาษี" in f_risk else 9); fdf = fdf[fdf.iloc[:, idx].astype(str).str.contains("ไม่มี|ขาด")]
+                if f_lv != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_lv)]
+                if f_br != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_br]
+                st.session_state.search_results_df = fdf
+
             if st.session_state.search_results_df is not None:
                 for i, row in st.session_state.search_results_df.iterrows():
                     v = row.tolist(); sc = int(v[13]) if len(v)>13 and str(v[13]).isdigit() else 100
