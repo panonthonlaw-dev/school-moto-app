@@ -23,18 +23,150 @@ from reportlab.lib.utils import ImageReader
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
-ADMIN_PASSWORD = "Patwit1150" 
-UPGRADE_PASSWORD = "Patwitnext" 
+UPGRADE_PASSWORD = "Patwitnext" # รหัสยืนยันการทำรายการ (Safety PIN)
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
+
+# --- 🔑 กำหนดรายชื่อเจ้าหน้าที่และรหัสผ่าน (เพิ่มได้เรื่อยๆ) ---
+OFFICER_ACCOUNTS = {
+    "Patwit1150": "แอดมินสูงสุด",
+    "T001": "ครูสมชาย (ฝ่ายปกครอง)",
+    "T002": "ครูสมหญิง (ฝ่ายทะเบียน)",
+    "Director": "ท่านผู้อำนวยการ"
+}
 
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
+
+# --- 3. ฟังก์ชันระบบ ---
+if 'reset_count' not in st.session_state: st.session_state['reset_count'] = 0
+if 'page' not in st.session_state: st.session_state['page'] = 'student'
+if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
+if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
+if 'officer_name' not in st.session_state: st.session_state['officer_name'] = "" 
 
 def img_to_b64(img_path):
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return ""
+
+def connect_gsheet():
+    key_content = st.secrets["textkey"]["json_content"]
+    try: key_dict = json.loads(key_content, strict=False)
+    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open(SHEET_NAME).sheet1
+
+def load_data():
+    try:
+        sheet = connect_gsheet()
+        vals = sheet.get_all_values()
+        if len(vals) > 1:
+            st.session_state.df = pd.DataFrame(vals[1:], columns=[f"C{i}" for i, h in enumerate(vals[0])])
+            return True
+    except Exception as e:
+        st.error(f"โหลดข้อมูลไม่สำเร็จ: {e}")
+        return False
+    return False
+
+def clear_form_state():
+    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            st.session_state[key] = ""
+
+def reset_results(): st.session_state['search_results_df'] = None
+def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
+
+def upload_to_drive(file_obj, filename):
+    file_content = file_obj.getvalue()
+    base64_str = base64.b64encode(file_content).decode('utf-8')
+    payload = {"folder_id": DRIVE_FOLDER_ID, "filename": filename, "file": base64_str, "mimeType": file_obj.type}
+    try:
+        res = requests.post(GAS_APP_URL, json=payload).json()
+        return res.get("link") if res.get("status") == "success" else None
+    except: return None
+
+def get_img_link(url):
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)', str(url))
+    file_id = match.group(1) or match.group(2) if match else None
+    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
+
+# --- ฟังก์ชัน PDF ---
+def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบอัตโนมัติ"):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    f_reg, f_bold = "THSarabunNew.ttf", "THSarabunNewBold.ttf"
+    font_name, font_bold = ('Thai', 'ThaiBold') if os.path.exists(f_reg) else ('Helvetica', 'Helvetica-Bold')
+    if font_name == 'Thai':
+        pdfmetrics.registerFont(TTFont('Thai', f_reg))
+        pdfmetrics.registerFont(TTFont('ThaiBold', f_bold))
+    logo = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
+    if logo: c.drawImage(logo, 50, height - 85, width=50, height=50, mask='auto')
+    
+    # Header
+    c.setFont(font_bold, 22); c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
+    c.setFont(font_name, 18); c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
+    c.line(50, height - 85, width - 50, height - 85)
+    
+    # Data
+    name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
+    lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
+    raw_note = str(vals[12]).strip() if len(vals) > 12 else ""
+    note_text = raw_note if raw_note and raw_note.lower() != "nan" else "ไม่พบประวัติ"
+    score = str(vals[13]) if len(vals) > 13 and str(vals[13]).lower() != "nan" else "100"
+    
+    c.setFont(font_name, 16)
+    c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}"); c.drawString(300, height - 115, f"ยี่ห้อรถ: {brand}")
+    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}"); c.drawString(300, height - 135, f"สีรถ: {color}")
+    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}"); c.setFont(font_bold, 16); c.drawString(300, height - 155, f"ทะเบียน: {plate}")
+    
+    c.setFont(font_bold, 18); color_val = (0.7, 0, 0) if int(score) < 80 else (0, 0.5, 0); c.setFillColorRGB(*color_val)
+    c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
+    c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
+    c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
+    
+    def draw_img_func(url, x, y, w, h):
+        try:
+            if url and "drive.google.com" in url:
+                res = requests.get(url, timeout=5)
+                img_data = ImageReader(io.BytesIO(res.content))
+                c.drawImage(img_data, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
+                c.rect(x, y, w, h)
+        except: pass
+
+    draw_img_func(img_url1, 70, height - 415, 180, 180)
+    draw_img_func(img_url2, 300, height - 415, 180, 180)
+
+    note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
+    c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
+    for line in note_text.split('\n'):
+        for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
+    c.drawText(text_obj)
+    
+    sign_y = 180 
+    c.setFont(font_name, 16)
+    c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ")
+    c.drawString(100, sign_y - 20, f"({name})")
+
+    if face_url:
+        draw_img_func(face_url, 450, height - 200, 90, 110) # รูปขวาบน
+        c.setFont(font_name, 12); c.drawCentredString(495, height - 215, "(เจ้าของรถ)")
+
+    c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
+    c.drawString(340, sign_y - 20, "(.........................................)")
+    
+    # --- แสดงชื่อผู้พิมพ์ (Footer) ---
+    c.setFont(font_name, 10)
+    c.setFillColorRGB(0.5, 0.5, 0.5)
+    print_time = (datetime.now() + timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
+    # แสดงชื่อเจ้าหน้าที่ที่ Login เข้ามา
+    c.drawRightString(width - 30, 20, f"พิมพ์โดย: {printed_by} | เมื่อ: {print_time}")
+    
+    c.save(); buffer.seek(0); return buffer
 
 st.markdown("""
     <style>
@@ -79,128 +211,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ฟังก์ชันระบบ ---
-# Initialize session state for reset counter
-if 'reset_count' not in st.session_state: st.session_state['reset_count'] = 0
-if 'page' not in st.session_state: st.session_state['page'] = 'student'
-if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
-if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
-
-def load_data():
-    try:
-        sheet = connect_gsheet()
-        vals = sheet.get_all_values()
-        if len(vals) > 1:
-            st.session_state.df = pd.DataFrame(vals[1:], columns=[f"C{i}" for i, h in enumerate(vals[0])])
-            return True
-    except Exception as e:
-        st.error(f"โหลดข้อมูลไม่สำเร็จ: {e}")
-        return False
-    return False
-
-def clear_form_state():
-    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
-    for key in keys_to_clear:
-        if key in st.session_state: st.session_state[key] = ""
-
-def reset_results(): st.session_state['search_results_df'] = None
-def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
-
-def connect_gsheet():
-    key_content = st.secrets["textkey"]["json_content"]
-    try: key_dict = json.loads(key_content, strict=False)
-    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
-    client = gspread.authorize(creds)
-    return client.open(SHEET_NAME).sheet1
-
-def upload_to_drive(file_obj, filename):
-    file_content = file_obj.getvalue()
-    base64_str = base64.b64encode(file_content).decode('utf-8')
-    payload = {"folder_id": DRIVE_FOLDER_ID, "filename": filename, "file": base64_str, "mimeType": file_obj.type}
-    try:
-        res = requests.post(GAS_APP_URL, json=payload).json()
-        return res.get("link") if res.get("status") == "success" else None
-    except: return None
-
-def get_img_link(url):
-    match = re.search(r'/d/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)', str(url))
-    file_id = match.group(1) or match.group(2) if match else None
-    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
-
-# --- ฟังก์ชัน PDF (แก้ตำแหน่งรูป + วันที่) ---
-def create_pdf(vals, img_url1, img_url2, face_url=None):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    f_reg, f_bold = "THSarabunNew.ttf", "THSarabunNewBold.ttf"
-    font_name, font_bold = ('Thai', 'ThaiBold') if os.path.exists(f_reg) else ('Helvetica', 'Helvetica-Bold')
-    if font_name == 'Thai':
-        pdfmetrics.registerFont(TTFont('Thai', f_reg))
-        pdfmetrics.registerFont(TTFont('ThaiBold', f_bold))
-    logo = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
-    if logo: c.drawImage(logo, 50, height - 85, width=50, height=50, mask='auto')
-    
-    # Header
-    c.setFont(font_bold, 22); c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
-    c.setFont(font_name, 18); c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
-    c.line(50, height - 85, width - 50, height - 85)
-    
-    # Data extraction
-    name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
-    lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
-    raw_note = str(vals[12]).strip() if len(vals) > 12 else ""
-    note_text = raw_note if raw_note and raw_note.lower() != "nan" else "ไม่พบประวัติ"
-    score = str(vals[13]) if len(vals) > 13 and str(vals[13]).lower() != "nan" else "100"
-    
-    # Text Information
-    c.setFont(font_name, 16)
-    c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}"); c.drawString(300, height - 115, f"ยี่ห้อรถ: {brand}")
-    c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}"); c.drawString(300, height - 135, f"สีรถ: {color}")
-    c.drawString(60, height - 155, f"ระดับชั้น: {classroom}"); c.setFont(font_bold, 16); c.drawString(300, height - 155, f"ทะเบียน: {plate}")
-    
-    c.setFont(font_bold, 18); color_val = (0.7, 0, 0) if int(score) < 80 else (0, 0.5, 0); c.setFillColorRGB(*color_val)
-    c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
-    c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
-    c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
-    
-    # --- Image Drawing Function ---
-    def draw_img_func(url, x, y, w, h):
-        try:
-            if url and "drive.google.com" in url:
-                res = requests.get(url, timeout=5)
-                img_data = ImageReader(io.BytesIO(res.content))
-                c.drawImage(img_data, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
-                c.rect(x, y, w, h)
-        except: pass
-
-    # Draw Vehicle Images (Middle)
-    draw_img_func(img_url1, 70, height - 415, 180, 180)
-    draw_img_func(img_url2, 300, height - 415, 180, 180)
-
-    # History Section
-    note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจร:")
-    c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
-    for line in note_text.split('\n'):
-        for w_line in textwrap.wrap(line, width=75): text_obj.textLine(w_line)
-    c.drawText(text_obj)
-    
-    # Signature Section
-    sign_y = 180 
-    c.setFont(font_name, 16)
-    c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ")
-    c.drawString(100, sign_y - 20, f"({name})")
-
-    if face_url:
-        draw_img_func(face_url, 450, height - 200, 90, 110) # รูปหน้าคนอยู่ขวาบน
-        c.setFont(font_name, 12); c.drawCentredString(495, height - 215, "(เจ้าของรถ)")
-
-    c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
-    c.drawString(340, sign_y - 20, "(.........................................)")
-    
-    c.save(); buffer.seek(0); return buffer
-
 # --- 4. Main UI ---
 c_logo, c_title = st.columns([1, 8])
 logo_path = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
@@ -223,10 +233,10 @@ if st.session_state['page'] == 'student':
         with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
             fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
-        std_id = sc2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520", key="reg_id")
+        std_id = sc2.text_input("รหัสนักเรียน/รหัสบุคลากร (สำคัญ)", key="reg_id")
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง(0-13)หากไม่ใช่นักเรียนกรอก 0", key="reg_room")
+        room = st.text_input("ห้อง (0-13)", key="reg_room")
         st.write("🔐 **ตั้งค่าความปลอดภัย**")
         pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตร)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
         sc5, sc6 = st.columns(2)
@@ -372,15 +382,20 @@ elif st.session_state['page'] == 'teacher':
     if not st.session_state.get('logged_in'):
         with st.form("login_form"):
             st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
-            pwd = st.text_input("รหัสผ่าน", type="password")
+            # ช่องกรอกรหัสผ่านเจ้าหน้าที่ (เช็คจาก Dictionary)
+            pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
             if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
-                if pwd == ADMIN_PASSWORD:
+                if pwd in OFFICER_ACCOUNTS:
                     st.session_state.logged_in = True
+                    st.session_state.officer_name = OFFICER_ACCOUNTS[pwd]
                     st.rerun()
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if 'df' not in st.session_state: load_data()
+
+        # แสดงชื่อเจ้าหน้าที่ที่ Login อยู่
+        st.info(f"👤 ผู้ใช้งาน: {st.session_state.officer_name}")
 
         c1, c2 = st.columns(2)
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
@@ -451,16 +466,17 @@ elif st.session_state['page'] == 'teacher':
                                 st.image(get_img_link(v[11]), use_container_width=True)
                             
                             face_url = get_img_link(v[14]) if len(v) > 14 else None
-                            st.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url), f"{v[6]}.pdf", use_container_width=True)
+                            # ส่งชื่อเจ้าหน้าที่ที่ Login ไปพิมพ์ใน PDF
+                            st.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url, st.session_state.officer_name), f"{v[6]}.pdf", use_container_width=True)
+                            
                             if st.button("✏️ แก้ไขข้อมูล", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
                             
                             st.write("---")
                             st.caption("จัดการคะแนน:")
-                            # --- Dynamic Key Generation to Fix Clear Input Error ---
                             k_suffix = st.session_state.reset_count
                             pts = st.number_input("จำนวนแต้ม", 1, 50, 5, key=f"p_{i}_{k_suffix}")
                             note = st.text_area("เหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}_{k_suffix}")
-                            pwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key=f"pw_{i}_{k_suffix}")
+                            pwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"pw_{i}_{k_suffix}")
                             
                             b1, b2 = st.columns(2)
                             if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
@@ -468,9 +484,11 @@ elif st.session_state['page'] == 'teacher':
                                     s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
                                     tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts} คะแนน: {note}", str(ns)]])
+                                    # บันทึกชื่อเจ้าหน้าที่ลงไปใน Log
+                                    editor = st.session_state.officer_name
+                                    new_log = f"{old}\n[{tn}] หัก {pts} คะแนน: {note} (โดย: {editor})"
+                                    s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
                                     
-                                    # Force Reset Inputs by incrementing suffix
                                     st.session_state.reset_count += 1
                                     load_data()
                                     st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
@@ -480,7 +498,9 @@ elif st.session_state['page'] == 'teacher':
                                     s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
                                     tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M')
                                     old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note}", str(ns)]])
+                                    editor = st.session_state.officer_name
+                                    new_log = f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note} (โดย: {editor})"
+                                    s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
                                     
                                     st.session_state.reset_count += 1
                                     load_data()
@@ -489,7 +509,7 @@ elif st.session_state['page'] == 'teacher':
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน"):
                 st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
-                up_pwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key="prom_pwd")
+                up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
                 if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
                     s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
                     for row in r:
