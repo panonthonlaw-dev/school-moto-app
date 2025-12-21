@@ -79,13 +79,6 @@ if 'page' not in st.session_state: st.session_state['page'] = 'student'
 if 'search_results_df' not in st.session_state: st.session_state['search_results_df'] = None
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 
-# ฟังก์ชันสำหรับรีเซ็ตฟอร์มเฉพาะตอนบันทึกสำเร็จ
-def clear_form_state():
-    keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
-    for key in keys_to_clear:
-        if key in st.session_state:
-            st.session_state[key] = ""
-
 def reset_results(): st.session_state['search_results_df'] = None
 def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
 
@@ -164,7 +157,19 @@ with c_title: st.title("ระบบลงทะเบียนรถจัก�
 st.markdown("---")
 
 if st.session_state['page'] == 'student':
+    
+    # --- ส่วนการจัดการ State (ป้องกัน Error และล้างค่าเมื่อสำเร็จ) ---
+    if st.session_state.get("reg_success", False):
+        st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
+        st.balloons()
+        # ล้างค่าใน Session State หลังจากแสดงข้อความสำเร็จ
+        keys_to_clear = ["reg_fname", "reg_id", "reg_room", "reg_pin", "reg_brand", "reg_color", "reg_plate"]
+        for k in keys_to_clear:
+            if k in st.session_state: del st.session_state[k]
+        st.session_state.reg_success = False # รีเซ็ตสถานะ
+
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
+    
     # ใช้ clear_on_submit=False เพื่อไม่ให้ข้อมูลหายถ้ากรอกผิด
     with st.form("reg_form", clear_on_submit=False):
         sc1, sc2 = st.columns(2)
@@ -197,9 +202,10 @@ if st.session_state['page'] == 'student':
         
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
+        # ปุ่ม Submit จะถูกจัดการโดย st.form ซึ่งจะ Disable ขณะทำงานให้อัตโนมัติ
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน"):
             errors = []
-            # ตรวจสอบข้อมูลทีละจุด
+            # ตรวจสอบข้อมูลทีละจุดและแจ้งเตือนสีแดง
             if not fname: errors.append("ชื่อ-นามสกุล")
             if not std_id: errors.append("รหัสประจำตัว")
             if not plate: errors.append("ทะเบียนรถ")
@@ -221,7 +227,7 @@ if st.session_state['page'] == 'student':
                     sheet = connect_gsheet()
                     if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว ไม่สามารถลงซ้ำได้")
                     else:
-                        with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
+                        with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่ (ห้ามปิดหน้าจอ)"):
                             l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
                             l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
                             l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
@@ -230,10 +236,8 @@ if st.session_state['page'] == 'student':
                                 f"{level}/{room}", brand, color, plate, ls, ts, hs, 
                                 l_back, l_side, "", "100", l_face, str(pin)
                             ])
-                            st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
-                            st.balloons()
-                            clear_form_state() # ล้างค่าเมื่อสำเร็จ
-                            time.sleep(2)
+                            # ตั้งค่าสถานะสำเร็จ เพื่อไปแสดงผลและล้างค่าในรอบการรันถัดไป
+                            st.session_state.reg_success = True
                             st.rerun()
                 except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
 
