@@ -90,6 +90,7 @@ def get_img_link(url):
     file_id = match.group(1) or match.group(2) if match else None
     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800" if file_id else url
 
+# --- ฟังก์ชัน PDF ปรับปรุงใหม่ (ลบเส้นประ / แสดงประวัติสะสม) ---
 def create_pdf(vals, img_url1, img_url2):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -99,22 +100,33 @@ def create_pdf(vals, img_url1, img_url2):
     if font_name == 'Thai':
         pdfmetrics.registerFont(TTFont('Thai', f_reg))
         pdfmetrics.registerFont(TTFont('ThaiBold', f_bold))
+
     logo = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
     if logo: c.drawImage(logo, 50, height - 85, width=50, height=50, mask='auto')
+    
     c.setFont(font_bold, 22); c.drawCentredString(width/2, height - 50, "แบบทะเบียนประวัติรถจักรยานยนต์นักเรียน")
     c.setFont(font_name, 18); c.drawCentredString(width/2, height - 72, "โรงเรียนโพนทองพัฒนาวิทยา")
     c.line(50, height - 85, width - 50, height - 85)
+    
     name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
     lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
-    note = str(vals[12]).strip() if len(vals) > 12 and str(vals[12]).lower() != "nan" else ""
+    
+    # ดึงประวัติบันทึก (คอลัมน์ M) และจัดการกรณีไม่มีข้อมูล
+    raw_note = str(vals[12]).strip() if len(vals) > 12 else ""
+    note_text = raw_note if raw_note and raw_note.lower() != "nan" else "ไม่พบประวัติ"
+    
     score = str(vals[13]) if len(vals) > 13 and str(vals[13]).lower() != "nan" else "100"
+
     c.setFont(font_name, 16); c.drawString(60, height - 115, f"ชื่อ-นามสกุล: {name}"); c.drawString(330, height - 115, f"ยี่ห้อรถ: {brand}")
     c.drawString(60, height - 135, f"รหัสนักเรียน: {std_id}"); c.drawString(330, height - 135, f"สีรถ: {color}")
     c.drawString(60, height - 155, f"ระดับชั้น: {classroom}"); c.setFont(font_bold, 16); c.drawString(330, height - 155, f"ทะเบียน: {plate}")
+    
     c.setFont(font_bold, 18); color_val = (0.7, 0, 0) if int(score) < 80 else (0, 0.5, 0); c.setFillColorRGB(*color_val)
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
+    
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
+    
     def draw_img(url, x, y):
         try:
             if url and "drive.google.com" in url:
@@ -122,19 +134,25 @@ def create_pdf(vals, img_url1, img_url2):
                 c.drawImage(ImageReader(io.BytesIO(res.content)), x, y, width=180, height=180, preserveAspectRatio=True)
         except: pass
     draw_img(img_url1, 70, height - 415); draw_img(img_url2, 300, height - 415)
-    note_y = height - 455; c.setFont(font_bold, 16); c.drawString(60, note_y, "บันทึกข้อความเพิ่มเติมโดยเจ้าหน้าที่:")
-    c.setDash(1, 2)
-    for i in range(5): c.line(60, note_y - 25 - (i*25), 530, note_y - 25 - (i*25))
-    c.setDash()
-    if note:
-        c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 21); text_obj.setLeading(25)
-        for line in textwrap.wrap(note, width=70)[:5]: text_obj.textLine(line)
-        c.drawText(text_obj)
-    sign_y = 90; c.setFont(font_name, 16); c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ"); c.drawString(100, sign_y - 20, f"({name})")
+
+    # --- ส่วนบันทึก (ลบเส้นประออก เหลือเพียงตัวอักษร) ---
+    note_y = height - 455
+    c.setFont(font_bold, 16); c.drawString(60, note_y, "ประวัติบันทึกการทำผิดวินัยจราจรและข้อมูลเพิ่มเติม:")
+    
+    c.setFont(font_name, 15); text_obj = c.beginText(70, note_y - 25); text_obj.setLeading(20)
+    # ตัดบรรทัดข้อความประวัติสะสม
+    for line in note_text.split('\n'):
+        wrapped_lines = textwrap.wrap(line, width=75)
+        for w_line in wrapped_lines:
+            text_obj.textLine(w_line)
+    c.drawText(text_obj)
+
+    sign_y = 90; c.setFont(font_name, 16)
+    c.drawString(60, sign_y, "ลงชื่อ ......................................... เจ้าของรถ"); c.drawString(100, sign_y - 20, f"({name})")
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.save(); buffer.seek(0); return buffer
 
-# --- 4. Main App Header ---
+# --- 4. Main App UI ---
 c_logo, c_title = st.columns([1, 8])
 with c_logo:
     logo_file = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
@@ -144,7 +162,7 @@ with c_title: st.title("ระบบลงทะเบียนรถจัก�
 st.markdown("---")
 
 if st.session_state['page'] == 'student':
-    st.info("📝 ลงทะเบียนรถจักรยานยนต์นักเรียน")
+    st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
     with st.form("reg_form", clear_on_submit=True):
         sc1, sc2 = st.columns(2)
         with sc1:
@@ -169,12 +187,12 @@ if st.session_state['page'] == 'student':
                 else:
                     l1 = upload_to_drive(p1, f"{std_id}_F.jpg"); l2 = upload_to_drive(p2, f"{std_id}_S.jpg") if p2 else ""
                     sheet.append_row([(datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), f"{level}/{room}", brand, color, plate, ls, ts, hs, l1, l2, "", "100"])
-                    st.success("✅ สำเร็จ! คะแนนเริ่มต้น 100 แต้ม"); st.balloons()
+                    st.success("✅ ลงทะเบียนสำเร็จ คะแนนเริ่มต้น 100 แต้ม"); st.balloons()
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_page('teacher')
 
 elif st.session_state['page'] == 'dashboard':
     if st.button("⬅️ กลับหน้าจัดการ"): go_to_page('teacher')
-    st.subheader("📊 รายงานวิเคราะห์วินัยจราจร")
+    st.subheader("📊 รายงานวิเคราะห์สถิติภาพรวม")
     if 'df' in st.session_state:
         df = st.session_state.df.copy()
         df.columns = [f"Col_{i}_{name}" for i, name in enumerate(df.columns)]
@@ -189,7 +207,8 @@ elif st.session_state['page'] == 'dashboard':
         with b_col1:
             avg_s = df[['LV', score_col]].groupby('LV').mean().reset_index()
             st.plotly_chart(px.bar(avg_s, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยแยกชั้น"), use_container_width=True)
-        with b_col2: st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามชั้น"), use_container_width=True)
+        with b_col2:
+            st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามชั้น"), use_container_width=True)
 
 elif st.session_state['page'] == 'edit':
     st.subheader("✏️ แก้ไขข้อมูล")
@@ -236,7 +255,7 @@ elif st.session_state['page'] == 'teacher':
 
             st.markdown("---")
             q_txt = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
-            if st.button("กดเพื่อค้นหา", use_container_width=True) and q_txt:
+            if st.button("กดเพื่อค้นหาบุคคล", use_container_width=True) and q_txt:
                 st.session_state.search_results_df = df[df.iloc[:, [1, 2, 6]].apply(lambda r: r.astype(str).str.contains(q_txt, case=False).any(), axis=1)]
             
             st.write("---")
@@ -262,37 +281,44 @@ elif st.session_state['page'] == 'teacher':
                             with c_im:
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
                                 sub1, sub2 = st.columns(2)
-                                if i1:
-                                    sub1.image(i1, caption="หลัง")
-                                if i2:
-                                    sub2.image(i2, caption="ข้าง")
+                                if i1: sub1.image(i1, caption="หลัง")
+                                if i2: sub2.image(i2, caption="ข้าง")
                             with c_in:
                                 st.markdown(f'<div class="score-display">คะแนนวินัย: {curr_score} แต้ม</div>', unsafe_allow_html=True)
                                 st.download_button("⬇️ โหลด PDF", create_pdf(v, i1, i2), f"{v[6]}.pdf", key=f"pdf_{i}", mime="application/pdf")
                                 if st.button("✏️ แก้ไขข้อมูลเบื้องต้น", key=f"e_{i}"): st.session_state.edit_data = v; go_to_page('edit')
                                 
-                                st.write("---"); st.write("🛡️ **จัดการวินัยจราจร (หัก/เพิ่มแต้มจะบันทึกข้อความทันที)**")
-                                points = st.number_input("จำนวนแต้ม", min_value=1, max_value=50, value=5, key=f"pts_{i}")
-                                nn = st.text_area("✍️ ระบุเหตุผลการปรับคะแนน (จำเป็น)", key=f"n_{i}")
-                                apwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"apwd_{i}")
+                                st.write("---"); st.write("🛡️ **จัดการวินัยจราจร (ประวัติจะสะสมอัตโนมัติ)**")
+                                points = st.number_input("จำนวนแต้มที่จะปรับ", min_value=1, max_value=50, value=5, key=f"pts_{i}")
+                                nn = st.text_area("✍️ ระบุเหตุผล (จำเป็น)", key=f"n_{i}", placeholder="กรุณาระบุสาเหตุที่นี่...")
+                                apwd = st.text_input("รหัสยืนยันการทำรายการ (Patwitnext)", type="password", key=f"apwd_{i}")
                                 
-                                c_sc1, c_sc2 = st.columns(2)
-                                if c_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}", use_container_width=True):
-                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลก่อนหักคะแนน")
+                                col_sc1, col_sc2 = st.columns(2)
+                                # ตรรกะสะสมประวัติ (Append Log)
+                                if col_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}", use_container_width=True):
+                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลก่อนดำเนินการ")
                                     elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผิด")
                                     else:
-                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = max(0, curr_score - points)
-                                        final_note = f"หัก {points} คะแนน: {nn}"
-                                        sheet.update(f'M{cell.row}:N{cell.row}', [[final_note, str(new_s)]])
+                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
+                                        new_s = max(0, curr_score - points)
+                                        thai_now = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%y %H:%M')
+                                        current_note = str(v[12]).strip() if str(v[12]).lower() != "nan" else ""
+                                        new_entry = f"[{thai_now}] หัก {points} คะแนน: {nn}"
+                                        combined_note = f"{current_note}\n{new_entry}" if current_note else new_entry
+                                        sheet.update(f'M{cell.row}:N{cell.row}', [[combined_note, str(new_s)]])
                                         st.success("บันทึกสำเร็จ!"); time.sleep(1); st.rerun()
 
-                                if c_sc2.button(f"🟢 เพิ่ม {points} แต้ม", key=f"add_{i}", use_container_width=True):
-                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลก่อนเพิ่มคะแนน")
+                                if col_sc2.button(f"🟢 เพิ่ม {points} แต้ม", key=f"add_{i}", use_container_width=True):
+                                    if not nn.strip(): st.warning("⚠️ กรุณากรอกเหตุผลก่อนดำเนินการ")
                                     elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผิด")
                                     else:
-                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = min(100, curr_score + points)
-                                        final_note = f"เพิ่ม {points} คะแนน: {nn}"
-                                        sheet.update(f'M{cell.row}:N{cell.row}', [[final_note, str(new_s)]])
+                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2]))
+                                        new_s = min(100, curr_score + points)
+                                        thai_now = (datetime.now()+timedelta(hours=7)).strftime('%d/%m/%y %H:%M')
+                                        current_note = str(v[12]).strip() if str(v[12]).lower() != "nan" else ""
+                                        new_entry = f"[{thai_now}] เพิ่ม {points} คะแนน: {nn}"
+                                        combined_note = f"{current_note}\n{new_entry}" if current_note else new_entry
+                                        sheet.update(f'M{cell.row}:N{cell.row}', [[combined_note, str(new_s)]])
                                         st.success("บันทึกสำเร็จ!"); time.sleep(1); st.rerun()
 
             st.markdown("---")
