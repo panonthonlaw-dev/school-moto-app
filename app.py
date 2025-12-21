@@ -42,29 +42,19 @@ st.markdown("""
         footer { visibility: hidden !important; height: 0px !important; }
         [data-testid="stSidebar"] { display: none; }
         .block-container { padding-top: 2rem; }
-        
-        /* Metric Card Style Updated */
         .metric-card {
             background-color: #ffffff; padding: 15px; border-radius: 10px;
             border: 1px solid #e2e8f0; text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .metric-value { 
-            font-size: 2.5rem; font-weight: 800; color: #1e293b; line-height: 1.2;
-        }
-        .metric-percent { 
-            font-size: 1.1rem; color: #16a34a; font-weight: bold; margin-top: -5px; margin-bottom: 5px;
-        }
-        .metric-label { 
-            font-size: 1rem; color: #64748b; 
-        }
-
+        .metric-value { font-size: 2.5rem; font-weight: 800; color: #1e293b; line-height: 1.2; }
+        .metric-percent { font-size: 1.1rem; color: #16a34a; font-weight: bold; margin-top: -5px; margin-bottom: 5px; }
+        .metric-label { font-size: 1rem; color: #64748b; }
         .score-display {
             font-size: 1.5rem; font-weight: bold; color: #ef4444;
             background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
             margin-bottom: 10px;
         }
-        
         /* ATM Card Style */
         .atm-card {
             width: 100%; max-width: 450px; aspect-ratio: 1.586;
@@ -388,38 +378,43 @@ elif st.session_state['page'] == 'teacher':
                 if f_br != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_br]
                 st.session_state.search_results_df = fdf
 
+            # --- แสดงผลการค้นหา ---
             if st.session_state.search_results_df is not None:
-                for i, row in st.session_state.search_results_df.iterrows():
-                    v = row.tolist(); sc = int(v[13]) if len(v)>13 and str(v[13]).isdigit() else 100
-                    with st.expander(f"📍 {v[6]} | {v[1]} (แต้ม: {sc})"):
-                        ci, cd = st.columns([1, 2])
-                        with ci: 
-                            if len(v)>14 and v[14]: st.image(get_img_link(v[14]), width=120)
-                        with cd:
-                            st.download_button("PDF", create_pdf(v, get_img_link(v[10]), get_img_link(v[11])), f"{v[6]}.pdf", use_container_width=True)
-                            if st.button("✏️ แก้ไข", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
-                            
-                            st.write("---")
-                            pts = st.number_input("แต้ม", 1, 50, 5, key=f"p_{i}"); note = st.text_area("บันทึกเหตุผล (จำเป็น)", key=f"n_{i}"); pwd = st.text_input("รหัสยืนยัน", type="password", key=f"pw_{i}")
-                            b1, b2 = st.columns(2)
-                            if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
-                                if note and pwd==UPGRADE_PASSWORD:
-                                    s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
-                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
-                                    old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts}: {note}", str(ns)]])
-                                    st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
-                                else: st.error("ต้องใส่บันทึกและรหัสให้ถูกต้อง")
-                            if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
-                                if note and pwd==UPGRADE_PASSWORD:
-                                    s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
-                                    tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
-                                    old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
-                                    s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts}: {note}", str(ns)]])
-                                    st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
+                if st.session_state.search_results_df.empty:
+                    st.warning("❌ ไม่พบข้อมูลที่ค้นหา") # เพิ่มการแจ้งเตือนเมื่อค้นหาไม่เจอ
+                else:
+                    for i, row in st.session_state.search_results_df.iterrows():
+                        v = row.tolist(); sc = int(v[13]) if len(v)>13 and str(v[13]).isdigit() else 100
+                        with st.expander(f"📍 {v[6]} | {v[1]} (แต้ม: {sc})"):
+                            ci, cd = st.columns([1, 2])
+                            with ci: 
+                                if len(v)>14 and v[14]: st.image(get_img_link(v[14]), width=120)
+                            with cd:
+                                st.download_button("PDF", create_pdf(v, get_img_link(v[10]), get_img_link(v[11])), f"{v[6]}.pdf", use_container_width=True)
+                                if st.button("✏️ แก้ไข", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
+                                
+                                st.write("---")
+                                pts = st.number_input("แต้ม", 1, 50, 5, key=f"p_{i}"); note = st.text_area("บันทึกเหตุผล (จำเป็น)", key=f"n_{i}"); pwd = st.text_input("รหัสยืนยัน", type="password", key=f"pw_{i}")
+                                b1, b2 = st.columns(2)
+                                if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
+                                    if note and pwd==UPGRADE_PASSWORD:
+                                        s = connect_gsheet(); cell = s.find(str(v[2])); ns = max(0, sc-pts)
+                                        tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
+                                        old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
+                                        s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] หัก {pts}: {note}", str(ns)]])
+                                        st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
+                                    else: st.error("ต้องใส่บันทึกและรหัสให้ถูกต้อง")
+                                if b2.button("🟢 เพิ่มแต้ม", key=f"s2_{i}", use_container_width=True):
+                                    if note and pwd==UPGRADE_PASSWORD:
+                                        s = connect_gsheet(); cell = s.find(str(v[2])); ns = min(100, sc+pts)
+                                        tn = (datetime.now()+timedelta(hours=7)).strftime('%d/%m %H:%M')
+                                        old = str(v[12]).strip() if str(v[12]).lower()!="nan" else ""
+                                        s.update(f'M{cell.row}:N{cell.row}', [[f"{old}\n[{tn}] เพิ่ม {pts}: {note}", str(ns)]])
+                                        st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
                                     
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน"):
+                st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ") # เพิ่มคำเตือนก่อนเลื่อนชั้น
                 up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
                 if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
                     s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
