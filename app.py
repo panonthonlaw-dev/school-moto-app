@@ -9,6 +9,7 @@ import base64
 import time
 import io
 import re
+import os
 
 # --- ส่วนของ PDF Library ---
 from reportlab.pdfgen import canvas
@@ -93,7 +94,8 @@ def create_pdf(vals, img_url1, img_url2):
         pdfmetrics.registerFont(TTFont('THSarabunNew', 'THSarabunNew.ttf'))
         font_name = 'THSarabunNew'
     except: font_name = 'Helvetica'
-        # --- เพิ่มส่วนการวาดโลโก้ลงใน PDF ---
+    
+    # --- เพิ่มส่วนการวาดโลโก้ลงใน PDF ---
     # ตรวจสอบว่ามีไฟล์ชื่อ logo.png หรือ logo หรือไม่
     logo_file = None
     for f in ["logo.png", "logo.jpg", "logo"]:
@@ -113,7 +115,6 @@ def create_pdf(vals, img_url1, img_url2):
     c.line(50, height - 90, width - 50, height - 90)
     
     c.setFont(font_name, 16)
-    # v: 0:Time, 1:Name, 2:ID, 3:Class, 4:Brand, 5:Color, 6:Plate, 7:Lic, 8:Tax, 9:Helmet, 10:Img1, 11:Img2
     name, std_id, classroom, brand, color, plate = str(vals[1]), str(vals[2]), str(vals[3]), str(vals[4]), str(vals[5]), str(vals[6])
     lic_s, tax_s, hel_s = str(vals[7]), str(vals[8]), str(vals[9])
     
@@ -171,8 +172,10 @@ def create_pdf(vals, img_url1, img_url2):
 # --- 4. Main App UI ---
 c_logo, c_title = st.columns([1, 8])
 with c_logo:
-    try: st.image("logo", width=90)
-    except: st.write("🏍️")
+    # แสดงโลโก้ในหน้าเว็บ
+    if os.path.exists("logo.png"): st.image("logo.png", width=90)
+    elif os.path.exists("logo"): st.image("logo", width=90)
+    else: st.write("🏍️")
 with c_title: st.title("ระบบลงทะเบียนรถจักรยานยนต์โรงเรียนโพนทองพัฒนาวิทยา")
 st.markdown("---")
 
@@ -239,19 +242,12 @@ elif st.session_state['page'] == 'teacher':
             try:
                 all_vals = connect_gsheet().get_all_values()
                 if len(all_vals) > 1:
-                    # ป้องกัน ValueError: DataFrame columns must be unique
                     headers = [h if h else f"Col_{i}" for i, h in enumerate(all_vals[0])]
-                    # ตรวจสอบชื่อหัวตารางซ้ำ
                     seen = {}
                     new_headers = []
                     for h in headers:
-                        if h in seen:
-                            seen[h] += 1
-                            new_headers.append(f"{h}_{seen[h]}")
-                        else:
-                            seen[h] = 0
-                            new_headers.append(h)
-                    
+                        if h in seen: seen[h] += 1; new_headers.append(f"{h}_{seen[h]}")
+                        else: seen[h] = 0; new_headers.append(h)
                     st.session_state.df = pd.DataFrame(all_vals[1:], columns=new_headers)
                     st.success("โหลดข้อมูลสำเร็จ!")
                 else: st.warning("ยังไม่มีข้อมูลในระบบ")
@@ -296,7 +292,7 @@ elif st.session_state['page'] == 'teacher':
                 if f_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_level, na=False)]
                 if f_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == f_brand]
                 if q_text: fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q_text, case=False).any(), axis=1)]
-                st.session_state.search_results_df = fdf # เก็บเป็น DataFrame โดยตรง ไม่ใช้ JSON
+                st.session_state.search_results_df = fdf
 
             if st.session_state.search_results_df is not None:
                 res_df = st.session_state.search_results_df
