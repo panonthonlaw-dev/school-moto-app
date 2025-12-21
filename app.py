@@ -134,7 +134,7 @@ def create_pdf(vals, img_url1, img_url2):
     c.drawString(320, sign_y, "ลงชื่อ ......................................... ครูผู้ตรวจสอบ")
     c.save(); buffer.seek(0); return buffer
 
-# --- 4. Main UI ---
+# --- 4. Main App Header ---
 c_logo, c_title = st.columns([1, 8])
 with c_logo:
     logo_file = next((f for f in ["logo.png", "logo.jpg", "logo"] if os.path.exists(f)), None)
@@ -150,10 +150,10 @@ if st.session_state['page'] == 'student':
         with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = st.text_input("ชื่อ-นามสกุล")
-        std_id = sc2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520")
+        std_id = sc2.text_input("รหัสนักเรียน/เจ้าหน้าที่")
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง(0-13)หากไม่ใช่นักเรียนกรอก 0", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
+        room = st.text_input("ห้อง (0-13)")
         sc5, sc6 = st.columns(2)
         brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = st.text_input("สีรถ"); plate = st.text_input("ทะเบียนรถ")
@@ -167,7 +167,8 @@ if st.session_state['page'] == 'student':
                 sheet = connect_gsheet()
                 if str(std_id) in sheet.col_values(3): st.error("รหัสนี้เคยลงทะเบียนแล้ว")
                 else:
-                    l1 = upload_to_drive(p1, f"{std_id}_F.jpg"); l2 = upload_to_drive(p2, f"{std_id}_S.jpg") if p2 else ""
+                    l1 = upload_to_drive(p1, f"{std_id}_F.jpg")
+                    l2 = upload_to_drive(p2, f"{std_id}_S.jpg") if p2 else ""
                     sheet.append_row([(datetime.now()+timedelta(hours=7)).strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), f"{level}/{room}", brand, color, plate, ls, ts, hs, l1, l2, "", "100"])
                     st.success("✅ ลงทะเบียนสำเร็จ คะแนนเริ่มต้น 100 แต้ม"); st.balloons()
     if st.button("🔐 สำหรับเจ้าหน้าที่", use_container_width=True): go_to_page('teacher')
@@ -182,13 +183,13 @@ elif st.session_state['page'] == 'dashboard':
         df[score_col] = pd.to_numeric(df[score_col], errors='coerce').fillna(100)
         df['LV'] = df[class_col].apply(lambda x: str(x).split('/')[0])
         p_col1, p_col2, p_col3 = st.columns(3)
-        with p_col1: st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 ใบขับขี่รวม", hole=0.3, color_discrete_sequence=['#2ecc71', '#e74c3c']), use_container_width=True)
-        with p_col2: st.plotly_chart(px.pie(df, names=df.columns[8], title="📝 ภาษี/พรบ.รวม", hole=0.3, color_discrete_sequence=['#3498db', '#f39c12']), use_container_width=True)
-        with p_col3: st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ การสวมหมวกกันน็อค", hole=0.3), use_container_width=True)
+        with p_col1: st.plotly_chart(px.pie(df, names=df.columns[7], title="🪪 ใบขับขี่", hole=0.3), use_container_width=True)
+        with p_col2: st.plotly_chart(px.pie(df, names=df.columns[8], title="📝 ภาษี/พรบ.", hole=0.3), use_container_width=True)
+        with p_col3: st.plotly_chart(px.pie(df, names=df.columns[9], title="⛑️ หมวกกันน็อค", hole=0.3), use_container_width=True)
         b_col1, b_col2 = st.columns(2)
         with b_col1:
-            avg_score = df[['LV', score_col]].groupby('LV').mean().reset_index()
-            st.plotly_chart(px.bar(avg_score, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยแยกชั้น", color_discrete_sequence=['#10b981']), use_container_width=True)
+            avg_s = df[['LV', score_col]].groupby('LV').mean().reset_index()
+            st.plotly_chart(px.bar(avg_s, x='LV', y=score_col, title="⭐ คะแนนวินัยเฉลี่ยแยกชั้น"), use_container_width=True)
         with b_col2: st.plotly_chart(px.bar(df.groupby('LV').size().reset_index(name='จำนวน'), x='LV', y='จำนวน', title="📚 จำนวนรถแยกตามชั้น"), use_container_width=True)
 
 elif st.session_state['page'] == 'edit':
@@ -204,15 +205,18 @@ elif st.session_state['page'] == 'edit':
         p1_new = st.file_uploader("เปลี่ยนรูปหลังรถ"); p2_new = st.file_uploader("เปลี่ยนรูปข้างรถ")
         if st.form_submit_button("บันทึก"):
             sheet = connect_gsheet(); cell = sheet.find(str(v[2])); l1, l2 = v[10], v[11]
-            if p1_new: l1 = upload_to_drive(p1_new, f"{v[2]}_F_n.jpg"); if p2_new: l2 = upload_to_drive(p2_new, f"{v[2]}_S_n.jpg")
+            if p1_new:
+                l1 = upload_to_drive(p1_new, f"{v[2]}_F_n.jpg")
+            if p2_new:
+                l2 = upload_to_drive(p2_new, f"{v[2]}_S_n.jpg")
             sheet.update(f'B{cell.row}:L{cell.row}', [[n_name, v[2], n_class, n_brand, n_color, n_plate, n_lic, n_tax, n_hel, l1, l2]])
             st.success("แก้ไขแล้ว!"); del st.session_state.df; go_to_page('teacher')
     if st.button("ยกเลิก"): go_to_page('teacher')
 
 elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 หน้าหลัก"): go_to_page('student')
+    if st.button("🏠 กลับหน้าหลัก"): go_to_page('student')
     if not st.session_state.get('logged_in'):
-        pwd = st.text_input("รหัสผ่านเจ้าหน้าที่", type="password")
+        pwd = st.text_input("รหัสผ่าน", type="password")
         if st.button("เข้าสู่ระบบ"):
             if pwd == ADMIN_PASSWORD: st.session_state.logged_in = True; st.rerun()
             else: st.error("รหัสไม่ถูกต้อง")
@@ -226,12 +230,12 @@ elif st.session_state['page'] == 'teacher':
         if 'df' in st.session_state:
             df = st.session_state.df; total = len(df)
             lok = df[df.iloc[:, 7].astype(str).str.contains("✅ มี")].shape[0]; tok = df[df.iloc[:, 8].astype(str).str.contains("ปกติ|✅")].shape[0]; hok = df[df.iloc[:, 9].astype(str).str.contains("✅ มี")].shape[0]
-            st.markdown("### 📊 สรุปผลวินัยจราจร")
+            st.markdown("### 📊 สรุปภาพรวม")
             m1, m2, m3, m4 = st.columns(4)
-            m1.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-percent">100%</div><div class="metric-label">🏍️ รถทั้งหมด</div></div>', unsafe_allow_html=True)
-            m2.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-percent">{(lok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">🪪 มีใบขับขี่</div></div>', unsafe_allow_html=True)
+            m1.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-percent">100%</div><div class="metric-label">🏍️ ทั้งหมด</div></div>', unsafe_allow_html=True)
+            m2.markdown(f'<div class="metric-card"><div class="metric-value">{lok}</div><div class="metric-percent">{(lok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">🪪 ใบขับขี่</div></div>', unsafe_allow_html=True)
             m3.markdown(f'<div class="metric-card"><div class="metric-value">{tok}</div><div class="metric-percent">{(tok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">📝 ภาษีปกติ</div></div>', unsafe_allow_html=True)
-            m4.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{(hok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">⛑️ มีหมวก</div></div>', unsafe_allow_html=True)
+            m4.markdown(f'<div class="metric-card"><div class="metric-value">{hok}</div><div class="metric-percent">{(hok/total*100) if total>0 else 0:.1f}%</div><div class="metric-label">⛑️ หมวกกันน็อค</div></div>', unsafe_allow_html=True)
 
             st.markdown("---")
             q_txt = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", on_change=reset_results)
@@ -243,7 +247,7 @@ elif st.session_state['page'] == 'teacher':
             f_risk = col_f1.selectbox("🚨 กรองกลุ่มปัญหา:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"], on_change=reset_results)
             f_lv = col_f2.selectbox("📚 ระดับชั้น:", ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()]))), on_change=reset_results)
             f_br = col_f3.selectbox("🏍️ ยี่ห้อรถ:", ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique()))), on_change=reset_results)
-            if st.button("⚡ กรองข้อมูลตามเงื่อนไข", use_container_width=True, type="primary"):
+            if st.button("⚡ กรองตามเงื่อนไข", use_container_width=True, type="primary"):
                 fdf = df.copy()
                 if f_risk != "ทั้งหมด": idx = 7 if "ใบขับขี่" in f_risk else (8 if "ภาษี" in f_risk else 9); fdf = fdf[fdf.iloc[:, idx].astype(str).str.contains("ไม่มี|ขาด")]
                 if f_lv != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(f_lv)]
@@ -260,48 +264,40 @@ elif st.session_state['page'] == 'teacher':
                             c_im, c_in = st.columns([2, 1])
                             with c_im:
                                 i1, i2 = get_img_link(v[10]), get_img_link(v[11])
-                                sub1, sub2 = st.columns(2); if i1: sub1.image(i1, caption="หลัง"); if i2: sub2.image(i2, caption="ข้าง")
+                                sub1, sub2 = st.columns(2)
+                                if i1: sub1.image(i1, caption="หลัง")
+                                if i2: sub2.image(i2, caption="ข้าง")
                             with c_in:
                                 st.markdown(f'<div class="score-display">คะแนนวินัย: {curr_score} แต้ม</div>', unsafe_allow_html=True)
                                 st.download_button("⬇️ โหลด PDF", create_pdf(v, i1, i2), f"{v[6]}.pdf", key=f"pdf_{i}", mime="application/pdf")
                                 if st.button("✏️ แก้ไขข้อมูลเบื้องต้น", key=f"e_{i}"): st.session_state.edit_data = v; go_to_page('edit')
-                                
-                                st.write("---"); st.write("🛡️ **จัดการคะแนนและบันทึกข้อความ**")
+                                st.write("---"); st.write("🛡️ **จัดการคะแนนและบันทึก**")
                                 points = st.number_input("คะแนนที่จะปรับ", min_value=1, max_value=50, value=5, key=f"pts_{i}")
                                 cn = str(v[12]).strip() if len(v)>12 and str(v[12]).lower()!="nan" else ""; nn = st.text_area("✍️ บันทึกเจ้าหน้าที่ (จำเป็นต้องระบุ)", value=cn, key=f"n_{i}")
                                 apwd = st.text_input("รหัสยืนยัน (Patwitnext)", type="password", key=f"apwd_{i}")
-                                
                                 col_sc1, col_sc2, col_sc3 = st.columns(3)
-                                # ตรรกะปุ่มหักคะแนน
                                 if col_sc1.button(f"🔴 หัก {points} แต้ม", key=f"sub_{i}"):
                                     if not nn.strip(): st.warning("⚠️ กรุณากรอกบันทึกเจ้าหน้าที่ก่อนดำเนินการ")
-                                    elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผ่านไม่ถูกต้อง")
+                                    elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผิด")
                                     else:
                                         sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = max(0, curr_score - points)
-                                        sheet.update(f'M{cell.row}:N{cell.row}', [[nn, str(new_s)]])
-                                        st.success(f"หักคะแนนและบันทึกข้อความแล้ว!"); time.sleep(1); st.rerun()
-
-                                # ตรรกะปุ่มเพิ่มคะแนน
+                                        sheet.update(f'M{cell.row}:N{cell.row}', [[nn, str(new_s)]]); st.success("หักแต้มแล้ว!"); time.sleep(1); st.rerun()
                                 if col_sc2.button(f"🟢 เพิ่ม {points} แต้ม", key=f"add_{i}"):
                                     if not nn.strip(): st.warning("⚠️ กรุณากรอกบันทึกเจ้าหน้าที่ก่อนดำเนินการ")
-                                    elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผ่านไม่ถูกต้อง")
+                                    elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผิด")
                                     else:
                                         sheet = connect_gsheet(); cell = sheet.find(str(v[2])); new_s = min(100, curr_score + points)
-                                        sheet.update(f'M{cell.row}:N{cell.row}', [[nn, str(new_s)]])
-                                        st.success(f"เพิ่มคะแนนและบันทึกข้อความแล้ว!"); time.sleep(1); st.rerun()
-
-                                # ตรรกะปุ่มบันทึกข้อความอย่างเดียว
+                                        sheet.update(f'M{cell.row}:N{cell.row}', [[nn, str(new_s)]]); st.success("เพิ่มแต้มแล้ว!"); time.sleep(1); st.rerun()
                                 if col_sc3.button("💾 บันทึกข้อความ", key=f"s_{i}"):
                                     if not nn.strip(): st.warning("⚠️ กรุณากรอกบันทึกเจ้าหน้าที่ก่อนดำเนินการ")
-                                    elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผ่านไม่ถูกต้อง")
+                                    elif apwd != UPGRADE_PASSWORD: st.error("❌ รหัสผิด")
                                     else:
-                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2])); sheet.update_acell(f'M{cell.row}', nn)
-                                        st.success("บันทึกข้อความแล้ว!"); time.sleep(1); st.rerun()
+                                        sheet = connect_gsheet(); cell = sheet.find(str(v[2])); sheet.update_acell(f'M{cell.row}', nn); st.success("บันทึกแล้ว!"); time.sleep(1); st.rerun()
 
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียนประจำปี"):
-                up_pwd = st.text_input("รหัสยืนยันการดำเนินการ", type="password", key="prom_pwd")
-                if st.button("ยืนยันเลื่อนชั้นนักเรียน") and up_pwd == UPGRADE_PASSWORD:
+                up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
+                if st.button("ยืนยันเลื่อนชั้นทุกคน") and up_pwd == UPGRADE_PASSWORD:
                     sheet = connect_gsheet(); d = sheet.get_all_values(); h = d[0]; r = d[1:]; new_r = []
                     for row in r:
                         ol = str(row[3]); nl = ol
