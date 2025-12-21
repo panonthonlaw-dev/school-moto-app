@@ -170,7 +170,7 @@ with c_title: st.title("ระบบลงทะเบียนรถจัก�
 st.markdown("---")
 
 if st.session_state['page'] == 'student':
-    st.info("📝 ลงทะเบียนข้อมูลรถและถ่ายรูปรถ")
+    st.info("📝 สำหรับนักเรียน: ลงทะเบียนข้อมูลรถ")
     with st.form("reg_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
@@ -190,7 +190,7 @@ if st.session_state['page'] == 'student':
         
         doc_c1, doc_c2, doc_c3 = st.columns(3)
         license_status = doc_c1.radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ไม่มี"], horizontal=True)
+        tax_status = doc_c2.radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
         helmet_status = doc_c3.radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         
         photo1 = st.file_uploader("รูปหลังรถ", type=['jpg','png','jpeg'])
@@ -204,7 +204,7 @@ if st.session_state['page'] == 'student':
             except ValueError: pass
 
             if not valid_room:
-                st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (เลข 0 ถึง 13 เท่านั้น)")
+                st.error("❌ กรุณาใส่ห้องให้ถูกต้อง (ใส่เฉพาะตัวเลข 0 ถึง 13 เท่านั้น)")
             elif fname and std_id and plate and photo1:
                 try:
                     sheet = connect_gsheet()
@@ -216,7 +216,6 @@ if st.session_state['page'] == 'student':
                             l2 = upload_to_drive(photo2, f"{std_id}_S.jpg") if photo2 else ""
                             thai_now = datetime.now() + timedelta(hours=7)
                             full_name = f"{prefix}{fname}"
-                            # ลำดับ: 0:เวลา, 1:ชื่อ, 2:ID, 3:ชั้น, 4:ยี่ห้อ, 5:สี, 6:ทะเบียน, 7:ใบขับขี่, 8:ภาษี, 9:หมวก, 10:รูป1, 11:รูป2
                             sheet.append_row([
                                 thai_now.strftime('%d/%m/%Y %H:%M'), 
                                 full_name, str(std_id), f"{level}/{room_input}", 
@@ -255,23 +254,49 @@ elif st.session_state['page'] == 'teacher':
             df = st.session_state.df
             total = len(df)
             try:
-                lic_c = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                tax_c = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
-                hel_c = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
-                lic_p, tax_p, hel_p = (lic_c/total)*100, (tax_c/total)*100, (hel_c/total)*100
-            except: lic_c, tax_c, hel_c, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
+                lic_count = df[df.iloc[:, 7].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                tax_count = df[df.iloc[:, 8].astype(str).str.contains("✅ ปกติ", na=False)].shape[0]
+                hel_count = df[df.iloc[:, 9].astype(str).str.contains("✅ มี", na=False)].shape[0]
+                lic_p, tax_p, hel_p = (lic_count/total)*100, (tax_count/total)*100, (hel_count/total)*100
+            except: lic_count, tax_count, hel_count, lic_p, tax_p, hel_p = 0, 0, 0, 0, 0, 0
             
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("🏍️ รถทั้งหมด", f"{total} คัน")
-            c2.metric("🪪 มีใบขับขี่", f"{lic_c} คน", f"{lic_p:.1f}%")
-            c3.metric("📝 ภาษีปกติ", f"{tax_c} คัน", f"{tax_p:.1f}%")
-            c4.metric("⛑️ หมวกกันน็อค", f"{hel_c} คน", f"{hel_p:.1f}%")
+            c2.metric("🪪 มีใบขับขี่", f"{lic_count} คน", f"{lic_p:.1f}%")
+            c3.metric("📝 ภาษีปกติ", f"{tax_count} คัน", f"{tax_p:.1f}%")
+            c4.metric("⛑️ หมวกกันน็อค", f"{hel_count} คน", f"{hel_p:.1f}%")
 
             st.markdown("---")
+            
+            # --- ส่วน SMART FILTER (ระบบกรองข้อมูลอัจฉริยะ) ---
+            with st.expander("⚡ ตัวกรองข้อมูลอัจฉริยะ (Smart Filter)"):
+                col_f1, col_f2, col_f3 = st.columns(3)
+                filter_risk = col_f1.selectbox("🚨 เลือกกลุ่มเสี่ยง:", ["ทั้งหมด", "❌ ไม่มีใบขับขี่", "❌ ภาษีขาด", "❌ ไม่สวมหมวก"])
+                try: all_levels = ["ทั้งหมด"] + sorted(list(set([str(x).split('/')[0] for x in df.iloc[:, 3].unique()])))
+                except: all_levels = ["ทั้งหมด"]
+                filter_level = col_f2.selectbox("📚 เลือกระดับชั้น:", all_levels)
+                try: all_brands = ["ทั้งหมด"] + sorted(list(set(df.iloc[:, 4].unique())))
+                except: all_brands = ["ทั้งหมด"]
+                filter_brand = col_f3.selectbox("🏍️ เลือกยี่ห้อ:", all_brands)
+
+            # Logic การกรอง
+            fdf = df.copy()
+            if filter_risk == "❌ ไม่มีใบขับขี่": fdf = fdf[fdf.iloc[:, 7].astype(str).str.contains("ไม่มี", na=False)]
+            elif filter_risk == "❌ ภาษีขาด": fdf = fdf[fdf.iloc[:, 8].astype(str).str.contains("ขาด|ไม่มี", na=False)]
+            elif filter_risk == "❌ ไม่สวมหมวก": fdf = fdf[fdf.iloc[:, 9].astype(str).str.contains("ไม่มี", na=False)]
+            if filter_level != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 3].astype(str).str.contains(filter_level, na=False)]
+            if filter_brand != "ทั้งหมด": fdf = fdf[fdf.iloc[:, 4] == filter_brand]
+
+            # --- ส่วนค้นหาปกติ (ข้อความเหมือนเดิมเป๊ะ) ---
             q = st.text_input("🔍 ค้นหา (ชื่อ/รหัส/ทะเบียน)", key="search_query")
-            if st.button("เริ่มการค้นหา") and q:
-                fdf = df[df.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
-                if fdf.empty: st.warning("ไม่พบข้อมูล")
+            
+            # ใช้ Smart Filter ร่วมกับคำค้นหา
+            if q:
+                fdf = fdf[fdf.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)]
+
+            if st.button("เริ่มการค้นหา") or (filter_risk!="ทั้งหมด" or filter_level!="ทั้งหมด" or filter_brand!="ทั้งหมด"):
+                if fdf.empty:
+                    st.warning("ไม่พบข้อมูล")
                 else:
                     st.success(f"✅ พบ {len(fdf)} รายการ")
                     for i, row in fdf.iterrows():
@@ -286,7 +311,6 @@ elif st.session_state['page'] == 'teacher':
                             with c_info:
                                 st.write(f"**รหัส:** {v[2]} | **ชั้น:** {v[3]}")
                                 st.write(f"**ยี่ห้อ/สี:** {v[4]} ({v[5]})")
-                                # แก้ไขจุดแสดงผลเอกสารรายบุคคลที่นี่
                                 st.write(f"**ใบขับขี่:** {v[7]}")
                                 st.write(f"**ภาษี/พรบ:** {v[8]}")
                                 st.write(f"**หมวกกันน็อค:** {v[9]}")
@@ -295,9 +319,9 @@ elif st.session_state['page'] == 'teacher':
             
             st.markdown("---")
             with st.expander("⚙️ เลื่อนชั้นปี"):
-                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรเรียกคืนไม่ได้")
-                spwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key="upgrade_pwd")
-                if st.button("ปรับปรุงการเลื่อนชั้นปี") and spwd == "Patwitnext":
+                st.error("### ⚠️ คำเตือน: ข้อมูลจะถูกเปลี่ยนถาวรและย้อนกลับไม่ได้")
+                spwd = st.text_input("รหัสยืนยันของเจ้าหน้าที่ระดับสูง", type="password", key="upgrade_pwd")
+                if st.button("ตกลงเลื่อนชั้นปี") and spwd == "Patwitnext":
                     try:
                         sheet = connect_gsheet()
                         d = sheet.get_all_values()
