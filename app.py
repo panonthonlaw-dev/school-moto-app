@@ -390,11 +390,11 @@ elif st.session_state['page'] == 'teacher':
                             with ci: 
                                 if len(v)>14 and v[14]: st.image(get_img_link(v[14]), width=120)
                             with cd:
-                                st.download_button("PDF", create_pdf(v, get_img_link(v[10]), get_img_link(v[11])), f"{v[6]}.pdf", use_container_width=True)
+                                st.download_button("📊PDF", create_pdf(v, get_img_link(v[10]), get_img_link(v[11])), f"{v[6]}.pdf", use_container_width=True)
                                 if st.button("✏️ แก้ไข", key=f"e_{i}", use_container_width=True): st.session_state.edit_data = v; go_to_page('edit')
                                 
                                 st.write("---")
-                                pts = st.number_input("แต้ม", 1, 50, 5, key=f"p_{i}"); note = st.text_area("บันทึกเหตุผล (จำเป็น)", key=f"n_{i}"); pwd = st.text_input("รหัสยืนยัน", type="password", key=f"pw_{i}")
+                                pts = st.number_input("แต้ม", 1, 50, 5, key=f"p_{i}"); note = st.text_area("บันทึกเหตุผล (จำเป็น)", key=f"n_{i}"); pwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key=f"pw_{i}")
                                 b1, b2 = st.columns(2)
                                 if b1.button("🔴 หักแต้ม", key=f"s1_{i}", use_container_width=True):
                                     if note and pwd==UPGRADE_PASSWORD:
@@ -415,7 +415,7 @@ elif st.session_state['page'] == 'teacher':
             st.markdown("---")
             with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน"):
                 st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ") # เพิ่มคำเตือนก่อนเลื่อนชั้น
-                up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
+                up_pwd = st.text_input("รหัสเจ้าหน้าที่ระดับสูง", type="password", key="prom_pwd")
                 if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
                     s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
                     for row in r:
