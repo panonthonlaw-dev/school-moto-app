@@ -27,18 +27,14 @@ UPGRADE_PASSWORD = "Patwitnext"
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 SESSION_TIMEOUT_MINUTES = 30 
 
-# --- 🔑 ระบบจัดการสิทธิ์ (แก้ไข Syntax ให้ถูกต้อง) ---
+# --- 🔑 ระบบจัดการสิทธิ์ ---
+# role: 'admin' = แก้ไขได้ทุกอย่าง, 'viewer' = ดูได้อย่างเดียว
 OFFICER_ACCOUNTS = {
     "Patwit1150": {"name": "แอดมินสูงสุด", "role": "admin"},
-    "Pencharee001": {"name": "ครูเพ็ญชรีย์(ปกครอง)", "role": "admin"},
-    "chaiya001": {"name": "ครูไชยา(ปกครอง)", "role": "admin"},
-    "P001": {"name": "ผู้อำนวยการ", "role": "admin"},
-    "P002": {"name": "รองผู้อำนวยการ", "role": "admin"},
-    "P003": {"name": "ผู้กำกับ(ตำรวจนักเรียน)", "role": "admin"},
-    "P001": {"name": "รองผู้กำกับจราจร(ตำรวจนักเรียน)", "role": "admin"},
+    "Pencharee001": {"name": "ครูเพ็ญชรีย์ (ปกครอง)", "role": "admin"},
     "Jak001": {"name": "ยามจักร (รปภ.)", "role": "admin"},
     "User01": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"},
-    "User02": {"name": "ตำรวจนักเรียน", "role": "viewer"}
+    "User05": {"name": "ตำรวจนักเรียน", "role": "viewer"}
 }
 
 # --- 2. Setup หน้าเว็บ ---
@@ -51,7 +47,7 @@ if 'search_results_df' not in st.session_state: st.session_state['search_results
 if 'edit_data' not in st.session_state: st.session_state['edit_data'] = None
 if 'officer_name' not in st.session_state: st.session_state['officer_name'] = "" 
 if 'officer_role' not in st.session_state: st.session_state['officer_role'] = ""
-if 'current_user_pwd' not in st.session_state: st.session_state['current_user_pwd'] = ""
+if 'current_user_pwd' not in st.session_state: st.session_state['current_user_pwd'] = "" # ใช้เก็บว่าล็อกอินด้วย user id อะไร
 if 'last_active' not in st.session_state: st.session_state['last_active'] = time.time()
 
 def check_session_timeout():
@@ -249,7 +245,7 @@ if st.session_state.get('logged_in'):
     with st.sidebar:
         st.write(f"👤 **{st.session_state.officer_name}**")
         st.caption(f"สถานะ: {st.session_state.officer_role}")
-        if st.button("🚪 ออกจากระบบ", type="secondary", use_container_width=True):
+        if st.button("🚪 ออกจากระบบ (Sidebar)", type="secondary", use_container_width=True):
             logout()
 
 if st.session_state['page'] == 'student':
@@ -414,7 +410,6 @@ elif st.session_state['page'] == 'teacher':
     if not st.session_state.get('logged_in'):
         with st.form("login_form"):
             st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
-            # ระบบล็อกอินแบบใหม่ ใช้ Dictionary เช็คสิทธิ์
             pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
             if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
                 if pwd in OFFICER_ACCOUNTS:
@@ -422,15 +417,18 @@ elif st.session_state['page'] == 'teacher':
                     st.session_state.logged_in = True
                     st.session_state.officer_name = user_info["name"]
                     st.session_state.officer_role = user_info["role"]
-                    st.session_state.current_user_pwd = pwd # จำรหัสไว้เช็คตอนยืนยันการหักแต้ม
-                    st.session_state.last_active = time.time() # เริ่มนับเวลา session
+                    st.session_state.current_user_pwd = pwd
+                    st.session_state.last_active = time.time()
                     st.rerun()
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
     else:
         if 'df' not in st.session_state: load_data()
 
-        st.info(f"👤 ผู้ใช้งาน: {st.session_state.officer_name} (สิทธิ์: {st.session_state.officer_role})")
+        col_user, col_logout = st.columns([3, 1])
+        col_user.info(f"👤 ผู้ใช้งาน: {st.session_state.officer_name} (สิทธิ์: {st.session_state.officer_role})")
+        if col_logout.button("🚪 ออกจากระบบ", key="main_logout", use_container_width=True):
+            logout()
 
         c1, c2 = st.columns(2)
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
@@ -552,9 +550,9 @@ elif st.session_state['page'] == 'teacher':
                                 st.info("🔒 ท่านไม่มีสิทธิ์แก้ไขข้อมูลหรือดาวน์โหลดเอกสาร")
                                     
             st.markdown("---")
-            # ระบบเลื่อนชั้น (สงวนสิทธิ์เฉพาะ admin)
-            if st.session_state.officer_role == "admin":
-                with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน (Admin Only)"):
+            # ระบบเลื่อนชั้น (เฉพาะ Patwit1150 เท่านั้น)
+            if st.session_state.current_user_pwd == "Patwit1150":
+                with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน (Super Admin Only)"):
                     st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
                     up_pwd = st.text_input("รหัสเลื่อนชั้น (Patwitnext)", type="password", key="prom_pwd")
                     if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
