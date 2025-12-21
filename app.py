@@ -152,10 +152,10 @@ if st.session_state['page'] == 'student':
         with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง"])
             fname = st.text_input("ชื่อ-นามสกุล")
-        std_id = sc2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520")
+        std_id = sc2.text_input("รหัสนักเรียน /กรณีครูบุคลากรพ่อค้าแม่ค้า กรอก วันเดือนปีเกิด เช่น 15092520,help="ตัวอย่าง 15กันยายน2520 กรอก 15092520")
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง(0-13)หากไม่ใช่นักเรียนกรอก 0", help="หากอยู่ห้อง 5 ให้ใส่เลข 5)")
+        room = st.text_input("ห้อง(0-13)หากไม่ใช่นักเรียนกรอก 0", help="หากอยู่ห้อง 5 ให้ใส่เลข 5")
         sc5, sc6 = st.columns(2)
         brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"])
         color = st.text_input("สีรถ"); plate = st.text_input("ทะเบียนรถ")
