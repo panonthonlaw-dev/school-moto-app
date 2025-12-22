@@ -23,21 +23,12 @@ from reportlab.lib.utils import ImageReader
 # --- 1. ตั้งค่า (Config) ---
 SHEET_NAME = "Motorcycle_DB"
 DRIVE_FOLDER_ID = "1WQGATGaGBoIjf44Yj_-DjuX8LZ8kbmBA" 
-UPGRADE_PASSWORD = "Patwitnext" 
+# ดึงรหัสผ่านและบัญชีจาก Streamlit Secrets
+UPGRADE_PASSWORD = st.secrets["UPGRADE_PASSWORD"] 
+OFFICER_ACCOUNTS = st.secrets["OFFICER_ACCOUNTS"]
+
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 SESSION_TIMEOUT_MINUTES = 30 
-
-# --- 🔑 ระบบจัดการสิทธิ์ ---
-OFFICER_ACCOUNTS = {
-    "Patwit1510": {"name": "แอดมินสูงสุด", "role": "admin"},
-    "Pencharee001": {"name": "ครูเพ็ญชรีย์ (ปกครอง)", "role": "admin"},
-    "Chaiya001": {"name": "ครูไชยา(ปกครอง)", "role": "admin"},
-    "Jak001": {"name": "ยามจักร (รปภ.)", "role": "admin"},
-    "User01": {"name": "ผู้กำกับ(ตำรวจนักเรียน)", "role": "admin"},
-    "User02": {"name": "รองผู้กำกับจราจร(ตำรวจนักเรียน)", "role": "admin"},
-    "User03": {"name": "ครูเวร (ตรวจการณ์)", "role": "viewer"},
-    "User04": {"name": "ตำรวจนักเรียน", "role": "viewer"}
-}
 
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
@@ -412,7 +403,6 @@ elif st.session_state['page'] == 'teacher':
     if not st.session_state.get('logged_in'):
         with st.form("login_form"):
             st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
-            # ระบบล็อกอินแบบใหม่ ใช้ Dictionary เช็คสิทธิ์
             pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
             if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
                 if pwd in OFFICER_ACCOUNTS:
@@ -420,8 +410,8 @@ elif st.session_state['page'] == 'teacher':
                     st.session_state.logged_in = True
                     st.session_state.officer_name = user_info["name"]
                     st.session_state.officer_role = user_info["role"]
-                    st.session_state.current_user_pwd = pwd # จำรหัสไว้เช็คตอนยืนยันการหักแต้ม
-                    st.session_state.last_active = time.time() # เริ่มนับเวลา session
+                    st.session_state.current_user_pwd = pwd
+                    st.session_state.last_active = time.time()
                     st.rerun()
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
@@ -479,9 +469,7 @@ elif st.session_state['page'] == 'teacher':
                         v = row.tolist(); sc = int(v[13]) if len(v)>13 and str(v[13]).isdigit() else 100
                         sc_color = "#22c55e" if sc >= 80 else ("#eab308" if sc >= 50 else "#ef4444")
                         
-                        # เริ่มส่วนการแสดงผลแบบใหม่ (Profile Card)
                         with st.expander(f"📍 {v[6]} | {v[1]}"):
-                            # 1. Header & Badges (สวยงาม)
                             c1, c2 = st.columns([1.5, 1])
                             with c1:
                                 st.markdown(f"### 👤 {v[1]}")
@@ -490,7 +478,6 @@ elif st.session_state['page'] == 'teacher':
                                 st.markdown(f"### 🏍️ {v[6]}")
                                 st.caption(f"{v[4]} ({v[5]})")
 
-                            # 2. Document Status Badges
                             lic_ok = "มี" in str(v[7])
                             tax_ok = "ปกติ" in str(v[8]) or "✅" in str(v[8])
                             helm_ok = "มี" in str(v[9])
@@ -509,7 +496,6 @@ elif st.session_state['page'] == 'teacher':
                                 </div>
                             """, unsafe_allow_html=True)
 
-                            # 3. Score Bar
                             st.markdown(f"""
                                 <div style="margin-top: 10px; margin-bottom: 5px;">
                                     <div style="display: flex; justify-content: space-between; align-items: end;">
@@ -524,7 +510,6 @@ elif st.session_state['page'] == 'teacher':
                             
                             st.divider()
 
-                            # 4. Images
                             c_img1, c_img2, c_img3 = st.columns(3)
                             with c_img1:
                                 st.caption("👤 เจ้าของรถ")
@@ -539,7 +524,6 @@ elif st.session_state['page'] == 'teacher':
                             
                             face_url = get_img_link(v[14]) if len(v) > 14 else None
                             
-                            # 5. Actions (Admin Only)
                             if st.session_state.officer_role == "admin":
                                 col_act1, col_act2 = st.columns(2)
                                 col_act1.download_button("📥 โหลดใบประวัติ (PDF)", create_pdf(v, get_img_link(v[10]), get_img_link(v[11]), face_url, st.session_state.officer_name), f"{v[6]}.pdf", use_container_width=True)
@@ -564,7 +548,6 @@ elif st.session_state['page'] == 'teacher':
                                             editor = st.session_state.officer_name
                                             new_log = f"{old}\n[{tn}] หัก {pts} คะแนน: {note} (โดย: {editor})"
                                             s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
-                                            
                                             st.session_state.reset_count += 1
                                             load_data()
                                             st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
@@ -578,7 +561,6 @@ elif st.session_state['page'] == 'teacher':
                                             editor = st.session_state.officer_name
                                             new_log = f"{old}\n[{tn}] เพิ่ม {pts} คะแนน: {note} (โดย: {editor})"
                                             s.update(f'M{cell.row}:N{cell.row}', [[new_log, str(ns)]])
-                                            
                                             st.session_state.reset_count += 1
                                             load_data()
                                             st.success("บันทึกแล้ว"); time.sleep(1); st.rerun()
@@ -586,8 +568,7 @@ elif st.session_state['page'] == 'teacher':
                                 st.info("🔒 ท่านไม่มีสิทธิ์แก้ไขข้อมูลหรือดาวน์โหลดเอกสาร")
                                     
             st.markdown("---")
-            # ระบบเลื่อนชั้น (เฉพาะ Patwit1150 เท่านั้น)
-            if st.session_state.current_user_pwd == "Patwit1150":
+            if st.session_state.current_user_pwd == "Patwit1510":
                 with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน (Super Admin Only)"):
                     st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
                     up_pwd = st.text_input("รหัสเลื่อนชั้น (Patwitnext)", type="password", key="prom_pwd")
