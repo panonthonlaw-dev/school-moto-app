@@ -12,7 +12,15 @@ import re
 import os
 import textwrap
 import plotly.express as px
-
+# --- ฟังก์ชันป้องกัน Formula Injection ---
+def sanitize_for_gsheet(text):
+    if text is None:
+        return ""
+    text_str = str(text)
+    # ถ้าขึ้นต้นด้วยสัญลักษณ์สูตร ให้เติม ' นำหน้า
+    if text_str.startswith(("=", "+", "-", "@")):
+        return "'" + text_str
+    return text_str
 # --- ส่วนของ PDF Library ---
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
@@ -294,14 +302,25 @@ if st.session_state['page'] == 'student':
                     if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว")
                     else:
                         with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
+                            # อัปโหลดรูป (ส่วนนี้ปลอดภัยอยู่แล้วเพราะคืนค่าเป็น URL)
                             l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
                             l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
                             l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
+                            
+                            # ✅ บันทึกลง Sheet (ใส่เกราะป้องกัน Formula Injection ตรงนี้!)
                             sheet.append_row([
-                                datetime.now().strftime('%d/%m/%Y %H:%M'), f"{prefix}{fname}", str(std_id), 
-                                f"{level}/{room}", brand, color, plate, ls, ts, hs, 
-                                l_back, l_side, "", "100", l_face, str(pin)
+                                datetime.now().strftime('%d/%m/%Y %H:%M'), 
+                                sanitize_for_gsheet(f"{prefix}{fname}"),  # ชื่อ
+                                sanitize_for_gsheet(str(std_id)),         # รหัสนักเรียน (บางทีคนอาจใส่สูตร)
+                                f"{level}/{room}",                        # ชั้น/ห้อง (ตัวเลือก selectbox ปลอดภัยอยู่แล้วแต่ครอบไว้ก็ได้)
+                                brand, 
+                                sanitize_for_gsheet(color),               # สีรถ (ช่องกรอกอิสระ อันตราย)
+                                sanitize_for_gsheet(plate),               # ทะเบียน (ช่องกรอกอิสระ อันตรายมาก)
+                                ls, ts, hs, 
+                                l_back, l_side, "", "100", l_face, 
+                                sanitize_for_gsheet(str(pin))             # PIN
                             ])
+                            
                             st.session_state.reg_success = True
                             st.rerun()
                 except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
