@@ -568,10 +568,11 @@ elif st.session_state['page'] == 'teacher':
                                 st.info("🔒 ท่านไม่มีสิทธิ์แก้ไขข้อมูลหรือดาวน์โหลดเอกสาร")
                                     
             st.markdown("---")
-            if st.session_state.current_user_pwd == "Patwit1510":
+            # ตรวจสอบจาก Role แทน (ต้องไปตั้งค่าใน secrets.toml ให้ user นี้มี role เป็น 'super_admin')
+if st.session_state.officer_role == "super_admin":
                 with st.expander("⚙️ ระบบจัดการเลื่อนชั้นเรียน (Super Admin Only)"):
                     st.warning("⚠️ คำเตือน: การเลื่อนชั้นจะปรับระดับชั้นของนักเรียนทุกคน และไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
-                    up_pwd = st.text_input("รหัสเลื่อนชั้น (Patwitnext)", type="password", key="prom_pwd")
+                    up_pwd = st.text_input("รหัสเลื่อนชั้น", type="password", key="prom_pwd")
                     if st.button("ยืนยันเลื่อนชั้น", use_container_width=True) and up_pwd == UPGRADE_PASSWORD:
                         s = connect_gsheet(); d = s.get_all_values(); h = d[0]; r = d[1:]; nr = []
                         for row in r:
