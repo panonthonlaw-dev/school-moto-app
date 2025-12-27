@@ -327,7 +327,7 @@ if st.session_state['page'] == 'student':
 
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
-    if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
+    #if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
 
 elif st.session_state['page'] == 'portal':
     if st.button("🏠 กลับหน้าหลัก", use_container_width=True): go_to_page('student')
