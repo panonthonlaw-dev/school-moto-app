@@ -420,20 +420,21 @@ elif st.session_state['page'] == 'teacher':
     if st.button("🏠 กลับหน้าหลัก", use_container_width=True): go_to_page('student')
     
     if not st.session_state.get('logged_in'):
-        with st.form("login_form"):
-            st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
-            pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
-            if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
-                if pwd in OFFICER_ACCOUNTS:
-                    user_info = OFFICER_ACCOUNTS[pwd]
-                    st.session_state.logged_in = True
-                    st.session_state.officer_name = user_info["name"]
-                    st.session_state.officer_role = user_info["role"]
-                    st.session_state.current_user_pwd = pwd
-                    st.session_state.last_active = time.time()
-                    st.rerun()
-                else:
-                    st.error("รหัสผ่านไม่ถูกต้อง")
+    #    with st.form("login_form"):
+     #       st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
+      #      pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
+       #     if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
+        #        if pwd in OFFICER_ACCOUNTS:
+         #           user_info = OFFICER_ACCOUNTS[pwd]
+          #          st.session_state.logged_in = True
+           #         st.session_state.officer_name = user_info["name"]
+            #        st.session_state.officer_role = user_info["role"]
+             #       st.session_state.current_user_pwd = pwd
+              #      st.session_state.last_active = time.time()
+               #     st.rerun()
+                #else:
+                 #   st.error("รหัสผ่านไม่ถูกต้อง")
+                     
     else:
         if 'df' not in st.session_state: load_data()
 
