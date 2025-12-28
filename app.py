@@ -385,21 +385,32 @@ if st.session_state['page'] == 'student':
                             st.error("❌ เลขประจำตัวนี้ลงทะเบียนไปแล้ว")
                             st.stop()
 
-                        # 3.2 อัปโหลดรูป
-                        ts = int(time.time())
+                        # 2. อัปโหลดรูปภาพ (เปลี่ยนชื่อจาก ts เป็น current_ts)
+                        current_ts = int(time.time()) 
                         safe_id = str(std_id).replace("/", "").replace(" ", "")
-                        url_f = upload_image_to_supabase(p_face, f"{safe_id}_F_{ts}.jpg")
-                        url_b = upload_image_to_supabase(p_back, f"{safe_id}_B_{ts}.jpg")
-                        url_s = upload_image_to_supabase(p_side, f"{safe_id}_S_{ts}.jpg") if p_side else ""
+                        
+                        # ใช้ current_ts ในชื่อไฟล์รูปแทน
+                        url_f = upload_image_to_supabase(p_face, f"{safe_id}_F_{current_ts}.jpg")
+                        url_b = upload_image_to_supabase(p_back, f"{safe_id}_B_{current_ts}.jpg")
+                        url_s = upload_image_to_supabase(p_side, f"{safe_id}_S_{current_ts}.jpg") if p_side else ""
 
-                        # 3.3 เตรียมข้อมูล (เอา timestamp ออกแล้ว)
+                        # 3. เตรียมข้อมูล
                         data = {
-                            "student_name": f"{prefix}{fname}", "student_id": str(std_id),
-                            "class_room": f"{level}/{room}", "vehicle_brand": brand,
-                            "vehicle_color": color, "license_plate": plate,
-                            "driver_license": ls, "tax_status": ts, "helmet_status": hs,
-                            "image_face": url_f, "image_back": url_b, "image_side": url_s,
-                            "score": 100, "history": "ลงทะเบียนสำเร็จ", "user_pin": str(pin),
+                            "student_name": f"{prefix}{fname}", 
+                            "student_id": str(std_id),
+                            "class_room": f"{level}/{room}", 
+                            "vehicle_brand": brand,
+                            "vehicle_color": color, 
+                            "license_plate": plate,
+                            "driver_license": ls, 
+                            "tax_status": ts,  # <--- คราวนี้ค่า ts จะเป็น "✅ ปกติ" ของเดิม ไม่โดนทับแล้ว
+                            "helmet_status": hs,
+                            "image_face": url_f, 
+                            "image_back": url_b, 
+                            "image_side": url_s,
+                            "score": 100, 
+                            "history": "ลงทะเบียนสำเร็จ", 
+                            "user_pin": str(pin),
                             "academic_year": "2568"
                         }
                         
