@@ -435,8 +435,8 @@ elif st.session_state['page'] == 'teacher':
                 #else:
                  #   st.error("รหัสผ่านไม่ถูกต้อง")
                      
-    else:
-        if 'df' not in st.session_state: load_data()
+else:
+    if 'df' not in st.session_state: load_data()
 
         col_user, col_logout = st.columns([3, 1])
         col_user.info(f"👤 ผู้ใช้งาน: {st.session_state.officer_name} (สิทธิ์: {st.session_state.officer_role})")
