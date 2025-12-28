@@ -451,7 +451,7 @@ elif st.session_state['page'] == 'portal':
     with st.container(border=True):
         st.subheader("ยืนยันตัวตนเพื่อดูบัตร")
         with st.form("portal_login"):
-            sid = st.text_input("รหัสนักเรียน กรณีไม่ใช่นักเรียนกรอกวันเกิดเช่น 02092530")
+            sid = st.text_input("รหัสนักเรียน กรณีไม่ใช่นักเรียนกรอกเบอร์โทร")
             spin = st.text_input("รหัส PIN 6 หลัก", type="password", max_chars=6)
             if st.form_submit_button("🔓 แสดงบัตร", use_container_width=True, type="primary"):
                 if sid and spin:
