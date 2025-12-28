@@ -135,11 +135,12 @@ def upload_image_to_supabase(uploaded_file, file_name):
 
 def save_to_supabase(data_dict, table_name="traffic_registration"):
     try:
-        response = supabase.table(table_name).insert(data_dict).execute()
-        return True
+        # สั่งบันทึกเงียบๆ
+        supabase.table(table_name).insert(data_dict).execute()
+        return True, None # สำเร็จ, ไม่มี Error
     except Exception as e:
-        st.error(f"❌ บันทึกข้อมูลลงฐานข้อมูลใหม่ล้มเหลว: {e}")
-        return False
+        # ถ้าพัง ให้ส่ง Error กลับไปบอกข้างนอก (ไม่ต้องพ่นสีแดงตรงนี้)
+        return False, str(e)
 
 def connect_gsheet():
     # ก๊อปปี้ค่าจาก Secrets ออกมาเป็น Dictionary ปกติ (to_dict) เพื่อให้แก้ไขได้
@@ -359,80 +360,78 @@ if st.session_state['page'] == 'student':
         p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นเต็มคัน)", type=['jpg','png','jpeg'])
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
-        if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
-            errors = []
-            if not fname: errors.append("ชื่อ-นามสกุล")
-            if not std_id: errors.append("รหัสประจำตัว")
-            if not plate: errors.append("ทะเบียนรถ")
-            if not p_face: errors.append("รูปถ่ายหน้าตรง")
-            if not p_back: errors.append("รูปถ่ายหลังรถ")
-            if not pin or len(pin) != 6 or not pin.isdigit(): errors.append("รหัส PIN ต้องเป็นตัวเลข 6 หลัก")
-            elif len(set(pin)) == 1: errors.append("รหัส PIN ห้ามใช้เลขซ้ำกันทั้งหมด")
-            if not pdpa: errors.append("การยอมรับเงื่อนไข (PDPA)")
+        # --- ปุ่มส่งข้อมูล ---
+            if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
+                # 1. ตรวจสอบข้อมูลว่าง
+                errors = []
+                if not fname: errors.append("ชื่อ-นามสกุล")
+                if not std_id: errors.append("รหัสประจำตัว")
+                if not plate: errors.append("ทะเบียนรถ")
+                if not p_face or not p_back: errors.append("รูปถ่าย (หน้า/หลัง)")
+                if not pin or len(pin) != 6: errors.append("รหัส PIN 6 หลัก")
+                if not pdpa: errors.append("การยอมรับ PDPA")
 
-            if errors:
-                st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
-            else:
+                if errors:
+                    st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
+                    st.stop()
+                
+                # 2. เริ่มกระบวนการบันทึก
                 try:
-                    # 1. เชื่อมต่อระบบ Sheet เดิม (สำรอง)
-                    sheet = connect_gsheet()
-                    
-                    # 🔍 จุดที่ต้องแก้: เปลี่ยน Student_ID เป็น เลขประจำตัว ให้ตรงกับใน Supabase
-                    duplicate_check = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
-                    
-                    if len(duplicate_check.data) > 0:
-                        st.error("❌ เลขประจำตัวนี้เคยลงทะเบียนในระบบแล้ว")
-                    else:
-                        with st.spinner("⏳ กำลังส่งรูปภาพไป Google Drive 2TB และบันทึกข้อมูล..."):
-                            # --- อัปโหลดรูป ---
-                            ts_now = int(time.time())
-                            l_face = upload_image_to_supabase(p_face, f"{std_id}_Face_{ts_now}.jpg")
-                            l_back = upload_image_to_supabase(p_back, f"{std_id}_Back_{ts_now}.jpg")
-                            l_side = upload_image_to_supabase(p_side, f"{std_id}_Side_{ts_now}.jpg") if p_side else ""
-                            
-                            # --- 2. เตรียมก้อนข้อมูล (ใช้ชื่อภาษาไทยตามที่คุณครูตั้งใน Supabase) ---
-                            supabase_data = {
-                                "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                "student_name": f"{prefix}{fname}",
-                                "student_id": str(std_id),
-                                "class_room": f"{level}/{room}",
-                                "vehicle_brand": brand,
-                                "vehicle_color": color,
-                                "license_plate": plate,
-                                "driver_license": ls,
-                                "tax_status": ts,
-                                "helmet_status": hs,
-                                "image_face3": l_face,
-                                "image_back": l_back,
-                                "image_side": l_side,
-                                "score": 100,
-                                "user_pin": str(pin),
-                                "academic_year": "2568",
-                                "history": ""
-                            }
+                    with st.spinner("⏳ กำลังประมวลผล... (ห้ามปิดหน้าจอ)"):
+                        # Debug: บอกสถานะเงียบๆ (ใช้ st.empty ช่วยก็ได้ถ้าไม่อยากให้รก)
+                        sheet = connect_gsheet()
+                        
+                        # ตรวจสอบรหัสซ้ำ
+                        dup = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
+                        if len(dup.data) > 0:
+                            st.error("❌ เลขประจำตัวนี้เคยลงทะเบียนแล้ว")
+                            st.stop()
+                        
+                        # อัปโหลดรูปภาพ
+                        ts = int(time.time())
+                        safe_id = str(std_id).replace("/", "_").replace(" ", "") 
+                        url_f = upload_image_to_supabase(p_face, f"{safe_id}_F_{ts}.jpg")
+                        url_b = upload_image_to_supabase(p_back, f"{safe_id}_B_{ts}.jpg")
+                        url_s = upload_image_to_supabase(p_side, f"{safe_id}_S_{ts}.jpg") if p_side else ""
 
-                            # --- 3. บันทึกลง Supabase ---
-                            save_to_supabase(supabase_data, "traffic_registration")
-                            
-                            # --- 4. บันทึกลง Google Sheets (Backup) ---
-                            sheet.append_row([
-                                datetime.now().strftime('%d/%m/%Y %H:%M'), 
-                                sanitize_for_gsheet(f"{prefix}{fname}"), 
-                                sanitize_for_gsheet(str(std_id)), 
-                                f"{level}/{room}", 
-                                brand, 
-                                sanitize_for_gsheet(color), 
-                                sanitize_for_gsheet(plate), 
-                                ls, ts, hs, 
-                                l_back, l_side, "", "100", l_face, 
-                                sanitize_for_gsheet(str(pin))
-                            ])
-                            
-                            st.session_state.reg_success = True
-                            st.balloons()
-                            st.rerun()
-                except Exception as e: 
-                    st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+                        # เตรียมข้อมูล
+                        data = {
+                            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            "student_name": f"{prefix}{fname}", "student_id": str(std_id),
+                            "class_room": f"{level}/{room}", "vehicle_brand": brand,
+                            "vehicle_color": color, "license_plate": plate,
+                            "driver_license": ls, "tax_status": ts, "helmet_status": hs,
+                            "image_face": url_f, "image_back": url_b, "image_side": url_s,
+                            "score": 100, "history": "ลงทะเบียนสำเร็จ", "user_pin": str(pin),
+                            "academic_year": "2568"
+                        }
+                        
+                        # --- จุดสำคัญ: เรียกใช้ฟังก์ชันแบบใหม่ ---
+                        success, error_msg = save_to_supabase(data)
+                        
+                        if not success:
+                            # ถ้าพังจริงๆ ค่อยแดงตรงนี้
+                            raise Exception(f"Supabase Error: {error_msg}")
+
+                        # บันทึก Google Sheets
+                        sheet.append_row([
+                            datetime.now().strftime('%d/%m/%Y %H:%M'), 
+                            data["student_name"], data["student_id"], data["class_room"],
+                            brand, color, plate, ls, ts, hs, 
+                            url_b, url_s, "เริ่มลงทะเบียน", "100", url_f, str(pin)
+                        ])
+                        
+                        # สำเร็จหมดแล้ว
+                        st.session_state.reg_success = True
+                        time.sleep(1)
+                        st.rerun()
+
+                except Exception as e:
+                    # แสดง Error ค้างไว้ถ้าพังจริง
+                    st.divider()
+                    st.error("🚨 พบข้อผิดพลาด:")
+                    st.exception(e)
+                    st.stop()
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
     #if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
