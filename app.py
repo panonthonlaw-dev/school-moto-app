@@ -1,5 +1,3 @@
-from PIL import Image
-import io
 import streamlit as st
 import pandas as pd
 import gspread
@@ -14,10 +12,6 @@ import re
 import os
 import textwrap
 import plotly.express as px
-from supabase import create_client, Client
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 # --- ฟังก์ชันป้องกัน Formula Injection ---
 def sanitize_for_gsheet(text):
     if text is None:
@@ -43,31 +37,6 @@ OFFICER_ACCOUNTS = st.secrets["OFFICER_ACCOUNTS"]
 
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 SESSION_TIMEOUT_MINUTES = 30 
-# --- 1.1 เชื่อมต่อ Supabase ---
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# --- 1.2 เชื่อมต่อ Google Drive Service ---
-# --- 1.2 เชื่อมต่อ Google Drive Service ---
-def get_gdrive_service():
-    # 🚨 จุดสำคัญ: ต้องครอบด้วย dict() เพื่อให้เราแก้ค่าข้างในได้
-    creds_info = dict(st.secrets["gcp_service_account"])
-    
-    if "private_key" in creds_info:
-        # ตอนนี้เราแก้ไขค่าในตะกร้าใหม่ (creds_info) ได้แล้ว ไม่ Error แล้วครับ
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-        
-    creds = service_account.Credentials.from_service_account_info(
-        creds_info, scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    return build('drive', 'v3', credentials=creds)
-
-# ตอนสร้างตัวแปรใช้งาน
-try:
-    drive_service = get_gdrive_service()
-except Exception as e:
-    st.error(f"❌ เชื่อมต่อ Google Drive ไม่สำเร็จ: {e}")
 
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
@@ -106,51 +75,12 @@ def img_to_b64(img_path):
             return base64.b64encode(f.read()).decode()
     return ""
 
-# --- วางฟังก์ชันใหม่ต่อตรงนี้ครับ ---
-
-def upload_image_to_supabase(uploaded_file, file_name):
-    try:
-        # 1. บีบอัดรูปภาพเพื่อประหยัด Bandwidth 5GB
-        img = Image.open(uploaded_file)
-        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-        img.thumbnail((800, 800)) # ปรับขนาดให้พอดี
-        
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=70) # ลดขนาดไฟล์ลง 5-10 เท่า
-        buffer.seek(0)
-
-        # 2. อัปโหลดเข้า Bucket: moto_images
-        path_on_supa = f"registrations/{file_name}"
-        supabase.storage.from_("moto_images").upload(
-            path=path_on_supa,
-            file=buffer.getvalue(),
-            file_options={"content-type": "image/jpeg"}
-        )
-        
-        # 3. ส่ง URL กลับไปบันทึกใน Sheet และ Database
-        return supabase.storage.from_("moto_images").get_public_url(path_on_supa)
-    except Exception as e:
-        st.error(f"❌ อัปโหลดรูปภาพล้มเหลว: {e}")
-        return None
-
-def save_to_supabase(data_dict, table_name="traffic_registration"):
-    try:
-        # สั่งบันทึกข้อมูล
-        supabase.table(table_name).insert(data_dict).execute()
-        # ✅ ส่งกลับ 2 อย่าง: สถานะ (True) และ ไม่มีข้อความ Error (None)
-        return True, None 
-    except Exception as e:
-        # ❌ ส่งกลับ 2 อย่าง: สถานะ (False) และ ข้อความ Error
-        return False, str(e)
 def connect_gsheet():
-    # ก๊อปปี้ค่าจาก Secrets ออกมาเป็น Dictionary ปกติ (to_dict) เพื่อให้แก้ไขได้
-    creds_info = dict(st.secrets["gcp_service_account"]) 
-    
-    if "private_key" in creds_info:
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-        
-    scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scopes)
+    key_content = st.secrets["textkey"]["json_content"]
+    try: key_dict = json.loads(key_content, strict=False)
+    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
@@ -320,126 +250,80 @@ if st.session_state.get('logged_in'):
             logout()
 
 if st.session_state['page'] == 'student':
-    # --- 1. ส่วนแสดงผลเมื่อสำเร็จ ---
     if st.session_state.get("reg_success", False):
-        st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกเรียบร้อยแล้ว")
+        st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
         st.balloons()
-        if st.button("กลับหน้าแรก", type="primary", use_container_width=True):
-            clear_form_state()
-            st.session_state.reg_success = False
-            st.rerun()
-        st.stop() 
+        clear_form_state()
+        st.session_state.reg_success = False
 
-    # --- 2. ส่วนฟอร์มลงทะเบียน ---
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
-    
-    with st.container():
-        with st.form("reg_form", clear_on_submit=False):
-            sc1, sc2 = st.columns(2)
-            with sc1:
-                prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
-                fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
-            std_id = sc2.text_input("รหัสนักเรียน/ กรณีครู บุคลากรพ่อค้าแม่ค้าใช้เบอร์โทรศัพท์", key="reg_id")
-            
-            sc3, sc4 = st.columns(2)
-            level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-            room = st.text_input("ห้อง กรณีไม่ใช่นักเรียนกรอก0", key="reg_room")
-            pin = st.text_input("ตั้งรหัส PIN 6 หลัก", type="password", max_chars=6, key="reg_pin")
-            
-            sc5, sc6 = st.columns(2)
-            brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
-            color = st.text_input("สีรถ", key="reg_color")
-            plate = st.text_input("ทะเบียนรถ", key="reg_plate")
-            
-            doc_cols = st.columns(3)
-            ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-            ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
-            hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-            
-            st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
-            up1, up2, up3 = st.columns(3)
-            p_face = up1.file_uploader("1. รูปหน้าตรง", type=['jpg','png','jpeg'])
-            p_back = up2.file_uploader("2. รูปหลังรถ", type=['jpg','png','jpeg'])
-            p_side = up3.file_uploader("3. รูปข้างรถ", type=['jpg','png','jpeg'])
-            pdpa = st.checkbox("ยินยอมให้โรงเรียนน้ำข้อมูลไปใช้ในงานโรงเรียน")
+    with st.form("reg_form", clear_on_submit=False):
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
+            fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
+        std_id = sc2.text_input("รหัสนักเรียน/ กรณีครูบุคลากรพ่อค้าแม่ค้า ระบุวันเดือนปีเกิด เช่น 02092530", key="reg_id")
+        sc3, sc4 = st.columns(2)
+        level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
+        room = st.text_input("ห้อง(0-13) กรณีไม่ใช่นักเรียนกรอก 0", key="reg_room")
+        st.write("🔐 **ตั้งค่าความปลอดภัย**")
+        pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตรอนุญาต)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
+        sc5, sc6 = st.columns(2)
+        brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
+        color = st.text_input("สีรถ", key="reg_color")
+        plate = st.text_input("ทะเบียนรถ", placeholder="เช่น 1กข 1234ร้อยเอ็ด", key="reg_plate")
+        doc_cols = st.columns(3)
+        ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
+        hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
+        up1, up2, up3 = st.columns(3)
+        p_face = up1.file_uploader("1. รูปเจ้าของรถ", type=['jpg','png','jpeg'])
+        p_back = up2.file_uploader("2. รูปด้านหลังรถจักรยานยนต์(เห็นป้าย)", type=['jpg','png','jpeg'])
+        p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นเต็มคัน)", type=['jpg','png','jpeg'])
+        pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
-            # --- 3. ปุ่มส่งข้อมูล (จัดย่อหน้าให้ตรงกับ input ข้างบน) ---
-            if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
-                errors = []
-                if not fname: errors.append("ชื่อ-นามสกุล")
-                if not std_id: errors.append("รหัสประจำตัว")
-                if not plate: errors.append("ทะเบียนรถ")
-                if not p_face or not p_back: errors.append("รูปถ่าย (หน้า/หลัง)")
-                if not pin or len(pin) != 6: errors.append("รหัส PIN 6 หลัก")
-                if not pdpa: errors.append("การยอมรับ PDPA")
+        if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
+            errors = []
+            if not fname: errors.append("ชื่อ-นามสกุล")
+            if not std_id: errors.append("รหัสประจำตัว")
+            if not plate: errors.append("ทะเบียนรถ")
+            if not p_face: errors.append("รูปถ่ายหน้าตรง")
+            if not p_back: errors.append("รูปถ่ายหลังรถ")
+            if not pin or len(pin) != 6 or not pin.isdigit(): errors.append("รหัส PIN ต้องเป็นตัวเลข 6 หลัก")
+            elif len(set(pin)) == 1: errors.append("รหัส PIN ห้ามใช้เลขซ้ำกันทั้งหมด")
+            if not pdpa: errors.append("การยอมรับเงื่อนไข (PDPA)")
 
-                if errors:
-                    st.error(f"❌ ข้อมูลไม่ครบ: {', '.join(errors)}")
-                    st.stop()
-
+            if errors:
+                st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
+            else:
                 try:
-                    with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
-                        # 3.1 เช็คซ้ำ
-                        dup = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
-                        if len(dup.data) > 0:
-                            st.error("❌ เลขประจำตัวนี้ลงทะเบียนไปแล้ว")
-                            st.stop()
-
-                        # 2. อัปโหลดรูปภาพ (เปลี่ยนชื่อจาก ts เป็น current_ts)
-                        current_ts = int(time.time()) 
-                        safe_id = str(std_id).replace("/", "").replace(" ", "")
-                        
-                        # ใช้ current_ts ในชื่อไฟล์รูปแทน
-                        url_f = upload_image_to_supabase(p_face, f"{safe_id}_F_{current_ts}.jpg")
-                        url_b = upload_image_to_supabase(p_back, f"{safe_id}_B_{current_ts}.jpg")
-                        url_s = upload_image_to_supabase(p_side, f"{safe_id}_S_{current_ts}.jpg") if p_side else ""
-
-                        # 3. เตรียมข้อมูล
-                        data = {
-                            "student_name": f"{prefix}{fname}", 
-                            "student_id": str(std_id),
-                            "class_room": f"{level}/{room}", 
-                            "vehicle_brand": brand,
-                            "vehicle_color": color, 
-                            "license_plate": plate,
-                            "driver_license": ls, 
-                            "tax_status": ts,  # <--- คราวนี้ค่า ts จะเป็น "✅ ปกติ" ของเดิม ไม่โดนทับแล้ว
-                            "helmet_status": hs,
-                            "image_face": url_f, 
-                            "image_back": url_b, 
-                            "image_side": url_s,
-                            "score": 100, 
-                            "history": "ลงทะเบียนสำเร็จ", 
-                            "user_pin": str(pin),
-                            "academic_year": "2568"
-                        }
-                        
-                        # 3.4 บันทึก Supabase
-                        success, err_msg = save_to_supabase(data)
-                        
-                        if not success:
-                            st.divider()
-                            st.error("🚨 บันทึก Supabase ไม่สำเร็จ (แคปจอนี้แจ้งครูคอม):")
-                            st.code(err_msg)
-                            st.stop() 
-
-                        # 3.5 บันทึก Sheets
-                        sheet = connect_gsheet()
-                        sheet.append_row([
-                            datetime.now().strftime('%d/%m/%Y %H:%M'), 
-                            data["student_name"], data["student_id"], data["class_room"],
-                            brand, color, plate, ls, ts, hs, 
-                            url_b, url_s, "เริ่มลงทะเบียน", "100", url_f, str(pin)
-                        ])
-                        
-                        # สำเร็จ
-                        st.session_state.reg_success = True
-                        time.sleep(1)
-                        st.rerun()
-
-                except Exception as e:
-                    st.error(f"❌ เกิดข้อผิดพลาดร้ายแรง: {e}")
-                    st.stop()
+                    sheet = connect_gsheet()
+                    if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว")
+                    else:
+                        with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
+                            # อัปโหลดรูป (ส่วนนี้ปลอดภัยอยู่แล้วเพราะคืนค่าเป็น URL)
+                            l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
+                            l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
+                            l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
+                            
+                            # ✅ บันทึกลง Sheet (ใส่เกราะป้องกัน Formula Injection ตรงนี้!)
+                            sheet.append_row([
+                                datetime.now().strftime('%d/%m/%Y %H:%M'), 
+                                sanitize_for_gsheet(f"{prefix}{fname}"),  # ชื่อ
+                                sanitize_for_gsheet(str(std_id)),         # รหัสนักเรียน (บางทีคนอาจใส่สูตร)
+                                f"{level}/{room}",                        # ชั้น/ห้อง (ตัวเลือก selectbox ปลอดภัยอยู่แล้วแต่ครอบไว้ก็ได้)
+                                brand, 
+                                sanitize_for_gsheet(color),               # สีรถ (ช่องกรอกอิสระ อันตราย)
+                                sanitize_for_gsheet(plate),               # ทะเบียน (ช่องกรอกอิสระ อันตรายมาก)
+                                ls, ts, hs, 
+                                l_back, l_side, "", "100", l_face, 
+                                sanitize_for_gsheet(str(pin))             # PIN
+                            ])
+                            
+                            st.session_state.reg_success = True
+                            st.rerun()
+                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
 
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
@@ -451,7 +335,7 @@ elif st.session_state['page'] == 'portal':
     with st.container(border=True):
         st.subheader("ยืนยันตัวตนเพื่อดูบัตร")
         with st.form("portal_login"):
-            sid = st.text_input("รหัสนักเรียน กรณีไม่ใช่นักเรียนกรอกเบอร์โทร")
+            sid = st.text_input("รหัสนักเรียน กรณีไม่ใช่นักเรียนกรอกวันเกิดเช่น 02092530")
             spin = st.text_input("รหัส PIN 6 หลัก", type="password", max_chars=6)
             if st.form_submit_button("🔓 แสดงบัตร", use_container_width=True, type="primary"):
                 if sid and spin:
