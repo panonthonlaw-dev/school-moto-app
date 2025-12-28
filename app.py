@@ -320,14 +320,10 @@ if st.session_state.get('logged_in'):
 
 if st.session_state['page'] == 'student':
     if st.session_state.get("reg_success", False):
-    st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกทั้งใน Google Sheets และ Supabase เรียบร้อยแล้ว")
-    st.balloons()
-    # ไม่ต้องรีบ False ทันที ให้ค้างไว้ให้ครูเห็นก่อน
-    if st.button("ลงทะเบียนคนต่อไป"):
+        st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
+        st.balloons()
         clear_form_state()
         st.session_state.reg_success = False
-        st.rerun()
-    st.stop() # หยุดการทำงานของโค้ดข้างล่างไว้ก่อน เพื่อไม่ให้หน้าฟอร์มโผล่มาซ้อน
 
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
     with st.form("reg_form", clear_on_submit=False):
@@ -370,31 +366,26 @@ if st.session_state['page'] == 'student':
             if errors:
                 st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
             else:
-                # --- สร้างพื้นที่ว่างเพื่อป้องกัน UI กระตุก (แก้ปัญหาแว่บแดง) ---
-                msg_slot = st.empty() 
-                
                 try:
-                    with st.spinner("⏳ กำลังตรวจสอบข้อมูลและบันทึก..."):
-                        # 1. เชื่อมต่อระบบ Sheet เดิม
-                        sheet = connect_gsheet()
-                        
-                        # 2. ตรวจสอบรหัสซ้ำจาก Supabase
-                        duplicate_check = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
-                        
-                        if len(duplicate_check.data) > 0:
-                            msg_slot.error("❌ เลขประจำตัวนี้เคยลงทะเบียนในระบบแล้ว")
-                        else:
-                            # --- เริ่มกระบวนการอัปโหลดและบันทึก ---
+                    # 1. เชื่อมต่อระบบ Sheet เดิม (สำรอง)
+                    sheet = connect_gsheet()
+                    
+                    # 🔍 จุดที่ต้องแก้: เปลี่ยน Student_ID เป็น เลขประจำตัว ให้ตรงกับใน Supabase
+                    duplicate_check = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
+                    
+                    if len(duplicate_check.data) > 0:
+                        st.error("❌ เลขประจำตัวนี้เคยลงทะเบียนในระบบแล้ว")
+                    else:
+                        with st.spinner("⏳ กำลังส่งรูปภาพไป Google Drive 2TB และบันทึกข้อมูล..."):
+                            # --- อัปโหลดรูป ---
                             ts_now = int(time.time())
-                            
-                            # อัปโหลดรูปไป Supabase Storage
                             l_face = upload_image_to_supabase(p_face, f"{std_id}_Face_{ts_now}.jpg")
                             l_back = upload_image_to_supabase(p_back, f"{std_id}_Back_{ts_now}.jpg")
                             l_side = upload_image_to_supabase(p_side, f"{std_id}_Side_{ts_now}.jpg") if p_side else ""
-
-                            # เตรียมข้อมูลสำหรับบันทึก
+                            
+                            # --- 2. เตรียมก้อนข้อมูล (ใช้ชื่อภาษาไทยตามที่คุณครูตั้งใน Supabase) ---
                             supabase_data = {
-                                "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 "student_name": f"{prefix}{fname}",
                                 "student_id": str(std_id),
                                 "class_room": f"{level}/{room}",
@@ -404,30 +395,37 @@ if st.session_state['page'] == 'student':
                                 "driver_license": ls,
                                 "tax_status": ts,
                                 "helmet_status": hs,
-                                "image_face": l_face,
+                                "image_face3": l_face,
                                 "image_back": l_back,
                                 "image_side": l_side,
                                 "score": 100,
-                                "history": "เริ่มลงทะเบียนระบบ",
                                 "user_pin": str(pin),
-                                "academic_year": "2568"
+                                "academic_year": "2568",
+                                "history": ""
                             }
 
-                            # 3. บันทึกลงฐานข้อมูลทั้ง 2 ระบบ
+                            # --- 3. บันทึกลง Supabase ---
                             save_to_supabase(supabase_data, "traffic_registration")
+                            
+                            # --- 4. บันทึกลง Google Sheets (Backup) ---
                             sheet.append_row([
                                 datetime.now().strftime('%d/%m/%Y %H:%M'), 
-                                f"{prefix}{fname}", str(std_id), f"{level}/{room}", 
-                                brand, color, plate, ls, ts, hs, 
-                                l_back, l_side, "เริ่มลงทะเบียน", "100", l_face, str(pin)
+                                sanitize_for_gsheet(f"{prefix}{fname}"), 
+                                sanitize_for_gsheet(str(std_id)), 
+                                f"{level}/{room}", 
+                                brand, 
+                                sanitize_for_gsheet(color), 
+                                sanitize_for_gsheet(plate), 
+                                ls, ts, hs, 
+                                l_back, l_side, "", "100", l_face, 
+                                sanitize_for_gsheet(str(pin))
                             ])
                             
-                            # บันทึกสำเร็จ
                             st.session_state.reg_success = True
+                            st.balloons()
                             st.rerun()
-
-                except Exception as e:
-                    msg_slot.error(f"❌ เกิดข้อผิดพลาดทางเทคนิค: {str(e)}")
+                except Exception as e: 
+                    st.error(f"❌ เกิดข้อผิดพลาด: {e}")
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
     #if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
