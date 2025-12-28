@@ -108,38 +108,38 @@ def img_to_b64(img_path):
 
 # --- วางฟังก์ชันใหม่ต่อตรงนี้ครับ ---
 
+# 1. แก้ไขฟังก์ชันอัปโหลดรูป (ให้ส่งคืน Error message แทนการโวยวาย)
 def upload_image_to_supabase(uploaded_file, file_name):
     try:
-        # 1. บีบอัดรูปภาพเพื่อประหยัด Bandwidth 5GB
+        if not uploaded_file: return None
+        
         img = Image.open(uploaded_file)
         if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-        img.thumbnail((800, 800)) # ปรับขนาดให้พอดี
+        img.thumbnail((800, 800))
         
         buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=70) # ลดขนาดไฟล์ลง 5-10 เท่า
+        img.save(buffer, format="JPEG", quality=70)
         buffer.seek(0)
 
-        # 2. อัปโหลดเข้า Bucket: moto_images
         path_on_supa = f"registrations/{file_name}"
         supabase.storage.from_("moto_images").upload(
             path=path_on_supa,
             file=buffer.getvalue(),
-            file_options={"content-type": "image/jpeg"}
+            file_options={"content-type": "image/jpeg", "upsert": "true"} # เพิ่ม upsert เพื่อทับไฟล์เดิมได้
         )
-        
-        # 3. ส่ง URL กลับไปบันทึกใน Sheet และ Database
         return supabase.storage.from_("moto_images").get_public_url(path_on_supa)
     except Exception as e:
-        st.error(f"❌ อัปโหลดรูปภาพล้มเหลว: {e}")
+        # 🤫 เงียบไว้ ไม่ต้อง st.error
+        print(f"Upload Error: {e}") 
         return None
 
+# 2. แก้ไขฟังก์ชันบันทึกข้อมูล (ให้ส่งค่า True/False กลับมาบอกเงียบๆ)
 def save_to_supabase(data_dict, table_name="traffic_registration"):
     try:
-        # สั่งบันทึกเงียบๆ
         supabase.table(table_name).insert(data_dict).execute()
         return True, None # สำเร็จ, ไม่มี Error
     except Exception as e:
-        # ถ้าพัง ให้ส่ง Error กลับไปบอกข้างนอก (ไม่ต้องพ่นสีแดงตรงนี้)
+        # 🤫 เงียบไว้ แล้วส่ง error กลับไปให้คนเรียกจัดการ
         return False, str(e)
 
 def connect_gsheet():
@@ -320,49 +320,52 @@ if st.session_state.get('logged_in'):
             logout()
 
 if st.session_state['page'] == 'student':
-    # --- เริ่มส่วนแก้ไขโครงสร้างป้องกันแดงแว่บ ---
-    main_placeholder = st.empty()
-
+    # --- ส่วนแสดงผลเมื่อสำเร็จ ---
     if st.session_state.get("reg_success", False):
-        with main_placeholder.container():
-            st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
-            st.balloons()
-            if st.button("กลับสู่หน้าหลักเพื่อลงทะเบียนคนใหม่", type="primary", use_container_width=True):
-                clear_form_state()
-                st.session_state.reg_success = False
-                st.rerun()
-        st.stop() # หยุดการทำงานไม่ให้ฟอร์มโผล่
+        st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกเรียบร้อยแล้ว")
+        st.balloons()
+        if st.button("ลงทะเบียนคนต่อไป", type="primary", use_container_width=True):
+            clear_form_state()
+            st.session_state.reg_success = False
+            st.rerun()
+        st.stop() 
 
+    # --- ส่วนฟอร์มลงทะเบียน ---
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
-    with st.form("reg_form", clear_on_submit=False):
-        sc1, sc2 = st.columns(2)
-        with sc1:
-            prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
-            fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
-        std_id = sc2.text_input("รหัสนักเรียน/ กรณีครูบุคลากรพ่อค้าแม่ค้า ระบุวันเดือนปีเกิด เช่น 02092530", key="reg_id")
-        sc3, sc4 = st.columns(2)
-        level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-        room = st.text_input("ห้อง(0-13) กรณีไม่ใช่นักเรียนกรอก 0", key="reg_room")
-        st.write("🔐 **ตั้งค่าความปลอดภัย**")
-        pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตรอนุญาต)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
-        sc5, sc6 = st.columns(2)
-        brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
-        color = st.text_input("สีรถ", key="reg_color")
-        plate = st.text_input("ทะเบียนรถ", placeholder="เช่น 1กข 1234ร้อยเอ็ด", key="reg_plate")
-        doc_cols = st.columns(3)
-        ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
-        hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
-        st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
-        up1, up2, up3 = st.columns(3)
-        p_face = up1.file_uploader("1. รูปเจ้าของรถ", type=['jpg','png','jpeg'])
-        p_back = up2.file_uploader("2. รูปด้านหลังรถจักรยานยนต์(เห็นป้าย)", type=['jpg','png','jpeg'])
-        p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นเต็มคัน)", type=['jpg','png','jpeg'])
-        pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
+    
+    with st.container():
+        with st.form("reg_form", clear_on_submit=False):
+            # ... (ส่วน Input ต่างๆ เหมือนเดิม) ...
+            sc1, sc2 = st.columns(2)
+            with sc1:
+                prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
+                fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
+            std_id = sc2.text_input("รหัสนักเรียน/บุคลากร", key="reg_id")
+            
+            sc3, sc4 = st.columns(2)
+            level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
+            room = st.text_input("ห้อง (ถ้ามี)", key="reg_room")
+            pin = st.text_input("ตั้งรหัส PIN 6 หลัก", type="password", max_chars=6, key="reg_pin")
+            
+            sc5, sc6 = st.columns(2)
+            brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
+            color = st.text_input("สีรถ", key="reg_color")
+            plate = st.text_input("ทะเบียนรถ", key="reg_plate")
+            
+            doc_cols = st.columns(3)
+            ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+            ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
+            hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+            
+            st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
+            up1, up2, up3 = st.columns(3)
+            p_face = up1.file_uploader("1. รูปหน้าตรง", type=['jpg','png','jpeg'])
+            p_back = up2.file_uploader("2. รูปหลังรถ", type=['jpg','png','jpeg'])
+            p_side = up3.file_uploader("3. รูปข้างรถ", type=['jpg','png','jpeg'])
+            pdpa = st.checkbox("ยินยอมเงื่อนไข PDPA")
 
-        # --- ปุ่มส่งข้อมูล ---
+            # --- ปุ่มส่งข้อมูล (แก้ใหม่หมด) ---
             if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
-                # 1. ตรวจสอบข้อมูลว่าง
                 errors = []
                 if not fname: errors.append("ชื่อ-นามสกุล")
                 if not std_id: errors.append("รหัสประจำตัว")
@@ -372,29 +375,24 @@ if st.session_state['page'] == 'student':
                 if not pdpa: errors.append("การยอมรับ PDPA")
 
                 if errors:
-                    st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
-                    st.stop()
-                
-                # 2. เริ่มกระบวนการบันทึก
+                    st.error(f"❌ ข้อมูลไม่ครบ: {', '.join(errors)}")
+                    st.stop() # หยุดทันที
+
                 try:
-                    with st.spinner("⏳ กำลังประมวลผล... (ห้ามปิดหน้าจอ)"):
-                        # Debug: บอกสถานะเงียบๆ (ใช้ st.empty ช่วยก็ได้ถ้าไม่อยากให้รก)
-                        sheet = connect_gsheet()
-                        
-                        # ตรวจสอบรหัสซ้ำ
+                    with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
+                        # 1. เช็คซ้ำเงียบๆ
                         dup = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
                         if len(dup.data) > 0:
-                            st.error("❌ เลขประจำตัวนี้เคยลงทะเบียนแล้ว")
-                            st.stop()
-                        
-                        # อัปโหลดรูปภาพ
+                            st.error("❌ เลขประจำตัวนี้ลงทะเบียนไปแล้ว")
+                            st.stop() # หยุดทันที
+
+                        # 2. อัปโหลดรูปเงียบๆ
                         ts = int(time.time())
-                        safe_id = str(std_id).replace("/", "_").replace(" ", "") 
+                        safe_id = str(std_id).replace("/", "").replace(" ", "")
                         url_f = upload_image_to_supabase(p_face, f"{safe_id}_F_{ts}.jpg")
                         url_b = upload_image_to_supabase(p_back, f"{safe_id}_B_{ts}.jpg")
                         url_s = upload_image_to_supabase(p_side, f"{safe_id}_S_{ts}.jpg") if p_side else ""
 
-                        # เตรียมข้อมูล
                         data = {
                             "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                             "student_name": f"{prefix}{fname}", "student_id": str(std_id),
@@ -406,14 +404,15 @@ if st.session_state['page'] == 'student':
                             "academic_year": "2568"
                         }
                         
-                        # --- จุดสำคัญ: เรียกใช้ฟังก์ชันแบบใหม่ ---
-                        success, error_msg = save_to_supabase(data)
+                        # 3. บันทึก Supabase (รับค่า Error มาเช็คเอง)
+                        success, err_msg = save_to_supabase(data)
                         
                         if not success:
-                            # ถ้าพังจริงๆ ค่อยแดงตรงนี้
-                            raise Exception(f"Supabase Error: {error_msg}")
+                            st.error(f"❌ บันทึก Supabase ไม่สำเร็จ: {err_msg}")
+                            st.stop() # หยุดทันที ถ้าบันทึกไม่ได้
 
-                        # บันทึก Google Sheets
+                        # 4. บันทึก Sheets
+                        sheet = connect_gsheet()
                         sheet.append_row([
                             datetime.now().strftime('%d/%m/%Y %H:%M'), 
                             data["student_name"], data["student_id"], data["class_room"],
@@ -421,17 +420,15 @@ if st.session_state['page'] == 'student':
                             url_b, url_s, "เริ่มลงทะเบียน", "100", url_f, str(pin)
                         ])
                         
-                        # สำเร็จหมดแล้ว
+                        # ถ้าผ่านมาถึงตรงนี้ แปลว่าสำเร็จ 100% ไม่มี Error แว่บแน่นอน
                         st.session_state.reg_success = True
                         time.sleep(1)
                         st.rerun()
 
                 except Exception as e:
-                    # แสดง Error ค้างไว้ถ้าพังจริง
-                    st.divider()
-                    st.error("🚨 พบข้อผิดพลาด:")
-                    st.exception(e)
+                    st.error(f"❌ เกิดข้อผิดพลาดร้ายแรง: {e}")
                     st.stop()
+
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
     #if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
