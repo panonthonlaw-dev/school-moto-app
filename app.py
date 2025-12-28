@@ -135,12 +135,13 @@ def upload_image_to_supabase(uploaded_file, file_name):
 
 def save_to_supabase(data_dict, table_name="traffic_registration"):
     try:
-        response = supabase.table(table_name).insert(data_dict).execute()
-        return True
+        # สั่งบันทึกข้อมูล
+        supabase.table(table_name).insert(data_dict).execute()
+        # ✅ ส่งกลับ 2 อย่าง: สถานะ (True) และ ไม่มีข้อความ Error (None)
+        return True, None 
     except Exception as e:
-        st.error(f"❌ บันทึกข้อมูลลงฐานข้อมูลใหม่ล้มเหลว: {e}")
-        return False
-
+        # ❌ ส่งกลับ 2 อย่าง: สถานะ (False) และ ข้อความ Error
+        return False, str(e)
 def connect_gsheet():
     # ก๊อปปี้ค่าจาก Secrets ออกมาเป็น Dictionary ปกติ (to_dict) เพื่อให้แก้ไขได้
     creds_info = dict(st.secrets["gcp_service_account"]) 
