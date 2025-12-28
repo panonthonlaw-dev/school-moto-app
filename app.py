@@ -430,12 +430,8 @@ if st.session_state['page'] == 'student':
                                 st.rerun()
 
                 except Exception as e:
-                    # วางตรงนี้ครับ! (เยื้องให้ตรงกับ try ด้านบน)
-                    st.divider() 
-                    st.error("🚨 ตรวจพบข้อผิดพลาดขณะบันทึก:")
-                    st.exception(e) 
-                    st.warning("กรุณาถ่ายรูปหน้านี้ไว้ครับ (เพื่อใช้ตรวจสอบสาเหตุที่แว่บแดง)")
-                    st.stop()
+                    # ถ้าพังระหว่างทาง ให้พ่น Error ลงใน slot
+                    process_slot.error(f"❌ เกิดข้อผิดพลาด: {str(e)}")
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
     #if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
