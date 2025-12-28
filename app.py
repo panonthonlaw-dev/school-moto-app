@@ -122,11 +122,15 @@ def save_to_supabase(data_dict, table_name="traffic_registration"):
         return False
 
 def connect_gsheet():
-    key_content = st.secrets["textkey"]["json_content"]
-    try: key_dict = json.loads(key_content, strict=False)
-    except: key_dict = json.loads(key_content.replace('\n', '\\n'), strict=False)
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
+    # ดึงค่าจาก Secrets ชุดใหม่ที่เราเพิ่งจัดระเบียบไป
+    creds_info = st.secrets["gcp_service_account"]
+    
+    # แก้ไขปัญหาเรื่องขึ้นบรรทัดใหม่ใน Private Key
+    if "private_key" in creds_info:
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+        
+    scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scopes)
     client = gspread.authorize(creds)
     return client.open(SHEET_NAME).sheet1
 
