@@ -324,7 +324,7 @@ if st.session_state['page'] == 'student':
     if st.session_state.get("reg_success", False):
         st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกเรียบร้อยแล้ว")
         st.balloons()
-        if st.button("ลงทะเบียนคนต่อไป", type="primary", use_container_width=True):
+        if st.button("กลับหน้าแรก", type="primary", use_container_width=True):
             clear_form_state()
             st.session_state.reg_success = False
             st.rerun()
@@ -339,11 +339,11 @@ if st.session_state['page'] == 'student':
             with sc1:
                 prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
                 fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
-            std_id = sc2.text_input("รหัสนักเรียน/บุคลากร", key="reg_id")
+            std_id = sc2.text_input("รหัสนักเรียน/ กรณีครู บุคลากรพ่อค้าแม่ค้าใช้เบอร์โทรศัพท์", key="reg_id")
             
             sc3, sc4 = st.columns(2)
             level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
-            room = st.text_input("ห้อง (ถ้ามี)", key="reg_room")
+            room = st.text_input("ห้อง กรณีไม่ใช่นักเรียนกรอก0", key="reg_room")
             pin = st.text_input("ตั้งรหัส PIN 6 หลัก", type="password", max_chars=6, key="reg_pin")
             
             sc5, sc6 = st.columns(2)
@@ -361,7 +361,7 @@ if st.session_state['page'] == 'student':
             p_face = up1.file_uploader("1. รูปหน้าตรง", type=['jpg','png','jpeg'])
             p_back = up2.file_uploader("2. รูปหลังรถ", type=['jpg','png','jpeg'])
             p_side = up3.file_uploader("3. รูปข้างรถ", type=['jpg','png','jpeg'])
-            pdpa = st.checkbox("ยินยอมเงื่อนไข PDPA")
+            pdpa = st.checkbox("ยินยอมให้โรงเรียนน้ำข้อมูลไปใช้ในงานโรงเรียน")
 
             # --- 3. ปุ่มส่งข้อมูล (จัดย่อหน้าให้ตรงกับ input ข้างบน) ---
             if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
