@@ -417,31 +417,34 @@ elif st.session_state['page'] == 'edit':
     if st.button("ยกเลิก", use_container_width=True): go_to_page('teacher')
 
 elif st.session_state['page'] == 'teacher':
-    if st.button("🏠 กลับหน้าหลัก", use_container_width=True): go_to_page('student')
+    if st.button("🏠 กลับหน้าหลัก", use_container_width=True): 
+        go_to_page('student')
     
+    # เช็คว่า Login หรือยัง
     if not st.session_state.get('logged_in'):
-    #    with st.form("login_form"):
-     #       st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
-      #      pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
-       #     if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
-        #        if pwd in OFFICER_ACCOUNTS:
-         #           user_info = OFFICER_ACCOUNTS[pwd]
-          #          st.session_state.logged_in = True
-           #         st.session_state.officer_name = user_info["name"]
-            #        st.session_state.officer_role = user_info["role"]
-             #       st.session_state.current_user_pwd = pwd
-              #      st.session_state.last_active = time.time()
-               #     st.rerun()
-                #else:
-                 #   st.error("รหัสผ่านไม่ถูกต้อง")
-                     
-else:
-    if 'df' not in st.session_state: load_data()
-
+        # ถ้ายังไม่ Login ให้แสดงฟอร์ม (คุณครูสามารถเอาคอมเมนต์ # ออกได้ถ้าพร้อมใช้)
+        with st.form("login_form"):
+            st.header("🔐 เข้าสู่ระบบเจ้าหน้าที่")
+            pwd = st.text_input("รหัสผ่านประจำตัวเจ้าหน้าที่", type="password")
+            if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
+                if pwd in OFFICER_ACCOUNTS:
+                    user_info = OFFICER_ACCOUNTS[pwd]
+                    st.session_state.logged_in = True
+                    st.session_state.officer_name = user_info["name"]
+                    st.session_state.officer_role = user_info["role"]
+                    st.rerun()
+                else:
+                    st.error("รหัสผ่านไม่ถูกต้อง")
+    else:
+        # ส่วนนี้จะทำงานเมื่อ Login สำเร็จแล้ว (ย่อหน้าให้ตรงกับ if ด้านบน)
+        if 'df' not in st.session_state: 
+            load_data()
+        
         col_user, col_logout = st.columns([3, 1])
         col_user.info(f"👤 ผู้ใช้งาน: {st.session_state.officer_name} (สิทธิ์: {st.session_state.officer_role})")
         if col_logout.button("🚪 ออกจากระบบ", key="main_logout", use_container_width=True):
-            logout()
+            st.session_state.logged_in = False
+            st.rerun()
 
         c1, c2 = st.columns(2)
         if c1.button("🔄 ดึงข้อมูลล่าสุด", use_container_width=True):
