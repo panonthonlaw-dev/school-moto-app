@@ -105,14 +105,39 @@ def clear_form_state():
 def reset_results(): st.session_state['search_results_df'] = None
 def go_to_page(page_name): st.session_state['page'] = page_name; st.rerun()
 
+def process_image(img_file):
+    if not img_file: return ""
+    try:
+        from PIL import Image
+        img = Image.open(img_file).convert('RGB')
+        # ปรับความละเอียดเป็น 1600px (ชัดมากสำหรับงานเอกสาร)
+        img.thumbnail((1600, 1600))
+        buf = io.BytesIO()
+        # ปรับคุณภาพเป็น 90% (คมชัดสูง)
+        img.save(buf, format="JPEG", quality=90, optimize=True)
+        return base64.b64encode(buf.getvalue()).decode()
+    except:
+        return ""
+
 def upload_to_drive(file_obj, filename):
-    file_content = file_obj.getvalue()
+    # ตรวจสอบว่าเป็นไฟล์ดิบ (จาก uploader) หรือเป็น bytes (จาก process_image)
+    if hasattr(file_obj, 'getvalue'):
+        file_content = file_obj.getvalue()
+    else:
+        file_content = file_obj # กรณีผ่านการ b64decode มาเป็น bytes แล้ว
+        
     base64_str = base64.b64encode(file_content).decode('utf-8')
-    payload = {"folder_id": DRIVE_FOLDER_ID, "filename": filename, "file": base64_str, "mimeType": file_obj.type}
+    payload = {
+        "folder_id": DRIVE_FOLDER_ID, 
+        "filename": filename, 
+        "file": base64_str, 
+        "mimeType": "image/jpeg"
+    }
     try:
         res = requests.post(GAS_APP_URL, json=payload).json()
         return res.get("link") if res.get("status") == "success" else None
-    except: return None
+    except: 
+        return None
 
 def get_img_link(url):
     match = re.search(r'/d/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)', str(url))
