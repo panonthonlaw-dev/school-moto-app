@@ -385,7 +385,7 @@ if st.session_state['page'] == 'student':
                             
                             # --- 2. เตรียมก้อนข้อมูล (ใช้ชื่อภาษาไทยตามที่คุณครูตั้งใน Supabase) ---
                             supabase_data = {
-                                "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                #"Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 "student_name": f"{prefix}{fname}",
                                 "student_id": str(std_id),
                                 "class_room": f"{level}/{room}",
