@@ -354,7 +354,7 @@ if st.session_state['page'] == 'student':
                     sheet = connect_gsheet()
                     
                     # 🔍 จุดที่ต้องแก้: เปลี่ยน Student_ID เป็น เลขประจำตัว ให้ตรงกับใน Supabase
-                    duplicate_check = supabase.table("traffic_registration").select("เลขประจำตัว").eq("เลขประจำตัว", str(std_id)).execute()
+                    duplicate_check = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
                     
                     if len(duplicate_check.data) > 0:
                         st.error("❌ เลขประจำตัวนี้เคยลงทะเบียนในระบบแล้ว")
@@ -369,21 +369,22 @@ if st.session_state['page'] == 'student':
                             # --- 2. เตรียมก้อนข้อมูล (ใช้ชื่อภาษาไทยตามที่คุณครูตั้งใน Supabase) ---
                             supabase_data = {
                                 "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                "ชื่อ-สกุล": f"{prefix}{fname}",
-                                "เลขประจำตัว": str(std_id),
-                                "ชั้น": f"{level}/{room}",
-                                "ยี่ห้อ": brand,
-                                "สี": color,
-                                "ทะเบียน": plate,
-                                "ใบขับขี่": ls,
-                                "พรบ_ภาษี": ts,
-                                "หมวกกันน๊อค": hs,
-                                "รูปภาพ3": l_face,
-                                "รูปภาพ1": l_back,
-                                "รูปภาพ2": l_side,
-                                "คะแนน": 100,
-                                "รหัสpin": str(pin),
-                                "Academic_Year": "2568"
+                                "student_name": f"{prefix}{fname}",
+                                "student_id": str(std_id),
+                                "class_room": f"{level}/{room}",
+                                "vehicle_brand": brand,
+                                "vehicle_color": color,
+                                "license_plate": plate,
+                                "driver_license": ls,
+                                "tax_status": ts,
+                                "helmet_status": hs,
+                                "image_face3": l_face,
+                                "image_back": l_back,
+                                "image_side": l_side,
+                                "score": 100,
+                                "user_pin": str(pin),
+                                "academic_year": "2568",
+                                "history": ""
                             }
 
                             # --- 3. บันทึกลง Supabase ---
