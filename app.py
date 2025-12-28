@@ -1,3 +1,5 @@
+from PIL import Image
+import io
 import streamlit as st
 import pandas as pd
 import gspread
@@ -106,15 +108,27 @@ def img_to_b64(img_path):
 
 # --- วางฟังก์ชันใหม่ต่อตรงนี้ครับ ---
 
-def upload_image_to_drive(uploaded_file, file_name):
+def upload_image_to_supabase(uploaded_file, file_name):
     try:
-        # ดึง ID จาก Secrets โดยตรงเพื่อความชัวร์
-        folder_id = st.secrets["GOOGLE_DRIVE_FOLDER_ID"] 
+        # 1. บีบอัดรูปภาพเพื่อประหยัด Bandwidth 5GB
+        img = Image.open(uploaded_file)
+        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+        img.thumbnail((800, 800)) # ปรับขนาดให้พอดี
         
-        file_metadata = {'name': file_name, 'parents': [folder_id]}
-        media = MediaIoBaseUpload(io.BytesIO(uploaded_file.getvalue()), mimetype='image/jpeg')
-        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        return file.get('id')
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=70) # ลดขนาดไฟล์ลง 5-10 เท่า
+        buffer.seek(0)
+
+        # 2. อัปโหลดเข้า Bucket: moto_images
+        path_on_supa = f"registrations/{file_name}"
+        supabase.storage.from_("moto_images").upload(
+            path=path_on_supa,
+            file=buffer.getvalue(),
+            file_options={"content-type": "image/jpeg"}
+        )
+        
+        # 3. ส่ง URL กลับไปบันทึกใน Sheet และ Database
+        return supabase.storage.from_("moto_images").get_public_url(path_on_supa)
     except Exception as e:
         st.error(f"❌ อัปโหลดรูปภาพล้มเหลว: {e}")
         return None
