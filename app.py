@@ -112,34 +112,30 @@ def img_to_b64(img_path):
 def upload_image_to_supabase(uploaded_file, file_name):
     try:
         if not uploaded_file: return None
-        
         img = Image.open(uploaded_file)
         if img.mode in ("RGBA", "P"): img = img.convert("RGB")
         img.thumbnail((800, 800))
-        
         buffer = io.BytesIO()
         img.save(buffer, format="JPEG", quality=70)
         buffer.seek(0)
-
-        path_on_supa = f"registrations/{file_name}"
-        supabase.storage.from_("moto_images").upload(
-            path=path_on_supa,
-            file=buffer.getvalue(),
-            file_options={"content-type": "image/jpeg", "upsert": "true"} # เพิ่ม upsert เพื่อทับไฟล์เดิมได้
-        )
-        return supabase.storage.from_("moto_images").get_public_url(path_on_supa)
+        
+        path = f"registrations/{file_name}"
+        supabase.storage.from_("moto_images").upload(path, buffer.getvalue(), file_options={"content-type": "image/jpeg", "upsert": "true"})
+        return supabase.storage.from_("moto_images").get_public_url(path)
     except Exception as e:
-        # 🤫 เงียบไว้ ไม่ต้อง st.error
-        print(f"Upload Error: {e}") 
+        # 🤫 เงียบไว้เหมือนกัน
+        print(f"Upload Error: {e}")
         return None
 
 # 2. แก้ไขฟังก์ชันบันทึกข้อมูล (ให้ส่งค่า True/False กลับมาบอกเงียบๆ)
 def save_to_supabase(data_dict, table_name="traffic_registration"):
     try:
+        # สั่งบันทึก
         supabase.table(table_name).insert(data_dict).execute()
-        return True, None # สำเร็จ, ไม่มี Error
+        return True, None # ส่งสัญญาณว่า "ผ่าน"
     except Exception as e:
-        # 🤫 เงียบไว้ แล้วส่ง error กลับไปให้คนเรียกจัดการ
+        # 🤫 ถ้าพัง ให้เก็บเงียบไว้ ส่งแค่ข้อความไปบอกคนเรียกใช้ (ห้าม st.error ตรงนี้!)
+        print(f"Supabase Error: {e}") 
         return False, str(e)
 
 def connect_gsheet():
@@ -320,7 +316,7 @@ if st.session_state.get('logged_in'):
             logout()
 
 if st.session_state['page'] == 'student':
-    # --- ส่วนแสดงผลเมื่อสำเร็จ ---
+    # --- เช็คสถานะความสำเร็จ ---
     if st.session_state.get("reg_success", False):
         st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกเรียบร้อยแล้ว")
         st.balloons()
@@ -330,12 +326,11 @@ if st.session_state['page'] == 'student':
             st.rerun()
         st.stop() 
 
-    # --- ส่วนฟอร์มลงทะเบียน ---
+    # --- แสดงฟอร์ม ---
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
     
     with st.container():
         with st.form("reg_form", clear_on_submit=False):
-            # ... (ส่วน Input ต่างๆ เหมือนเดิม) ...
             sc1, sc2 = st.columns(2)
             with sc1:
                 prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
@@ -364,7 +359,7 @@ if st.session_state['page'] == 'student':
             p_side = up3.file_uploader("3. รูปข้างรถ", type=['jpg','png','jpeg'])
             pdpa = st.checkbox("ยินยอมเงื่อนไข PDPA")
 
-            # --- ปุ่มส่งข้อมูล (แก้ใหม่หมด) ---
+            # --- ส่วนประมวลผล ---
             if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
                 errors = []
                 if not fname: errors.append("ชื่อ-นามสกุล")
@@ -376,15 +371,15 @@ if st.session_state['page'] == 'student':
 
                 if errors:
                     st.error(f"❌ ข้อมูลไม่ครบ: {', '.join(errors)}")
-                    st.stop() # หยุดทันที
+                    st.stop()
 
                 try:
                     with st.spinner("⏳ กำลังบันทึกข้อมูล..."):
-                        # 1. เช็คซ้ำเงียบๆ
+                        # 1. เช็คซ้ำเงียบๆ (Duplicate Check)
                         dup = supabase.table("traffic_registration").select("student_id").eq("student_id", str(std_id)).execute()
                         if len(dup.data) > 0:
                             st.error("❌ เลขประจำตัวนี้ลงทะเบียนไปแล้ว")
-                            st.stop() # หยุดทันที
+                            st.stop()
 
                         # 2. อัปโหลดรูปเงียบๆ
                         ts = int(time.time())
@@ -393,6 +388,7 @@ if st.session_state['page'] == 'student':
                         url_b = upload_image_to_supabase(p_back, f"{safe_id}_B_{ts}.jpg")
                         url_s = upload_image_to_supabase(p_side, f"{safe_id}_S_{ts}.jpg") if p_side else ""
 
+                        # 3. เตรียมข้อมูล
                         data = {
                             "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                             "student_name": f"{prefix}{fname}", "student_id": str(std_id),
@@ -404,14 +400,17 @@ if st.session_state['page'] == 'student':
                             "academic_year": "2568"
                         }
                         
-                        # 3. บันทึก Supabase (รับค่า Error มาเช็คเอง)
+                        # 4. บันทึก Supabase (รับค่า Error มาดูเงียบๆ)
+                        # สังเกตตรงนี้! เราเปลี่ยนวิธีเรียกใช้ครับ
                         success, err_msg = save_to_supabase(data)
                         
                         if not success:
-                            st.error(f"❌ บันทึก Supabase ไม่สำเร็จ: {err_msg}")
-                            st.stop() # หยุดทันที ถ้าบันทึกไม่ได้
+                            # ถ้า Supabase พัง เราจะเลือกได้ว่าจะหยุด หรือจะปล่อยผ่านไป Google Sheets
+                            # แต่เพื่อความชัวร์ ควรหยุดและแจ้งเตือน
+                            st.error(f"❌ บันทึกฐานข้อมูลไม่สำเร็จ: {err_msg}")
+                            st.stop() 
 
-                        # 4. บันทึก Sheets
+                        # 5. บันทึก Sheets (สำรอง)
                         sheet = connect_gsheet()
                         sheet.append_row([
                             datetime.now().strftime('%d/%m/%Y %H:%M'), 
@@ -420,7 +419,7 @@ if st.session_state['page'] == 'student':
                             url_b, url_s, "เริ่มลงทะเบียน", "100", url_f, str(pin)
                         ])
                         
-                        # ถ้าผ่านมาถึงตรงนี้ แปลว่าสำเร็จ 100% ไม่มี Error แว่บแน่นอน
+                        # สำเร็จ!
                         st.session_state.reg_success = True
                         time.sleep(1)
                         st.rerun()
