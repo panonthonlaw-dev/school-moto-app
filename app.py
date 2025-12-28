@@ -319,11 +319,18 @@ if st.session_state.get('logged_in'):
             logout()
 
 if st.session_state['page'] == 'student':
+    # --- เริ่มส่วนแก้ไขโครงสร้างป้องกันแดงแว่บ ---
+    main_placeholder = st.empty()
+
     if st.session_state.get("reg_success", False):
-        st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
-        st.balloons()
-        clear_form_state()
-        st.session_state.reg_success = False
+        with main_placeholder.container():
+            st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
+            st.balloons()
+            if st.button("กลับสู่หน้าหลักเพื่อลงทะเบียนคนใหม่", type="primary", use_container_width=True):
+                clear_form_state()
+                st.session_state.reg_success = False
+                st.rerun()
+        st.stop() # หยุดการทำงานไม่ให้ฟอร์มโผล่
 
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
     with st.form("reg_form", clear_on_submit=False):
