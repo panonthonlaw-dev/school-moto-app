@@ -12,6 +12,10 @@ import re
 import os
 import textwrap
 import plotly.express as px
+from supabase import create_client, Client
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 # --- ฟังก์ชันป้องกัน Formula Injection ---
 def sanitize_for_gsheet(text):
     if text is None:
@@ -37,6 +41,28 @@ OFFICER_ACCOUNTS = st.secrets["OFFICER_ACCOUNTS"]
 
 GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxRf6z032SxMkiI4IxtUBvWLKeo1LmIQAUMByoXidy4crNEwHoO6h0B-3hT0X7Q5g/exec" 
 SESSION_TIMEOUT_MINUTES = 30 
+# --- 1.1 เชื่อมต่อ Supabase ---
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# --- 1.2 เชื่อมต่อ Google Drive Service ---
+def get_gdrive_service():
+    creds_info = st.secrets["gcp_service_account"]
+    # แปลง private_key ที่อาจจะมีปัญหาเรื่องขึ้นบรรทัดใหม่ (\n)
+    if "private_key" in creds_info:
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+        
+    creds = service_account.Credentials.from_service_account_info(
+        creds_info, scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    return build('drive', 'v3', credentials=creds)
+
+# สร้างตัวแปรไว้เรียกใช้งาน
+try:
+    drive_service = get_gdrive_service()
+except Exception as e:
+    st.error(f"❌ เชื่อมต่อ Google Drive ไม่สำเร็จ: {e}")
 
 # --- 2. Setup หน้าเว็บ ---
 st.set_page_config(page_title="patwit moto.", page_icon="logo", layout="wide")
@@ -74,6 +100,26 @@ def img_to_b64(img_path):
         with open(img_path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return ""
+
+# --- วางฟังก์ชันใหม่ต่อตรงนี้ครับ ---
+
+def upload_image_to_drive(uploaded_file, file_name):
+    try:
+        file_metadata = {'name': file_name, 'parents': [DRIVE_FOLDER_ID]}
+        media = MediaIoBaseUpload(io.BytesIO(uploaded_file.getvalue()), mimetype='image/jpeg')
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        return file.get('id')
+    except Exception as e:
+        st.error(f"❌ อัปโหลดรูปภาพล้มเหลว: {e}")
+        return None
+
+def save_to_supabase(data_dict, table_name="traffic_registration"):
+    try:
+        response = supabase.table(table_name).insert(data_dict).execute()
+        return True
+    except Exception as e:
+        st.error(f"❌ บันทึกข้อมูลลงฐานข้อมูลใหม่ล้มเหลว: {e}")
+        return False
 
 def connect_gsheet():
     key_content = st.secrets["textkey"]["json_content"]
@@ -298,33 +344,64 @@ if st.session_state['page'] == 'student':
                 st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
             else:
                 try:
+                    # 1. เชื่อมต่อระบบ Sheet เดิม (สำรอง)
                     sheet = connect_gsheet()
-                    if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว")
+                    
+                    # ตรวจสอบรหัสซ้ำจาก Supabase
+                    duplicate_check = supabase.table("traffic_registration").select("Student_ID").eq("Student_ID", str(std_id)).execute()
+                    
+                    if len(duplicate_check.data) > 0:
+                        st.error("❌ รหัสประจำตัวนี้เคยลงทะเบียนในระบบใหม่แล้ว")
                     else:
-                        with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
-                            # อัปโหลดรูป (ส่วนนี้ปลอดภัยอยู่แล้วเพราะคืนค่าเป็น URL)
-                            l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
-                            l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
-                            l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
+                        with st.spinner("⏳ กำลังส่งรูปภาพไป Google Drive 2TB และบันทึกข้อมูล..."):
+                            # --- อัปโหลดรูป ---
+                            ts_now = int(time.time())
+                            l_face = upload_image_to_drive(p_face, f"{std_id}_Face_{ts_now}.jpg")
+                            l_back = upload_image_to_drive(p_back, f"{std_id}_Back_{ts_now}.jpg")
+                            l_side = upload_image_to_drive(p_side, f"{std_id}_Side_{ts_now}.jpg") if p_side else ""
                             
-                            # ✅ บันทึกลง Sheet (ใส่เกราะป้องกัน Formula Injection ตรงนี้!)
+                            # --- 2. เตรียมก้อนข้อมูลสำหรับ Supabase (ต้องย่อหน้าให้ตรงกับ l_side) ---
+                            supabase_data = {
+                                "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                "ชื่อ-สกุล": f"{prefix}{fname}",
+                                "เลขประจำตัว": str(std_id),
+                                "ชั้น": f"{level}/{room}",
+                                "ยี่ห้อ": brand,
+                                "สี": color,
+                                "ทะเบียน": plate,
+                                "ใบขับขี่": ls,
+                                "พรบ_ภาษี": ts,
+                                "หมวกกันน๊อค": hs,
+                                "รูปภาพ3": l_face,
+                                "รูปภาพ1": l_back,
+                                "รูปภาพ2": l_side, # เพิ่มส่วนนี้เข้าไปด้วยครับ
+                                "คะแนน": 100,
+                                "รหัสpin": str(pin),
+                                "Academic_Year": "2568"
+                            }
+
+                            # --- 3. บันทึกลง Supabase ---
+                            save_to_supabase(supabase_data, "traffic_registration")
+                            
+                            # --- 4. บันทึกลง Google Sheets (Backup) ---
                             sheet.append_row([
                                 datetime.now().strftime('%d/%m/%Y %H:%M'), 
-                                sanitize_for_gsheet(f"{prefix}{fname}"),  # ชื่อ
-                                sanitize_for_gsheet(str(std_id)),         # รหัสนักเรียน (บางทีคนอาจใส่สูตร)
-                                f"{level}/{room}",                        # ชั้น/ห้อง (ตัวเลือก selectbox ปลอดภัยอยู่แล้วแต่ครอบไว้ก็ได้)
+                                sanitize_for_gsheet(f"{prefix}{fname}"), 
+                                sanitize_for_gsheet(str(std_id)), 
+                                f"{level}/{room}", 
                                 brand, 
-                                sanitize_for_gsheet(color),               # สีรถ (ช่องกรอกอิสระ อันตราย)
-                                sanitize_for_gsheet(plate),               # ทะเบียน (ช่องกรอกอิสระ อันตรายมาก)
+                                sanitize_for_gsheet(color), 
+                                sanitize_for_gsheet(plate), 
                                 ls, ts, hs, 
                                 l_back, l_side, "", "100", l_face, 
-                                sanitize_for_gsheet(str(pin))             # PIN
+                                sanitize_for_gsheet(str(pin))
                             ])
                             
                             st.session_state.reg_success = True
+                            st.balloons()
                             st.rerun()
-                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-
+                except Exception as e: 
+                    st.error(f"❌ เกิดข้อผิดพลาด: {e}")
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
     #if c2.button("🔐 เจ้าหน้าที่เข้าสู่ระบบ", use_container_width=True): go_to_page('teacher')
