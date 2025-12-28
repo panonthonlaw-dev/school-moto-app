@@ -379,9 +379,9 @@ if st.session_state['page'] == 'student':
                         with st.spinner("⏳ กำลังส่งรูปภาพไป Google Drive 2TB และบันทึกข้อมูล..."):
                             # --- อัปโหลดรูป ---
                             ts_now = int(time.time())
-                            l_face = upload_image_to_drive(p_face, f"{std_id}_Face_{ts_now}.jpg")
-                            l_back = upload_image_to_drive(p_back, f"{std_id}_Back_{ts_now}.jpg")
-                            l_side = upload_image_to_drive(p_side, f"{std_id}_Side_{ts_now}.jpg") if p_side else ""
+                            l_face = upload_image_to_supabase(p_face, f"{std_id}_Face_{ts_now}.jpg")
+                            l_back = upload_image_to_supabase(p_back, f"{std_id}_Back_{ts_now}.jpg")
+                            l_side = upload_image_to_supabase(p_side, f"{std_id}_Side_{ts_now}.jpg") if p_side else ""
                             
                             # --- 2. เตรียมก้อนข้อมูล (ใช้ชื่อภาษาไทยตามที่คุณครูตั้งใน Supabase) ---
                             supabase_data = {
