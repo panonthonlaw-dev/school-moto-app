@@ -319,16 +319,18 @@ if st.session_state.get('logged_in'):
             logout()
 
 if st.session_state['page'] == 'student':
+    # --- ส่วนแสดงข้อความสำเร็จ (แสดงเฉพาะเมื่อบันทึกเสร็จแล้ว) ---
     if st.session_state.get("reg_success", False):
-    st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกทั้งใน Google Sheets และ Supabase เรียบร้อยแล้ว")
-    st.balloons()
-    # ไม่ต้องรีบ False ทันที ให้ค้างไว้ให้ครูเห็นก่อน
-    if st.button("ลงทะเบียนคนต่อไป"):
-        clear_form_state()
-        st.session_state.reg_success = False
-        st.rerun()
-    st.stop() # หยุดการทำงานของโค้ดข้างล่างไว้ก่อน เพื่อไม่ให้หน้าฟอร์มโผล่มาซ้อน
+        st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกทั้งใน Google Sheets และ Supabase เรียบร้อยแล้ว")
+        st.balloons()
+        # ปุ่มสำหรับเริ่มลงทะเบียนใหม่
+        if st.button("ลงทะเบียนคนต่อไป", type="primary", use_container_width=True):
+            clear_form_state()
+            st.session_state.reg_success = False
+            st.rerun()
+        st.stop() # หยุดการทำงานเพื่อไม่ให้แสดงฟอร์มด้านล่าง
 
+    # --- ส่วนของฟอร์มลงทะเบียนปกติ ---
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
     with st.form("reg_form", clear_on_submit=False):
         sc1, sc2 = st.columns(2)
@@ -336,26 +338,33 @@ if st.session_state['page'] == 'student':
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
             fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
         std_id = sc2.text_input("รหัสนักเรียน/ กรณีครูบุคลากรพ่อค้าแม่ค้า ระบุวันเดือนปีเกิด เช่น 02092530", key="reg_id")
+        
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
         room = st.text_input("ห้อง(0-13) กรณีไม่ใช่นักเรียนกรอก 0", key="reg_room")
+        
         st.write("🔐 **ตั้งค่าความปลอดภัย**")
         pin = st.text_input("ตั้งรหัส PIN 6 หลัก (สำหรับโหลดบัตรอนุญาต)", type="password", max_chars=6, key="reg_pin", help="ห้ามใช้เลขซ้ำกันทั้งหมด")
+        
         sc5, sc6 = st.columns(2)
         brand = st.selectbox("ยี่ห้อ", ["Honda", "Yamaha", "Suzuki", "GPX", "Kawasaki", "อื่นๆ"], key="reg_brand")
         color = st.text_input("สีรถ", key="reg_color")
         plate = st.text_input("ทะเบียนรถ", placeholder="เช่น 1กข 1234ร้อยเอ็ด", key="reg_plate")
+        
         doc_cols = st.columns(3)
         ls = doc_cols[0].radio("ใบขับขี่", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         ts = doc_cols[1].radio("ภาษี/พรบ", ["✅ ปกติ", "❌ ขาด"], horizontal=True)
         hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
+        
         st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
         up1, up2, up3 = st.columns(3)
         p_face = up1.file_uploader("1. รูปเจ้าของรถ", type=['jpg','png','jpeg'])
         p_back = up2.file_uploader("2. รูปด้านหลังรถจักรยานยนต์(เห็นป้าย)", type=['jpg','png','jpeg'])
         p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นเต็มคัน)", type=['jpg','png','jpeg'])
+        
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
+        # --- ส่วนประมวลผลเมื่อกดปุ่มส่งข้อมูล ---
         if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
             errors = []
             if not fname: errors.append("ชื่อ-นามสกุล")
@@ -370,12 +379,12 @@ if st.session_state['page'] == 'student':
             if errors:
                 st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
             else:
-                # --- สร้างพื้นที่ว่างเพื่อป้องกัน UI กระตุก (แก้ปัญหาแว่บแดง) ---
+                # สร้าง msg_slot ไว้นอก try เพื่อให้แสดง error ได้นิ่งๆ
                 msg_slot = st.empty() 
                 
                 try:
                     with st.spinner("⏳ กำลังตรวจสอบข้อมูลและบันทึก..."):
-                        # 1. เชื่อมต่อระบบ Sheet เดิม
+                        # 1. เชื่อมต่อระบบ Sheet
                         sheet = connect_gsheet()
                         
                         # 2. ตรวจสอบรหัสซ้ำจาก Supabase
@@ -384,15 +393,15 @@ if st.session_state['page'] == 'student':
                         if len(duplicate_check.data) > 0:
                             msg_slot.error("❌ เลขประจำตัวนี้เคยลงทะเบียนในระบบแล้ว")
                         else:
-                            # --- เริ่มกระบวนการอัปโหลดและบันทึก ---
+                            # เริ่มกระบวนการอัปโหลด
                             ts_now = int(time.time())
                             
-                            # อัปโหลดรูปไป Supabase Storage
+                            # อัปโหลดรูปไป Supabase Storage (ใช้ฟังก์ชันที่บีบอัดรูปแล้ว)
                             l_face = upload_image_to_supabase(p_face, f"{std_id}_Face_{ts_now}.jpg")
                             l_back = upload_image_to_supabase(p_back, f"{std_id}_Back_{ts_now}.jpg")
                             l_side = upload_image_to_supabase(p_side, f"{std_id}_Side_{ts_now}.jpg") if p_side else ""
 
-                            # เตรียมข้อมูลสำหรับบันทึก
+                            # เตรียมข้อมูลสำหรับ Supabase
                             supabase_data = {
                                 "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 "student_name": f"{prefix}{fname}",
@@ -413,7 +422,7 @@ if st.session_state['page'] == 'student':
                                 "academic_year": "2568"
                             }
 
-                            # 3. บันทึกลงฐานข้อมูลทั้ง 2 ระบบ
+                            # 3. บันทึกข้อมูล
                             save_to_supabase(supabase_data, "traffic_registration")
                             sheet.append_row([
                                 datetime.now().strftime('%d/%m/%Y %H:%M'), 
@@ -422,7 +431,7 @@ if st.session_state['page'] == 'student':
                                 l_back, l_side, "เริ่มลงทะเบียน", "100", l_face, str(pin)
                             ])
                             
-                            # บันทึกสำเร็จ
+                            # เมื่อสำเร็จทุกขั้นตอน
                             st.session_state.reg_success = True
                             st.rerun()
 
