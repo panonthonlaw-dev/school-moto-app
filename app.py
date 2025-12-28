@@ -353,11 +353,11 @@ if st.session_state['page'] == 'student':
                     # 1. เชื่อมต่อระบบ Sheet เดิม (สำรอง)
                     sheet = connect_gsheet()
                     
-                    # ตรวจสอบรหัสซ้ำจาก Supabase
-                    duplicate_check = supabase.table("traffic_registration").select("Student_ID").eq("Student_ID", str(std_id)).execute()
+                    # 🔍 จุดที่ต้องแก้: เปลี่ยน Student_ID เป็น เลขประจำตัว ให้ตรงกับใน Supabase
+                    duplicate_check = supabase.table("traffic_registration").select("เลขประจำตัว").eq("เลขประจำตัว", str(std_id)).execute()
                     
                     if len(duplicate_check.data) > 0:
-                        st.error("❌ รหัสประจำตัวนี้เคยลงทะเบียนในระบบใหม่แล้ว")
+                        st.error("❌ เลขประจำตัวนี้เคยลงทะเบียนในระบบแล้ว")
                     else:
                         with st.spinner("⏳ กำลังส่งรูปภาพไป Google Drive 2TB และบันทึกข้อมูล..."):
                             # --- อัปโหลดรูป ---
@@ -366,7 +366,7 @@ if st.session_state['page'] == 'student':
                             l_back = upload_image_to_drive(p_back, f"{std_id}_Back_{ts_now}.jpg")
                             l_side = upload_image_to_drive(p_side, f"{std_id}_Side_{ts_now}.jpg") if p_side else ""
                             
-                            # --- 2. เตรียมก้อนข้อมูลสำหรับ Supabase (ต้องย่อหน้าให้ตรงกับ l_side) ---
+                            # --- 2. เตรียมก้อนข้อมูล (ใช้ชื่อภาษาไทยตามที่คุณครูตั้งใน Supabase) ---
                             supabase_data = {
                                 "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 "ชื่อ-สกุล": f"{prefix}{fname}",
@@ -380,7 +380,7 @@ if st.session_state['page'] == 'student':
                                 "หมวกกันน๊อค": hs,
                                 "รูปภาพ3": l_face,
                                 "รูปภาพ1": l_back,
-                                "รูปภาพ2": l_side, # เพิ่มส่วนนี้เข้าไปด้วยครับ
+                                "รูปภาพ2": l_side,
                                 "คะแนน": 100,
                                 "รหัสpin": str(pin),
                                 "Academic_Year": "2568"
