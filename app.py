@@ -47,18 +47,21 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- 1.2 เชื่อมต่อ Google Drive Service ---
-def get_drive_service():
-    creds_info = dict(st.secrets["gcp_service_account"]) # ต้องครอบด้วย dict() แบบนี้ครับ
+# --- 1.2 เชื่อมต่อ Google Drive Service ---
+def get_gdrive_service():
+    # 🚨 จุดสำคัญ: ต้องครอบด้วย dict() เพื่อให้เราแก้ค่าข้างในได้
+    creds_info = dict(st.secrets["gcp_service_account"])
+    
     if "private_key" in creds_info:
+        # ตอนนี้เราแก้ไขค่าในตะกร้าใหม่ (creds_info) ได้แล้ว ไม่ Error แล้วครับ
         creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-   
         
     creds = service_account.Credentials.from_service_account_info(
         creds_info, scopes=["https://www.googleapis.com/auth/drive"]
     )
     return build('drive', 'v3', credentials=creds)
 
-# สร้างตัวแปรไว้เรียกใช้งาน
+# ตอนสร้างตัวแปรใช้งาน
 try:
     drive_service = get_gdrive_service()
 except Exception as e:
