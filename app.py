@@ -320,10 +320,14 @@ if st.session_state.get('logged_in'):
 
 if st.session_state['page'] == 'student':
     if st.session_state.get("reg_success", False):
-        st.success("✅ ลงทะเบียนสำเร็จ! กรุณาจำรหัส PIN เพื่อใช้โหลดบัตร")
-        st.balloons()
+    st.success("✅ ลงทะเบียนสำเร็จ! ข้อมูลถูกบันทึกทั้งใน Google Sheets และ Supabase เรียบร้อยแล้ว")
+    st.balloons()
+    # ไม่ต้องรีบ False ทันที ให้ค้างไว้ให้ครูเห็นก่อน
+    if st.button("ลงทะเบียนคนต่อไป"):
         clear_form_state()
         st.session_state.reg_success = False
+        st.rerun()
+    st.stop() # หยุดการทำงานของโค้ดข้างล่างไว้ก่อน เพื่อไม่ให้หน้าฟอร์มโผล่มาซ้อน
 
     st.info("📝 ลงทะเบียนรถและทำบัตรอนุญาตดิจิทัล")
     with st.form("reg_form", clear_on_submit=False):
@@ -422,7 +426,6 @@ if st.session_state['page'] == 'student':
                             ])
                             
                             st.session_state.reg_success = True
-                            st.balloons()
                             st.rerun()
                 except Exception as e: 
                     st.error(f"❌ เกิดข้อผิดพลาด: {e}")
