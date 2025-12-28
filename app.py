@@ -47,11 +47,11 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- 1.2 เชื่อมต่อ Google Drive Service ---
-def get_gdrive_service():
-    creds_info = st.secrets["gcp_service_account"]
-    # แปลง private_key ที่อาจจะมีปัญหาเรื่องขึ้นบรรทัดใหม่ (\n)
+def get_drive_service():
+    creds_info = dict(st.secrets["gcp_service_account"]) # ต้องครอบด้วย dict() แบบนี้ครับ
     if "private_key" in creds_info:
         creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+   
         
     creds = service_account.Credentials.from_service_account_info(
         creds_info, scopes=["https://www.googleapis.com/auth/drive"]
@@ -122,10 +122,9 @@ def save_to_supabase(data_dict, table_name="traffic_registration"):
         return False
 
 def connect_gsheet():
-    # ดึงค่าจาก Secrets ชุดใหม่ที่เราเพิ่งจัดระเบียบไป
-    creds_info = st.secrets["gcp_service_account"]
+    # ก๊อปปี้ค่าจาก Secrets ออกมาเป็น Dictionary ปกติ (to_dict) เพื่อให้แก้ไขได้
+    creds_info = dict(st.secrets["gcp_service_account"]) 
     
-    # แก้ไขปัญหาเรื่องขึ้นบรรทัดใหม่ใน Private Key
     if "private_key" in creds_info:
         creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
         
