@@ -108,7 +108,10 @@ def img_to_b64(img_path):
 
 def upload_image_to_drive(uploaded_file, file_name):
     try:
-        file_metadata = {'name': file_name, 'parents': [DRIVE_FOLDER_ID]}
+        # ดึง ID จาก Secrets โดยตรงเพื่อความชัวร์
+        folder_id = st.secrets["GOOGLE_DRIVE_FOLDER_ID"] 
+        
+        file_metadata = {'name': file_name, 'parents': [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(uploaded_file.getvalue()), mimetype='image/jpeg')
         file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         return file.get('id')
