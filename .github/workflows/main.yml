@@ -1,31 +1,53 @@
-name: Wake Up Streamlit App
+name: Wake Up Streamlit App (Playwright Version)
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */6 * * *' # ปลุกทุก 6 ชั่วโมง
   workflow_dispatch:
 
 jobs:
-  build:
+  wake_up:
     runs-on: ubuntu-latest
-    # ✅ เพิ่มส่วนนี้เพื่อให้แน่ใจว่า Bot มีสิทธิ์เขียนข้อมูล
-    permissions:
-      contents: write
-      
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4 # อัปเดตเป็น v4 ล่าสุด
+      - uses: actions/checkout@v4
 
-      - name: Update last_wake_up.txt
-        run: |
-          echo "Last Wake Up: $(date +'%Y-%m-%d %H:%M:%S') (UTC)" > last_wake_up.txt
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-      - name: Commit and Push changes
+      - name: Install dependencies
         run: |
-          # ✅ ใช้ identity มาตรฐานของ GitHub Actions Bot
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add last_wake_up.txt
-          # ✅ ป้องกัน error กรณีที่ไม่มีการเปลี่ยนแปลงไฟล์
-          git commit -m "Keep-alive: Wake up Streamlit [skip ci]" || echo "No changes to commit"
-          git push
+          pip install playwright
+          playwright install chromium
+
+      - name: Open App and Wait (Simulate Human)
+        run: |
+          python -c "
+          from playwright.sync_api import sync_playwright
+          import time
+
+          with sync_playwright() as p:
+              # เปิดเบราว์เซอร์แบบซ่อนหน้าจอ (Headless)
+              browser = p.chromium.launch()
+              page = browser.new_page()
+              
+              print('🚀 กำลังเดินทางไปที่แอป...')
+              # เปลี่ยน URL_HERE เป็นลิงก์แอปจริงของคุณครู
+              page.goto('https://patwitmotoregis.streamlit.app/')
+              
+              # รอ 15 วินาทีเพื่อให้ WebSocket ทำงานและแอปเริ่ม Boot
+              print('⏳ รอระบบ Boot 15 วินาที...')
+              time.sleep(15)
+              
+              # ถ่ายภาพหน้าจอเก็บไว้ดู (Optional - สำหรับเช็กใน Action logs)
+              page.screenshot(path='app_status.png')
+              print('✅ ปลุกสำเร็จ!')
+              browser.close()
+          "
+      # (Optional) ถ้าอยากให้ Green เหมือนเดิมและมีหลักฐานการปลุก
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-status-screenshot
+          path: app_status.png
