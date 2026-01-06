@@ -324,7 +324,7 @@ if st.session_state['page'] == 'student':
             else:
                 try:
                     sheet = connect_gsheet()
-                    if str(std_id) in sheet.col_values(3): st.error("❌ รหัสนี้เคยลงทะเบียนแล้ว")
+                    if str(std_id) in sheet.col_values(3): st.error("❌ ข้อมูลนี้เคยลงทะเบียนแล้วติดต่อLine id : jakchai36")
                     else:
                         with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
                             # อัปโหลดรูป (ส่วนนี้ปลอดภัยอยู่แล้วเพราะคืนค่าเป็น URL)
