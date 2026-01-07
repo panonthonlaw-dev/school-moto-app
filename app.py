@@ -287,7 +287,7 @@ if st.session_state['page'] == 'student':
         with sc1:
             prefix = st.selectbox("คำนำหน้า", ["นาย", "นางสาว", "เด็กชาย", "เด็กหญิง", "นาง", "ครู"])
             fname = st.text_input("ชื่อ-นามสกุล", key="reg_fname")
-        std_id = sc2.text_input("รหัสนักเรียน/ กรณีครูบุคลากรพ่อค้าแม่ค้า ระบุเบอร์ติดต่อ", key="reg_id")
+        std_id = sc2.text_input("รหัสนักเรียน หรือถ้าเป็นครูบุคลากรพ่อค้าแม่ค้า ใช้เบอเบอร์ติดต่อโดยไม่ต้องมี ขีด", key="reg_id")
         sc3, sc4 = st.columns(2)
         level = st.selectbox("ชั้น", ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6", "ครู,บุคลากร", "พ่อค้าแม่ค้า"])
         room = st.text_input("ห้อง(0-13) กรณีไม่ใช่นักเรียนกรอก 0", key="reg_room")
