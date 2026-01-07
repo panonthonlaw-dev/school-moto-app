@@ -50,6 +50,7 @@ if 'officer_name' not in st.session_state: st.session_state['officer_name'] = ""
 if 'officer_role' not in st.session_state: st.session_state['officer_role'] = ""
 if 'current_user_pwd' not in st.session_state: st.session_state['current_user_pwd'] = ""
 if 'last_active' not in st.session_state: st.session_state['last_active'] = time.time()
+if 'is_loading' not in st.session_state: st.session_state['is_loading'] = False
 
 def check_session_timeout():
     if st.session_state.get('logged_in'):
@@ -308,7 +309,15 @@ if st.session_state['page'] == 'student':
         p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นเต็มคัน)", type=['jpg','png','jpeg'])
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
-        if st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True):
+        # --- แก้ไขปุ่มส่งข้อมูลและการเช็ค Lock ---
+        submit_btn = st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True)
+
+        if submit_btn:
+            # 🚩 จุดแก้ไขที่ 1: เช็คว่าระบบกำลังทำงานอยู่ไหม ถ้าใช่ให้หยุด (กันกดซ้ำ)
+            if st.session_state.is_loading:
+                st.toast("⏳ ระบบกำลังบันทึกข้อมูลเดิมอยู่ กรุณารอสักครู่...", icon="⚠️")
+                st.stop()
+            
             errors = []
             if not fname: errors.append("ชื่อ-นามสกุล")
             if not std_id: errors.append("รหัสประจำตัว")
@@ -323,32 +332,45 @@ if st.session_state['page'] == 'student':
                 st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
             else:
                 try:
-                    sheet = connect_gsheet()
-                    if str(std_id) in sheet.col_values(3): st.error("❌ ข้อมูลนี้เคยลงทะเบียนแล้วติดต่อLine id : jakchai36")
-                    else:
-                        with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
-                            # อัปโหลดรูป (ส่วนนี้ปลอดภัยอยู่แล้วเพราะคืนค่าเป็น URL)
+                    # 🚩 จุดแก้ไขที่ 2: เริ่มทำการล็อคระบบทันที
+                    st.session_state.is_loading = True
+                    
+                    with st.spinner("⏳ กำลังบันทึกข้อมูลและอัปโหลดรูปภาพ... (ห้ามกดซ้ำหรือปิดหน้าจอนี้)"):
+                        sheet = connect_gsheet()
+                        
+                        # 🚩 จุดแก้ไขที่ 3: เช็คซ้ำอีกรอบใน Sheet (เผื่อเคสกดเบิ้ลจังหวะเดียวกันเป๊ะ)
+                        existing_ids = sheet.col_values(3)
+                        if str(std_id) in existing_ids:
+                            st.error("❌ ข้อมูลนี้เคยลงทะเบียนแล้ว!")
+                            st.session_state.is_loading = False # ปลดล็อคเพื่อให้แก้ไขได้
+                        else:
+                            # อัปโหลดรูป (จะเร็วขึ้นเพราะเราปรับเป็น 1024px / 85% แล้ว)
                             l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
                             l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
                             l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
                             
-                            # ✅ บันทึกลง Sheet (ใส่เกราะป้องกัน Formula Injection ตรงนี้!)
+                            # บันทึกลง Sheet
                             sheet.append_row([
                                 datetime.now().strftime('%d/%m/%Y %H:%M'), 
-                                sanitize_for_gsheet(f"{prefix}{fname}"),  # ชื่อ
-                                sanitize_for_gsheet(str(std_id)),         # รหัสนักเรียน (บางทีคนอาจใส่สูตร)
-                                f"{level}/{room}",                        # ชั้น/ห้อง (ตัวเลือก selectbox ปลอดภัยอยู่แล้วแต่ครอบไว้ก็ได้)
-                                brand, 
-                                sanitize_for_gsheet(color),               # สีรถ (ช่องกรอกอิสระ อันตราย)
-                                sanitize_for_gsheet(plate),               # ทะเบียน (ช่องกรอกอิสระ อันตรายมาก)
-                                ls, ts, hs, 
-                                l_back, l_side, "", "100", l_face, 
-                                sanitize_for_gsheet(str(pin))             # PIN
+                                sanitize_for_gsheet(f"{prefix}{fname}"),
+                                sanitize_for_gsheet(str(std_id)),
+                                f"{level}/{room}",
+                                brand,
+                                sanitize_for_gsheet(color),
+                                sanitize_for_gsheet(plate),
+                                ls, ts, hs,
+                                l_back, l_side, "", "100", l_face,
+                                sanitize_for_gsheet(str(pin))
                             ])
                             
                             st.session_state.reg_success = True
+                            st.session_state.is_loading = False # เสร็จแล้วปลดล็อค
                             st.rerun()
-                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+
+                except Exception as e:
+                    # 🚩 จุดแก้ไขที่ 4: หากเกิด Error ต้องปลดล็อคเพื่อให้เขากดใหม่ได้
+                    st.session_state.is_loading = False
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
 
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
