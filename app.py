@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
+import pytz  # ✅ เพิ่มตัวนี้เข้ามาเพื่อแก้ปัญหาเวลาไม่ตรง
 import json
 import requests
 import base64
@@ -11,6 +12,8 @@ import io
 import re
 import os
 import textwrap
+import numpy as np # ✅ เพิ่มไว้รอสำหรับระบบ AI สแกนทะเบียน (LPR)
+from PIL import Image # ✅ เพิ่มไว้สำหรับจัดการรูปภาพ
 import plotly.express as px
 # ✅ 1. เพิ่มฟังก์ชันล็อคปุ่มไว้ตรงนี้ได้เลยครับ
 def start_loading():
@@ -382,16 +385,19 @@ if st.session_state['page'] == 'student':
 
                         # ขั้นที่ 5: บันทึกข้อมูลลงตาราง (100%)
                         status_text.text("📝 ขั้นที่ 5/5: กำลังบันทึกข้อมูลขั้นสุดท้าย...")
-                        sheet.append_row([
-                            datetime.now().strftime('%d/%m/%Y %H:%M'), 
+                        ssheet.append_row([
+                            datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%d/%m/%Y %H:%M'),
                             sanitize_for_gsheet(f"{prefix}{fname}"),
                             sanitize_for_gsheet(str(std_id)),
                             f"{level}/{room}",
                             brand,
                             sanitize_for_gsheet(color),
                             sanitize_for_gsheet(plate),
-                            ls, ts, hs,
-                            l_back, l_side, "", "100", l_face,
+                            ls, 
+                            ts, 
+                            hs,
+                            l_back, 
+                            l_side, "", "100", l_face,
                             sanitize_for_gsheet(str(pin))
                         ])
                         progress_bar.progress(100)
