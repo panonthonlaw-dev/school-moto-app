@@ -346,43 +346,64 @@ if st.session_state['page'] == 'student':
                 st.rerun()
             else:
                 try:
-                    with st.spinner("⏳ กำลังบันทึกข้อมูล... (ปุ่มถูกล็อคแล้วขณะรอ)"):
-                        sheet = connect_gsheet()
+                    # 🔒 เริ่มทำการล็อคระบบ
+                    st.session_state.is_loading = True
+                    
+                    # --- 🆕 เพิ่มแถบเปอร์เซ็นต์ ---
+                    progress_bar = st.progress(0)
+                    status_text = st.empty() # พื้นที่สำหรับข้อความบอกสถานะ
+
+                    # ขั้นที่ 1: ตรวจสอบฐานข้อมูล (20%)
+                    status_text.text("🔍 ขั้นที่ 1/5: กำลังตรวจสอบรหัสซ้ำ...")
+                    sheet = connect_gsheet()
+                    existing_ids = sheet.col_values(3)
+                    progress_bar.progress(20)
+
+                    if str(std_id) in existing_ids:
+                        st.error("❌ ข้อมูลนี้เคยลงทะเบียนแล้ว!")
+                        st.session_state.is_loading = False
+                        progress_bar.empty() # ลบแถบออกถ้า Error
+                        status_text.empty()
+                    else:
+                        # ขั้นที่ 2: อัปโหลดรูปเจ้าของรถ (40%)
+                        status_text.text("📸 ขั้นที่ 2/5: กำลังอัปโหลดรูปเจ้าของรถ...")
+                        l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
+                        progress_bar.progress(40)
+
+                        # ขั้นที่ 3: อัปโหลดรูปหลังรถ (60%)
+                        status_text.text("🏍️ ขั้นที่ 3/5: กำลังอัปโหลดรูปด้านหลังรถ...")
+                        l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
+                        progress_bar.progress(60)
+
+                        # ขั้นที่ 4: อัปโหลดรูปข้างรถ (80%)
+                        status_text.text("🏍️ ขั้นที่ 4/5: กำลังอัปโหลดรูปด้านข้างรถ...")
+                        l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
+                        progress_bar.progress(80)
+
+                        # ขั้นที่ 5: บันทึกข้อมูลลงตาราง (100%)
+                        status_text.text("📝 ขั้นที่ 5/5: กำลังบันทึกข้อมูลขั้นสุดท้าย...")
+                        sheet.append_row([
+                            datetime.now().strftime('%d/%m/%Y %H:%M'), 
+                            sanitize_for_gsheet(f"{prefix}{fname}"),
+                            sanitize_for_gsheet(str(std_id)),
+                            f"{level}/{room}",
+                            brand,
+                            sanitize_for_gsheet(color),
+                            sanitize_for_gsheet(plate),
+                            ls, ts, hs,
+                            l_back, l_side, "", "100", l_face,
+                            sanitize_for_gsheet(str(pin))
+                        ])
+                        progress_bar.progress(100)
+                        status_text.text("✅ บันทึกสำเร็จ!")
                         
-                        # 🚩 จุดแก้ไขที่ 3: เช็คซ้ำอีกรอบใน Sheet (เผื่อเคสกดเบิ้ลจังหวะเดียวกันเป๊ะ)
-                        existing_ids = sheet.col_values(3)
-                        if str(std_id) in existing_ids:
-                            st.error("❌ ข้อมูลนี้เคยลงทะเบียนแล้ว!")
-                            st.session_state.is_loading = False # ปลดล็อค
-                            st.rerun()
-                        else:
-                            # อัปโหลดรูป (1024px / 85% ไวแน่นอน)
-                            l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
-                            l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
-                            l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
-                            
-                            # บันทึกลง Sheet
-                            sheet.append_row([
-                                datetime.now().strftime('%d/%m/%Y %H:%M'), 
-                                sanitize_for_gsheet(f"{prefix}{fname}"),
-                                sanitize_for_gsheet(str(std_id)),
-                                f"{level}/{room}",
-                                brand,
-                                sanitize_for_gsheet(color),
-                                sanitize_for_gsheet(plate),
-                                ls, ts, hs,
-                                l_back, l_side, "", "100", l_face,
-                                sanitize_for_gsheet(str(pin))
-                            ])
-                            
-                            st.session_state.reg_success = True
-                            # ✅ บันทึกเสร็จแล้วปลดล็อคปุ่ม
-                            st.session_state.is_loading = False 
-                            st.rerun()
+                        time.sleep(1) # ให้คนใช้เห็นว่าเต็ม 100% แป๊บนึง
+                        st.session_state.reg_success = True
+                        st.session_state.is_loading = False 
+                        st.rerun()
 
                 except Exception as e:
-                    # 🔓 ปลดล็อคปุ่มหากเกิดข้อผิดพลาด
-                    st.session_state.is_loading = False 
+                    st.session_state.is_loading = False
                     st.error(f"เกิดข้อผิดพลาด: {e}")
                     st.rerun()
 
