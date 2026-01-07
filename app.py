@@ -110,11 +110,11 @@ def process_image(img_file):
     try:
         from PIL import Image
         img = Image.open(img_file).convert('RGB')
-        # ปรับความละเอียดเป็น 1600px (ชัดมากสำหรับงานเอกสาร)
-        img.thumbnail((1600, 1600))
+        # ปรับความละเอียดเป็น 1024px (ชัดมากสำหรับงานเอกสาร)
+        img.thumbnail((1024, 1024))
         buf = io.BytesIO()
-        # ปรับคุณภาพเป็น 90% (คมชัดสูง)
-        img.save(buf, format="JPEG", quality=90, optimize=True)
+        # ปรับคุณภาพเป็น 85% (คมชัดสูง)
+        img.save(buf, format="JPEG", quality=85, optimize=True)
         return base64.b64encode(buf.getvalue()).decode()
     except:
         return ""
