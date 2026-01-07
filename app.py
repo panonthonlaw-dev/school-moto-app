@@ -12,6 +12,9 @@ import re
 import os
 import textwrap
 import plotly.express as px
+# ✅ 1. เพิ่มฟังก์ชันล็อคปุ่มไว้ตรงนี้ได้เลยครับ
+def start_loading():
+    st.session_state.is_loading = True
 # --- ฟังก์ชันป้องกัน Formula Injection ---
 def sanitize_for_gsheet(text):
     if text is None:
@@ -310,14 +313,22 @@ if st.session_state['page'] == 'student':
         pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
 
         # --- แก้ไขปุ่มส่งข้อมูลและการเช็ค Lock ---
-        submit_btn = st.form_submit_button("ส่งข้อมูลลงทะเบียน", type="primary", use_container_width=True)
+        # 🚩 เพิ่มวงเล็บปิด ) หลัง st.session_state.is_loading
+        submit_btn = st.form_submit_button(
+            "ส่งข้อมูลลงทะเบียน", 
+            type="primary", 
+            use_container_width=True,
+            on_click=start_loading, 
+            disabled=st.session_state.is_loading
+        )
 
         if submit_btn:
-            # 🚩 จุดแก้ไขที่ 1: เช็คว่าระบบกำลังทำงานอยู่ไหม ถ้าใช่ให้หยุด (กันกดซ้ำ)
-            if st.session_state.is_loading:
-                st.toast("⏳ ระบบกำลังบันทึกข้อมูลเดิมอยู่ กรุณารอสักครู่...", icon="⚠️")
-                st.stop()
-            
+            # 🚩 จุดแก้ไขที่ 1: เช็คกุญแจซ้ำซ้อน (Safety First)
+            if st.session_state.is_loading == False:
+                # ถ้ากุญแจหลุด (ซึ่งปกติจะไม่หลุดเพราะ on_click ทำงานก่อน) 
+                # ให้สั่งล็อคอีกครั้งเพื่อความชัวร์
+                st.session_state.is_loading = True
+
             errors = []
             if not fname: errors.append("ชื่อ-นามสกุล")
             if not std_id: errors.append("รหัสประจำตัว")
@@ -330,21 +341,22 @@ if st.session_state['page'] == 'student':
 
             if errors:
                 st.error(f"❌ กรุณากรอกข้อมูลให้ครบถ้วน: {', '.join(errors)}")
+                # 🚩 สำคัญ: ถ้าเจอ Error ต้องปลดล็อคให้ปุ่มกลับมาคลิกได้
+                st.session_state.is_loading = False
+                st.rerun()
             else:
                 try:
-                    # 🚩 จุดแก้ไขที่ 2: เริ่มทำการล็อคระบบทันที
-                    st.session_state.is_loading = True
-                    
-                    with st.spinner("⏳ กำลังบันทึกข้อมูลและอัปโหลดรูปภาพ... (ห้ามกดซ้ำหรือปิดหน้าจอนี้)"):
+                    with st.spinner("⏳ กำลังบันทึกข้อมูล... (ปุ่มถูกล็อคแล้วขณะรอ)"):
                         sheet = connect_gsheet()
                         
                         # 🚩 จุดแก้ไขที่ 3: เช็คซ้ำอีกรอบใน Sheet (เผื่อเคสกดเบิ้ลจังหวะเดียวกันเป๊ะ)
                         existing_ids = sheet.col_values(3)
                         if str(std_id) in existing_ids:
                             st.error("❌ ข้อมูลนี้เคยลงทะเบียนแล้ว!")
-                            st.session_state.is_loading = False # ปลดล็อคเพื่อให้แก้ไขได้
+                            st.session_state.is_loading = False # ปลดล็อค
+                            st.rerun()
                         else:
-                            # อัปโหลดรูป (จะเร็วขึ้นเพราะเราปรับเป็น 1024px / 85% แล้ว)
+                            # อัปโหลดรูป (1024px / 85% ไวแน่นอน)
                             l_face = upload_to_drive(p_face, f"{std_id}_Face.jpg")
                             l_back = upload_to_drive(p_back, f"{std_id}_Back.jpg")
                             l_side = upload_to_drive(p_side, f"{std_id}_Side.jpg") if p_side else ""
@@ -364,13 +376,15 @@ if st.session_state['page'] == 'student':
                             ])
                             
                             st.session_state.reg_success = True
-                            st.session_state.is_loading = False # เสร็จแล้วปลดล็อค
+                            # ✅ บันทึกเสร็จแล้วปลดล็อคปุ่ม
+                            st.session_state.is_loading = False 
                             st.rerun()
 
                 except Exception as e:
-                    # 🚩 จุดแก้ไขที่ 4: หากเกิด Error ต้องปลดล็อคเพื่อให้เขากดใหม่ได้
-                    st.session_state.is_loading = False
+                    # 🔓 ปลดล็อคปุ่มหากเกิดข้อผิดพลาด
+                    st.session_state.is_loading = False 
                     st.error(f"เกิดข้อผิดพลาด: {e}")
+                    st.rerun()
 
     c1, c2 = st.columns(2)
     if c1.button("🆔 โหลดบัตรอนุญาต (Student Portal)", use_container_width=True): go_to_page('portal')
