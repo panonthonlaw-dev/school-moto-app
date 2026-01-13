@@ -181,87 +181,83 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
-def get_fitting_font(text, max_width, font_path, default_size):
-    """ฟังก์ชันช่วยหาขนาดฟอนต์ที่พอดีกับความกว้างที่กำหนด (แบบ PDF)"""
-    size = default_size
+def get_fitting_font(text, max_width, font_path, initial_size):
+    """ฟังก์ชันคำนวณหาขนาดฟอนต์ที่ใหญ่ที่สุด ที่ยังอยู่ในพื้นที่ max_width (แนวคิดแบบ PDF)"""
+    size = initial_size
     font = ImageFont.truetype(font_path, size)
-    # วนลูปเช็ค: ถ้าความกว้างข้อความเกินพื้นที่ ให้ลดขนาดฟอนต์ลงทีละ 1 px
-    while font.getlength(text) > max_width and size > 10:
+    # วนลูป: ถ้าความกว้างข้อความยังมากกว่าพื้นที่ที่ล๊อคไว้ ให้ลดขนาดฟอนต์ลงครั้งละ 1px
+    while font.getlength(str(text)) > max_width and size > 10:
         size -= 1
         font = ImageFont.truetype(font_path, size)
     return font
 def create_permit_img(v, logo_path):
-    width, height = 800, 480 
+    width, height = 850, 520  # ขนาดรูปมาตรฐาน
     img = Image.new('RGB', (width, height), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     
-    # พาธฟอนต์ (สำคัญมากในการคำนวณขนาด)
     f_reg = "THSarabunNew.ttf"
     f_bold = "THSarabunNewBold.ttf"
+    margin = 40 # ระยะห่างจากขอบที่ปลอดภัย
 
-    # 1. วาดกรอบและองค์ประกอบคงที่
-    draw.rectangle([15, 15, width-15, height-15], outline=(203, 213, 225), width=4)
-    draw.line((30, 150, width-30, 150), fill=(226, 232, 240), width=3)
+    # 1. วาดกรอบบัตร
+    draw.rectangle([15, 15, width-15, height-15], outline=(203, 213, 225), width=5)
 
-    # 2. ส่วนหัวบัตร (ล๊อคกึ่งกลางแบบ PDF)
-    title_font = ImageFont.truetype(f_bold, 50)
-    draw.text((width/2, 45), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=title_font, anchor="mm")
+    # 2. หัวบัตร (Lock Center กึ่งกลางรูป)
+    title_font = ImageFont.truetype(f_bold, 55)
+    draw.text((width/2, 55), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=title_font, anchor="mm")
     
-    sub_title_font = ImageFont.truetype(f_reg, 38)
-    draw.text((width/2, 100), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=sub_title_font, anchor="mm")
+    sub_title_font = ImageFont.truetype(f_reg, 40)
+    draw.text((width/2, 115), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=sub_title_font, anchor="mm")
+    draw.line((margin, 165, width-margin, 165), fill=(226, 232, 240), width=3)
 
-    # 3. จัดการรูปภาพ (ล๊อคพิกัดคงที่)
+    # 3. ส่วนรูปถ่ายนักเรียน (Lock ตำแหน่งซ้ายมือ)
     try:
         face_url = get_img_link(v[14])
         res = requests.get(face_url, timeout=5)
         student_img = Image.open(io.BytesIO(res.content)).convert("RGB")
-        student_img = ImageOps.fit(student_img, (160, 200))
-        img.paste(student_img, (50, 180))
-        draw.rectangle([50, 180, 210, 380], outline=(203, 213, 225), width=3)
+        student_img = ImageOps.fit(student_img, (180, 240))
+        img.paste(student_img, (margin + 10, 200))
+        draw.rectangle([margin + 10, 200, margin + 190, 440], outline=(203, 213, 225), width=2)
     except:
-        draw.rectangle([50, 180, 210, 380], fill=(241, 245, 249))
+        draw.rectangle([margin + 10, 200, margin + 190, 440], fill=(241, 245, 249))
 
-    # 4. ส่วนข้อมูล (ล๊อคขอบเขตความกว้างสูงสุดไว้ที่ 350px)
-    max_text_w = 350
-    tx_start = 240
+    # 4. ส่วนข้อมูลนักเรียน (Lock พื้นที่เขียนไว้ที่ความกว้าง 380px)
+    text_x = margin + 210
+    max_text_w = 380  # ล๊อคความกว้างข้อความตรงกลาง ไม่ให้วิ่งไปทับแต้มวินัย
 
-    # ชื่อ-นามสกุล (ถ้าชื่อยาวมาก ขนาดฟอนต์จะเล็กลงเอง)
-    name_text = f"ชื่อ: {v[1]}"
-    name_font = get_fitting_font(name_text, max_text_w, f_bold, 48)
-    draw.text((tx_start, 190), name_text, fill=(15, 23, 42), font=name_font)
+    # ชื่อ-นามสกุล (Auto-Scale)
+    name_txt = f"ชื่อ: {v[1]}"
+    name_font = get_fitting_font(name_txt, max_text_w, f_bold, 55)
+    draw.text((text_x, 200), name_txt, fill=(15, 23, 42), font=name_font)
 
-    # รหัสและชั้น
-    reg_font = ImageFont.truetype(f_reg, 36)
-    draw.text((tx_start, 245), f"รหัส: {v[2]}", fill=(51, 65, 85), font=reg_font)
-    draw.text((tx_start, 290), f"ชั้น: {v[3]}", fill=(51, 65, 85), font=reg_font)
+    # ข้อมูลอื่นๆ
+    reg_font = ImageFont.truetype(f_reg, 38)
+    draw.text((text_x, 260), f"รหัสประจำตัว: {v[2]}", fill=(51, 65, 85), font=reg_font)
+    draw.text((text_x, 310), f"ระดับชั้น: {v[3]}", fill=(51, 65, 85), font=reg_font)
     
-    # ทะเบียนรถ (ล๊อคพื้นที่ไว้ ถ้าจังหวัดยาวจะลดขนาดฟอนต์เอง)
-    plate_label = "ทะเบียนรถ: "
+    # ทะเบียนรถ (Auto-Scale เฉพาะทะเบียน)
+    draw.text((text_x, 370), "ทะเบียนรถ:", fill=(100, 116, 139), font=ImageFont.truetype(f_reg, 36))
     plate_val = str(v[6])
-    draw.text((tx_start, 345), plate_label, fill=(100, 116, 139), font=ImageFont.truetype(f_bold, 34))
-    
-    # คำนวณขนาดทะเบียนแยกต่างหาก
-    plate_font = get_fitting_font(plate_val, 220, f_bold, 45)
-    draw.text((tx_start + 130, 345), plate_val, fill=(30, 41, 59), font=plate_font)
+    plate_font = get_fitting_font(plate_val, 250, f_bold, 55) # ล็อคความกว้างทะเบียนไว้ 250px
+    draw.text((text_x + 140, 370), plate_val, fill=(30, 41, 59), font=plate_font)
 
-    # 5. แต้มวินัย (ล๊อคตำแหน่งชิดขวาแบบ RM Anchor)
-    score_x = width - 60
-    draw.text((score_x, 220), "แต้มวินัย", fill=(100, 116, 139), font=ImageFont.truetype(f_reg, 35), anchor="rm")
+    # 5. แต้มวินัย (Lock ชิดขวาเสมอ - Right Anchor)
+    score_x = width - margin - 10
+    draw.text((score_x, 230), "แต้มวินัยจราจร", fill=(100, 116, 139), font=ImageFont.truetype(f_reg, 32), anchor="rm")
     
     score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
     s_color = (22, 163, 74) if score >= 80 else ((202, 138, 4) if score >= 50 else (220, 38, 38))
-    score_font = ImageFont.truetype(f_bold, 120)
-    draw.text((score_x, 300), str(score), fill=s_color, font=score_font, anchor="rm")
+    score_font = ImageFont.truetype(f_bold, 140)
+    draw.text((score_x, 320), str(score), fill=s_color, font=score_font, anchor="rm")
 
-    # 6. คำเตือน (ล๊อกกึ่งกลางท้ายบัตร)
-    warn_font = ImageFont.truetype(f_reg, 28)
-    draw.text((width/2, 440), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill=(220, 38, 38), font=warn_font, anchor="mm")
+    # 6. คำเตือน (Lock กึ่งกลางด้านล่าง)
+    draw.text((width/2, 490), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill=(220, 38, 38), font=ImageFont.truetype(f_reg, 30), anchor="mm")
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
     
-    def draw_img_func(url, x, y, w, h):
+def draw_img_func(url, x, y, w, h):
         try:
             if url and "drive.google.com" in url:
                 res = requests.get(url, timeout=5)
@@ -316,63 +312,35 @@ st.markdown("""
             background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
             margin-bottom: 10px;
         }
-        /* ล็อคขนาดและสัดส่วนบัตรให้ Responsive 100% */
         .atm-card {
-            width: 100%; 
-            max-width: 480px; 
-            margin: 10px auto;
-            aspect-ratio: 1.6 / 1; /* สัดส่วนมาตรฐานบัตรแข็ง */
+            width: 92vw; /* ใช้ความกว้าง 92% ของหน้าจอมือถือ */
+            max-width: 480px; /* แต่ไม่เกิน 480px บนจอคอม */
+            aspect-ratio: 1.6 / 1; /* ล็อคสัดส่วนบัตรให้เหมือนบัตรแข็ง */
             background: #ffffff; 
             border: 2px solid #cbd5e1;
             border-radius: 15px; 
-            padding: 3%; /* ใช้ % เพื่อให้ย่อตามขนาดจอ */
-            box-sizing: border-box; 
+            padding: 15px;
+            box-sizing: border-box; /* สำคัญ: กัน padding ดันบัตรบวม */
             position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            margin: 10px auto;
+            overflow: hidden; /* กันตัวอักษรหลุดขอบ */
         }
-
-        .atm-header { 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            border-bottom: 2px solid #e2e8f0; 
-            padding-bottom: 2%; 
-            margin-bottom: 3%; 
-        }
-
-        .atm-logo { height: 45px; width: auto; max-width: 20%; }
-        .atm-school-name { font-size: 4.5vw; font-weight: bold; color: #1e293b; }
-        @media (min-width: 500px) { .atm-school-name { font-size: 18px; } }
-
-        .atm-body { display: flex; gap: 4%; flex: 1; align-items: flex-start; }
+        
+        /* แก้ไขส่วน Photo ให้ยืดหยุ่น */
         .atm-photo { 
-            width: 30%; 
-            aspect-ratio: 3 / 4; 
-            border-radius: 8px; 
+            width: 25%; 
+            height: auto; 
+            aspect-ratio: 3/4; 
             object-fit: cover; 
-            border: 1px solid #cbd5e1; 
+            border-radius: 8px; 
         }
-
-        .atm-info { 
-            font-size: 3.5vw; 
-            line-height: 1.4; 
-            flex: 1; 
-            color: #334155; 
-            white-space: nowrap; /* ล็อคไม่ให้ขึ้นบรรทัดใหม่จนเละ */
+        
+        /* ปรับฟอนต์ให้เล็กลงอัตโนมัติถ้าดูในมือถือที่จอเล็กมากๆ */
+        @media (max-width: 400px) {
+            .atm-info { font-size: 11px !important; }
+            .atm-school-name { font-size: 14px !important; }
+            .atm-score-val { font-size: 28px !important; }
         }
-        @media (min-width: 500px) { .atm-info { font-size: 14px; } }
-
-        .atm-score-box { 
-            position: absolute; 
-            bottom: 15%; 
-            right: 5%; 
-            text-align: right; 
-        }
-        .atm-score-val { font-size: 10vw; font-weight: 800; line-height: 1; }
-        @media (min-width: 500px) { .atm-score-val { font-size: 40px; } }
-        div[data-testid="stForm"] { border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
