@@ -449,7 +449,7 @@ elif st.session_state['page'] == 'portal':
                     <img src="{face_url}" class="atm-photo" alt="Student Photo">
                     <div class="atm-info">
                         <div style="font-size:16px; font-weight:bold; color:#0f172a;">{v[1]}</div>
-                        <div>รหัส: <b>{v[2]}</b></div>
+                        <div>รหัสประจำตัว: <b>{v[2]}</b></div>
                         <div>ระดับชั้น: <b>{v[3]}</b></div>
                         <div style="margin-top:5px; font-size:12px; color:#64748b;">เลขทะเบียนรถ</div>
                         <div style="font-family:monospace; font-size:18px; font-weight:bold; letter-spacing:1px; color:#1e293b;">{v[6]}</div>
