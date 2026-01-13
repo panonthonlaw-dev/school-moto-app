@@ -182,65 +182,65 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
 def create_permit_img(v, logo_path):
-    # สร้างพื้นหลังสีขาว ขนาดบัตรมาตรฐาน (กว้าง x สูง)
-    width, height = 600, 380
+    # ขยายขนาดพื้นที่วาดเป็น 700x450 เพื่อให้มีที่ว่างมากขึ้น (กันตัวหนังสือเบียด)
+    width, height = 700, 450 
     img = Image.new('RGB', (width, height), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     
-    # พยายามโหลดฟอนต์
     try:
-        font_name = ImageFont.truetype("THSarabunNew.ttf", 35)
-        font_bold = ImageFont.truetype("THSarabunNewBold.ttf", 45)
-        font_id = ImageFont.truetype("THSarabunNewBold.ttf", 30)
-        font_score = ImageFont.truetype("THSarabunNewBold.ttf", 80)
+        font_name = ImageFont.truetype("THSarabunNew.ttf", 40)
+        font_bold = ImageFont.truetype("THSarabunNewBold.ttf", 50)
+        font_id = ImageFont.truetype("THSarabunNewBold.ttf", 35)
+        font_score = ImageFont.truetype("THSarabunNewBold.ttf", 100)
     except:
         font_name = font_bold = font_id = font_score = ImageFont.load_default()
 
     # วาดกรอบบัตร
     draw.rectangle([10, 10, width-10, height-10], outline=(203, 213, 225), width=3)
 
-    # ใส่โลโก้โรงเรียน
+    # โลโก้
     if logo_path and os.path.exists(logo_path):
         logo = Image.open(logo_path).convert("RGBA")
-        logo.thumbnail((80, 80))
+        logo.thumbnail((100, 100))
         img.paste(logo, (30, 30), logo)
 
     # หัวบัตร
-    draw.text((130, 30), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=font_bold)
-    draw.text((130, 75), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=font_name)
+    draw.text((150, 35), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=font_bold)
+    draw.text((150, 85), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=font_name)
+    draw.line((20, 140, width-20, 140), fill=(226, 232, 240), width=2)
 
-    # รูปนักเรียน
-    face_url = get_img_link(v[14])
+    # รูปนักเรียน (ย้ายลงมาและขยายขนาด)
     try:
+        face_url = get_img_link(v[14])
         res = requests.get(face_url, timeout=5)
         student_img = Image.open(io.BytesIO(res.content)).convert("RGB")
-        student_img = ImageOps.fit(student_img, (130, 160)) # ตัดให้พอดีกรอบ
-        img.paste(student_img, (30, 130))
-        draw.rectangle([30, 130, 160, 290], outline=(203, 213, 225), width=2)
+        from PIL import ImageOps 
+        student_img = ImageOps.fit(student_img, (150, 180))
+        img.paste(student_img, (40, 170))
+        draw.rectangle([40, 170, 190, 350], outline=(203, 213, 225), width=2)
     except:
-        draw.rectangle([30, 130, 160, 290], fill=(241, 245, 249)) # ถ้าโหลดรูปไม่ขึ้นให้เป็นกล่องเทา
+        draw.rectangle([40, 170, 190, 350], fill=(241, 245, 249))
 
-    # ข้อมูลนักเรียน
-    tx = 180
-    draw.text((tx, 135), f"ชื่อ: {v[1]}", fill=(15, 23, 42), font=font_bold)
-    draw.text((tx, 185), f"รหัสประจำตัว: {v[2]}", fill=(51, 65, 85), font=font_name)
-    draw.text((tx, 225), f"ระดับชั้น: {v[3]}", fill=(51, 65, 85), font=font_name)
+    # ข้อมูล (ขยับระยะห่างใหม่ไม่ให้ทับแต้ม)
+    tx = 220
+    draw.text((tx, 170), f"{v[1]}", fill=(15, 23, 42), font=font_bold)
+    draw.text((tx, 225), f"รหัสประจำตัว: {v[2]}", fill=(51, 65, 85), font=font_name)
+    draw.text((tx, 270), f"ระดับชั้น: {v[3]}", fill=(51, 65, 85), font=font_name)
     
-    # ทะเบียนรถ (เน้นตัวหนา)
-    draw.text((tx, 265), "เลขทะเบียนรถ", fill=(100, 116, 139), font=font_id)
-    draw.text((tx, 295), str(v[6]), fill=(30, 41, 59), font=font_bold)
+    # ทะเบียนรถ (แยกบรรทัดชัดเจน)
+    draw.text((tx, 320), "เลขทะเบียน:", fill=(100, 116, 139), font=font_id)
+    draw.text((tx + 140, 320), str(v[6]), fill=(30, 41, 59), font=font_bold)
 
-    # แต้มวินัย (มุมขวาล่าง)
+    # แต้มวินัย (ย้ายตำแหน่งไปมุมขวาบนของเนื้อหา เพื่อเลี่ยงทะเบียนรถ)
     score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
     s_color = (22, 163, 74) if score >= 80 else ((202, 138, 4) if score >= 50 else (220, 38, 38))
     
-    draw.text((width-180, height-130), "แต้มวินัย", fill=(100, 116, 139), font=font_id)
-    draw.text((width-180, height-100), str(score), fill=s_color, font=font_score)
+    draw.text((width-180, 170), "แต้มวินัย", fill=(100, 116, 139), font=font_id)
+    draw.text((width-170, 205), str(score), fill=s_color, font=font_score)
 
-    # คำเตือนท้ายบัตร
-    draw.text((width-220, height-40), "*ไม่อาจใช้ทดแทนใบขับขี่ได้", fill=(220, 38, 38), font=font_id)
+    # คำเตือนท้ายบัตร (ขยับเข้าข้างในและเล็กลง)
+    draw.text((width-380, height-45), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill=(220, 38, 38), font=font_id)
 
-    # ส่งค่ากลับเป็น Bytes
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -301,11 +301,20 @@ st.markdown("""
             margin-bottom: 10px;
         }
         .atm-card {
-            width: 100%; max-width: 450px; aspect-ratio: 1.586;
-            background: #ffffff; border-radius: 15px; border: 2px solid #cbd5e1;
+            width: 95%; /* เปลี่ยนจาก 100% เป็น 95% เพื่อเว้นขอบจอ */
+            max-width: 500px; /* เพิ่มความกว้างสูงสุดเล็กน้อย */
+            height: auto; /* ให้ความสูงปรับตามเนื้อหา */
+            aspect-ratio: 1.586;
+            background: #ffffff; 
+            border-radius: 15px; 
+            border: 2px solid #cbd5e1;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            padding: 20px; position: relative; font-family: 'Sarabun', sans-serif;
-            color: #334155; margin: auto;
+            padding: 20px; 
+            position: relative; 
+            font-family: 'Sarabun', sans-serif;
+            color: #334155; 
+            margin: 10px auto;
+            overflow: hidden; /* กันของล้นขอบบัตร */
         }
         .atm-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; }
         .atm-logo { height: 55px; width: auto; }
