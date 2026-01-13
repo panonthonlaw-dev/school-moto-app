@@ -181,7 +181,7 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
-    def create_permit_img(v, logo_path):
+def create_permit_img(v, logo_path):
     # สร้างพื้นหลังสีขาว ขนาดบัตรมาตรฐาน (กว้าง x สูง)
     width, height = 600, 380
     img = Image.new('RGB', (width, height), color=(255, 255, 255))
