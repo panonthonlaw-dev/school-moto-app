@@ -257,7 +257,7 @@ def create_permit_img(v, logo_path):
     img.save(buf, format="PNG")
     return buf.getvalue()
     
-def draw_img_func(url, x, y, w, h):
+    def draw_img_func(url, x, y, w, h):
         try:
             if url and "drive.google.com" in url:
                 res = requests.get(url, timeout=5)
