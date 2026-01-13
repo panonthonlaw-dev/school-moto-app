@@ -181,65 +181,81 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
+def get_fitting_font(text, max_width, font_path, default_size):
+    """ฟังก์ชันช่วยหาขนาดฟอนต์ที่พอดีกับความกว้างที่กำหนด (แบบ PDF)"""
+    size = default_size
+    font = ImageFont.truetype(font_path, size)
+    # วนลูปเช็ค: ถ้าความกว้างข้อความเกินพื้นที่ ให้ลดขนาดฟอนต์ลงทีละ 1 px
+    while font.getlength(text) > max_width and size > 10:
+        size -= 1
+        font = ImageFont.truetype(font_path, size)
+    return font
 def create_permit_img(v, logo_path):
-    # ขยายขนาดพื้นที่วาดเป็น 700x450 เพื่อให้มีที่ว่างมากขึ้น (กันตัวหนังสือเบียด)
-    width, height = 700, 450 
+    width, height = 800, 480 
     img = Image.new('RGB', (width, height), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     
-    try:
-        font_name = ImageFont.truetype("THSarabunNew.ttf", 40)
-        font_bold = ImageFont.truetype("THSarabunNewBold.ttf", 50)
-        font_id = ImageFont.truetype("THSarabunNewBold.ttf", 35)
-        font_score = ImageFont.truetype("THSarabunNewBold.ttf", 100)
-    except:
-        font_name = font_bold = font_id = font_score = ImageFont.load_default()
+    # พาธฟอนต์ (สำคัญมากในการคำนวณขนาด)
+    f_reg = "THSarabunNew.ttf"
+    f_bold = "THSarabunNewBold.ttf"
 
-    # วาดกรอบบัตร
-    draw.rectangle([10, 10, width-10, height-10], outline=(203, 213, 225), width=3)
+    # 1. วาดกรอบและองค์ประกอบคงที่
+    draw.rectangle([15, 15, width-15, height-15], outline=(203, 213, 225), width=4)
+    draw.line((30, 150, width-30, 150), fill=(226, 232, 240), width=3)
 
-    # โลโก้
-    if logo_path and os.path.exists(logo_path):
-        logo = Image.open(logo_path).convert("RGBA")
-        logo.thumbnail((100, 100))
-        img.paste(logo, (30, 30), logo)
+    # 2. ส่วนหัวบัตร (ล๊อคกึ่งกลางแบบ PDF)
+    title_font = ImageFont.truetype(f_bold, 50)
+    draw.text((width/2, 45), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=title_font, anchor="mm")
+    
+    sub_title_font = ImageFont.truetype(f_reg, 38)
+    draw.text((width/2, 100), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=sub_title_font, anchor="mm")
 
-    # หัวบัตร
-    draw.text((150, 35), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=font_bold)
-    draw.text((150, 85), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=font_name)
-    draw.line((20, 140, width-20, 140), fill=(226, 232, 240), width=2)
-
-    # รูปนักเรียน (ย้ายลงมาและขยายขนาด)
+    # 3. จัดการรูปภาพ (ล๊อคพิกัดคงที่)
     try:
         face_url = get_img_link(v[14])
         res = requests.get(face_url, timeout=5)
         student_img = Image.open(io.BytesIO(res.content)).convert("RGB")
-        from PIL import ImageOps 
-        student_img = ImageOps.fit(student_img, (150, 180))
-        img.paste(student_img, (40, 170))
-        draw.rectangle([40, 170, 190, 350], outline=(203, 213, 225), width=2)
+        student_img = ImageOps.fit(student_img, (160, 200))
+        img.paste(student_img, (50, 180))
+        draw.rectangle([50, 180, 210, 380], outline=(203, 213, 225), width=3)
     except:
-        draw.rectangle([40, 170, 190, 350], fill=(241, 245, 249))
+        draw.rectangle([50, 180, 210, 380], fill=(241, 245, 249))
 
-    # ข้อมูล (ขยับระยะห่างใหม่ไม่ให้ทับแต้ม)
-    tx = 220
-    draw.text((tx, 170), f"{v[1]}", fill=(15, 23, 42), font=font_bold)
-    draw.text((tx, 225), f"รหัสประจำตัว: {v[2]}", fill=(51, 65, 85), font=font_name)
-    draw.text((tx, 270), f"ระดับชั้น: {v[3]}", fill=(51, 65, 85), font=font_name)
+    # 4. ส่วนข้อมูล (ล๊อคขอบเขตความกว้างสูงสุดไว้ที่ 350px)
+    max_text_w = 350
+    tx_start = 240
+
+    # ชื่อ-นามสกุล (ถ้าชื่อยาวมาก ขนาดฟอนต์จะเล็กลงเอง)
+    name_text = f"ชื่อ: {v[1]}"
+    name_font = get_fitting_font(name_text, max_text_w, f_bold, 48)
+    draw.text((tx_start, 190), name_text, fill=(15, 23, 42), font=name_font)
+
+    # รหัสและชั้น
+    reg_font = ImageFont.truetype(f_reg, 36)
+    draw.text((tx_start, 245), f"รหัส: {v[2]}", fill=(51, 65, 85), font=reg_font)
+    draw.text((tx_start, 290), f"ชั้น: {v[3]}", fill=(51, 65, 85), font=reg_font)
     
-    # ทะเบียนรถ (แยกบรรทัดชัดเจน)
-    draw.text((tx, 320), "เลขทะเบียน:", fill=(100, 116, 139), font=font_id)
-    draw.text((tx + 140, 320), str(v[6]), fill=(30, 41, 59), font=font_bold)
+    # ทะเบียนรถ (ล๊อคพื้นที่ไว้ ถ้าจังหวัดยาวจะลดขนาดฟอนต์เอง)
+    plate_label = "ทะเบียนรถ: "
+    plate_val = str(v[6])
+    draw.text((tx_start, 345), plate_label, fill=(100, 116, 139), font=ImageFont.truetype(f_bold, 34))
+    
+    # คำนวณขนาดทะเบียนแยกต่างหาก
+    plate_font = get_fitting_font(plate_val, 220, f_bold, 45)
+    draw.text((tx_start + 130, 345), plate_val, fill=(30, 41, 59), font=plate_font)
 
-    # แต้มวินัย (ย้ายตำแหน่งไปมุมขวาบนของเนื้อหา เพื่อเลี่ยงทะเบียนรถ)
+    # 5. แต้มวินัย (ล๊อคตำแหน่งชิดขวาแบบ RM Anchor)
+    score_x = width - 60
+    draw.text((score_x, 220), "แต้มวินัย", fill=(100, 116, 139), font=ImageFont.truetype(f_reg, 35), anchor="rm")
+    
     score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
     s_color = (22, 163, 74) if score >= 80 else ((202, 138, 4) if score >= 50 else (220, 38, 38))
-    
-    draw.text((width-180, 170), "แต้มวินัย", fill=(100, 116, 139), font=font_id)
-    draw.text((width-170, 205), str(score), fill=s_color, font=font_score)
+    score_font = ImageFont.truetype(f_bold, 120)
+    draw.text((score_x, 300), str(score), fill=s_color, font=score_font, anchor="rm")
 
-    # คำเตือนท้ายบัตร (ขยับเข้าข้างในและเล็กลง)
-    draw.text((width-380, height-45), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill=(220, 38, 38), font=font_id)
+    # 6. คำเตือน (ล๊อกกึ่งกลางท้ายบัตร)
+    warn_font = ImageFont.truetype(f_reg, 28)
+    draw.text((width/2, 440), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill=(220, 38, 38), font=warn_font, anchor="mm")
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -300,35 +316,62 @@ st.markdown("""
             background: #fee2e2; padding: 10px; border-radius: 8px; text-align: center;
             margin-bottom: 10px;
         }
+        /* ล็อคขนาดและสัดส่วนบัตรให้ Responsive 100% */
         .atm-card {
-            width: 95%; /* เปลี่ยนจาก 100% เป็น 95% เพื่อเว้นขอบจอ */
-            max-width: 500px; /* เพิ่มความกว้างสูงสุดเล็กน้อย */
-            height: auto; /* ให้ความสูงปรับตามเนื้อหา */
-            aspect-ratio: 1.586;
-            background: #ffffff; 
-            border-radius: 15px; 
-            border: 2px solid #cbd5e1;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            padding: 20px; 
-            position: relative; 
-            font-family: 'Sarabun', sans-serif;
-            color: #334155; 
+            width: 100%; 
+            max-width: 480px; 
             margin: 10px auto;
-            overflow: hidden; /* กันของล้นขอบบัตร */
+            aspect-ratio: 1.6 / 1; /* สัดส่วนมาตรฐานบัตรแข็ง */
+            background: #ffffff; 
+            border: 2px solid #cbd5e1;
+            border-radius: 15px; 
+            padding: 3%; /* ใช้ % เพื่อให้ย่อตามขนาดจอ */
+            box-sizing: border-box; 
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
-        .atm-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; }
-        .atm-logo { height: 55px; width: auto; }
-        .atm-title { text-align: right; }
-        .atm-school-name { font-size: 16px; font-weight: bold; color: #1e293b; }
-        .atm-card-name { font-size: 14px; color: #059669; font-weight: bold; }
-        .atm-body { display: flex; gap: 15px; }
-        .atm-photo { width: 100px; height: 125px; border-radius: 8px; object-fit: cover; border: 1px solid #cbd5e1; background-color: #f1f5f9; }
-        .atm-info { font-size: 14px; line-height: 1.5; flex: 1; color: #334155; }
-        .atm-score-box { position: absolute; bottom: 35px; right: 20px; text-align: right; }
-        .atm-score-label { font-size: 12px; color: #64748b; }
-        .atm-score-val { font-size: 32px; font-weight: 800; line-height: 1; }
-        .atm-disclaimer { position: absolute; bottom: 8px; right: 15px; font-size: 9px; color: #ef4444; opacity: 0.8; font-style: italic; }
-        
+
+        .atm-header { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            border-bottom: 2px solid #e2e8f0; 
+            padding-bottom: 2%; 
+            margin-bottom: 3%; 
+        }
+
+        .atm-logo { height: 45px; width: auto; max-width: 20%; }
+        .atm-school-name { font-size: 4.5vw; font-weight: bold; color: #1e293b; }
+        @media (min-width: 500px) { .atm-school-name { font-size: 18px; } }
+
+        .atm-body { display: flex; gap: 4%; flex: 1; align-items: flex-start; }
+        .atm-photo { 
+            width: 30%; 
+            aspect-ratio: 3 / 4; 
+            border-radius: 8px; 
+            object-fit: cover; 
+            border: 1px solid #cbd5e1; 
+        }
+
+        .atm-info { 
+            font-size: 3.5vw; 
+            line-height: 1.4; 
+            flex: 1; 
+            color: #334155; 
+            white-space: nowrap; /* ล็อคไม่ให้ขึ้นบรรทัดใหม่จนเละ */
+        }
+        @media (min-width: 500px) { .atm-info { font-size: 14px; } }
+
+        .atm-score-box { 
+            position: absolute; 
+            bottom: 15%; 
+            right: 5%; 
+            text-align: right; 
+        }
+        .atm-score-val { font-size: 10vw; font-weight: 800; line-height: 1; }
+        @media (min-width: 500px) { .atm-score-val { font-size: 40px; } }
         div[data-testid="stForm"] { border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; }
     </style>
 """, unsafe_allow_html=True)
