@@ -12,6 +12,7 @@ import re
 import os
 import textwrap
 import plotly.express as px
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 # ✅ 1. เพิ่มฟังก์ชันล็อคปุ่มไว้ตรงนี้ได้เลยครับ
 def start_loading():
     st.session_state.is_loading = True
@@ -180,6 +181,69 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
+    def create_permit_img(v, logo_path):
+    # สร้างพื้นหลังสีขาว ขนาดบัตรมาตรฐาน (กว้าง x สูง)
+    width, height = 600, 380
+    img = Image.new('RGB', (width, height), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    
+    # พยายามโหลดฟอนต์
+    try:
+        font_name = ImageFont.truetype("THSarabunNew.ttf", 35)
+        font_bold = ImageFont.truetype("THSarabunNewBold.ttf", 45)
+        font_id = ImageFont.truetype("THSarabunNewBold.ttf", 30)
+        font_score = ImageFont.truetype("THSarabunNewBold.ttf", 80)
+    except:
+        font_name = font_bold = font_id = font_score = ImageFont.load_default()
+
+    # วาดกรอบบัตร
+    draw.rectangle([10, 10, width-10, height-10], outline=(203, 213, 225), width=3)
+
+    # ใส่โลโก้โรงเรียน
+    if logo_path and os.path.exists(logo_path):
+        logo = Image.open(logo_path).convert("RGBA")
+        logo.thumbnail((80, 80))
+        img.paste(logo, (30, 30), logo)
+
+    # หัวบัตร
+    draw.text((130, 30), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=font_bold)
+    draw.text((130, 75), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=font_name)
+
+    # รูปนักเรียน
+    face_url = get_img_link(v[14])
+    try:
+        res = requests.get(face_url, timeout=5)
+        student_img = Image.open(io.BytesIO(res.content)).convert("RGB")
+        student_img = ImageOps.fit(student_img, (130, 160)) # ตัดให้พอดีกรอบ
+        img.paste(student_img, (30, 130))
+        draw.rectangle([30, 130, 160, 290], outline=(203, 213, 225), width=2)
+    except:
+        draw.rectangle([30, 130, 160, 290], fill=(241, 245, 249)) # ถ้าโหลดรูปไม่ขึ้นให้เป็นกล่องเทา
+
+    # ข้อมูลนักเรียน
+    tx = 180
+    draw.text((tx, 135), f"ชื่อ: {v[1]}", fill=(15, 23, 42), font=font_bold)
+    draw.text((tx, 185), f"รหัสประจำตัว: {v[2]}", fill=(51, 65, 85), font=font_name)
+    draw.text((tx, 225), f"ระดับชั้น: {v[3]}", fill=(51, 65, 85), font=font_name)
+    
+    # ทะเบียนรถ (เน้นตัวหนา)
+    draw.text((tx, 265), "เลขทะเบียนรถ", fill=(100, 116, 139), font=font_id)
+    draw.text((tx, 295), str(v[6]), fill=(30, 41, 59), font=font_bold)
+
+    # แต้มวินัย (มุมขวาล่าง)
+    score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
+    s_color = (22, 163, 74) if score >= 80 else ((202, 138, 4) if score >= 50 else (220, 38, 38))
+    
+    draw.text((width-180, height-130), "แต้มวินัย", fill=(100, 116, 139), font=font_id)
+    draw.text((width-180, height-100), str(score), fill=s_color, font=font_score)
+
+    # คำเตือนท้ายบัตร
+    draw.text((width-220, height-40), "*ไม่อาจใช้ทดแทนใบขับขี่ได้", fill=(220, 38, 38), font=font_id)
+
+    # ส่งค่ากลับเป็น Bytes
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
     
     def draw_img_func(url, x, y, w, h):
         try:
@@ -436,6 +500,8 @@ elif st.session_state['page'] == 'portal':
             face_url = get_img_link(v[14]) if len(v) > 14 and v[14] else "https://via.placeholder.com/100"
             score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
             score_color = "#16a34a" if score >= 80 else ("#ca8a04" if score >= 50 else "#dc2626")
+            
+            # --- 1. แสดงผลบนเว็บ (HTML) ---
             card_html = f"""
             <div class="atm-card">
                 <div class="atm-header">
@@ -463,8 +529,77 @@ elif st.session_state['page'] == 'portal':
             </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
-            st.write(""); st.info("💡 ปรับเป็นแนวนอนเพื่อให้นักเรียนบันทึกหน้าจอนี้(Capture) ไว้ให้ตรวจสอบ")
 
+            # --- 2. ฟังก์ชันสร้างรูปภาพเพื่อดาวน์โหลด (ใช้ Pillow) ---
+            from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+            def create_card_image(data, score_val, score_col_hex):
+                # สร้างพื้นหลังขนาด 600x380 (สัดส่วนบัตร ATM)
+                card_img = Image.new('RGB', (600, 380), color='white')
+                draw = ImageDraw.Draw(card_img)
+                
+                # โหลดฟอนต์ (ถ้าไม่มีในระบบจะใช้ฟอนต์พื้นฐาน)
+                try:
+                    font_bold = ImageFont.truetype("THSarabunNewBold.ttf", 40)
+                    font_reg = ImageFont.truetype("THSarabunNew.ttf", 30)
+                except:
+                    font_bold = font_reg = ImageFont.load_default()
+
+                # วาดโลโก้ (ถ้ามี)
+                if logo_path and os.path.exists(logo_path):
+                    logo = Image.open(logo_path).convert("RGBA")
+                    logo.thumbnail((80, 80))
+                    card_img.paste(logo, (30, 20), logo)
+
+                # ข้อความหัวบัตร
+                draw.text((120, 20), "โรงเรียนโพนทองพัฒนาวิทยา", fill="#1e293b", font=font_bold)
+                draw.text((120, 65), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill="#059669", font=font_reg)
+                draw.line((20, 110, 580, 110), fill="#cbd5e1", width=2)
+
+                # รูปนักเรียน (ดึงจากลิงก์)
+                try:
+                    resp = requests.get(get_img_link(data[14]), timeout=5)
+                    p_img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+                    p_img = ImageOps.fit(p_img, (120, 150))
+                    card_img.paste(p_img, (30, 130))
+                except:
+                    draw.rectangle([30, 130, 150, 280], outline="#cbd5e1")
+
+                # ข้อมูลนักเรียน
+                draw.text((170, 130), f"{data[1]}", fill="black", font=font_bold)
+                draw.text((170, 175), f"รหัสประจำตัว: {data[2]}", fill="#334155", font=font_reg)
+                draw.text((170, 210), f"ระดับชั้น: {data[3]}", fill="#334155", font=font_reg)
+                draw.text((170, 260), f"ทะเบียน: {data[6]}", fill="#1e293b", font=font_bold)
+
+                # กล่องคะแนน
+                draw.text((450, 230), "แต้มวินัย", fill="#64748b", font=font_reg)
+                draw.text((450, 260), f"{score_val}", fill=score_col_hex, font=font_bold)
+                
+                # คำเตือน
+                draw.text((320, 340), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill="#ef4444", font=font_reg)
+
+                # แปลงเป็น Bytes
+                img_byte_arr = io.BytesIO()
+                card_img.save(img_byte_arr, format='PNG')
+                return img_byte_arr.getvalue()
+
+            # --- 3. ปุ่มดาวน์โหลด ---
+            st.write("")
+            with st.spinner("⏳ กำลังเตรียมไฟล์รูปภาพ..."):
+                try:
+                    img_bytes = create_card_image(v, score, score_color)
+                    st.download_button(
+                        label="📥 ดาวน์โหลดบัตรอนุญาต (PNG)",
+                        data=img_bytes,
+                        file_name=f"Permit_{v[2]}.png",
+                        mime="image/png",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                except Exception as e:
+                    st.error(f"สร้างรูปภาพไม่สำเร็จ: {e}")
+            
+            st.write(""); st.info("💡 ท่านสามารถบันทึกรูปภาพนี้ไว้ในโทรศัพท์เพื่อแสดงต่อเจ้าหน้าที่ได้ทันที")
 elif st.session_state['page'] == 'dashboard':
     if st.button("⬅️ กลับหน้าจัดการ", use_container_width=True): go_to_page('teacher')
     st.subheader("📊 สถิติจราจร")
