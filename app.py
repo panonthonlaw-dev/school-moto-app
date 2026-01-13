@@ -12,7 +12,6 @@ import re
 import os
 import textwrap
 import plotly.express as px
-from PIL import Image, ImageDraw, ImageFont, ImageOps
 # ✅ 1. เพิ่มฟังก์ชันล็อคปุ่มไว้ตรงนี้ได้เลยครับ
 def start_loading():
     st.session_state.is_loading = True
@@ -181,81 +180,6 @@ def create_pdf(vals, img_url1, img_url2, face_url=None, printed_by="ระบบ
     c.drawString(60, height - 185, f"คะแนนความประพฤติจราจรคงเหลือ: {score} คะแนน"); c.setFillColorRGB(0, 0, 0)
     c.setFont(font_name, 16); lm = "(/)" if "มี" in lic_s else "( )"; tm = "(/)" if "ปกติ" in tax_s or "✅" in tax_s else "( )"; hm = "(/)" if "มี" in hel_s else "( )"
     c.drawString(60, height - 210, f"สถานะเอกสาร:  {lm} ใบขับขี่    {tm} ภาษี/พรบ.    {hm} หมวกกันน็อค")
-def get_fitting_font(text, max_width, font_path, initial_size):
-    """ฟังก์ชันคำนวณหาขนาดฟอนต์ที่ใหญ่ที่สุด ที่ยังอยู่ในพื้นที่ max_width (แนวคิดแบบ PDF)"""
-    size = initial_size
-    font = ImageFont.truetype(font_path, size)
-    # วนลูป: ถ้าความกว้างข้อความยังมากกว่าพื้นที่ที่ล๊อคไว้ ให้ลดขนาดฟอนต์ลงครั้งละ 1px
-    while font.getlength(str(text)) > max_width and size > 10:
-        size -= 1
-        font = ImageFont.truetype(font_path, size)
-    return font
-def create_permit_img(v, logo_path):
-    width, height = 850, 520  # ขนาดรูปมาตรฐาน
-    img = Image.new('RGB', (width, height), color=(255, 255, 255))
-    draw = ImageDraw.Draw(img)
-    
-    f_reg = "THSarabunNew.ttf"
-    f_bold = "THSarabunNewBold.ttf"
-    margin = 40 # ระยะห่างจากขอบที่ปลอดภัย
-
-    # 1. วาดกรอบบัตร
-    draw.rectangle([15, 15, width-15, height-15], outline=(203, 213, 225), width=5)
-
-    # 2. หัวบัตร (Lock Center กึ่งกลางรูป)
-    title_font = ImageFont.truetype(f_bold, 55)
-    draw.text((width/2, 55), "โรงเรียนโพนทองพัฒนาวิทยา", fill=(30, 58, 138), font=title_font, anchor="mm")
-    
-    sub_title_font = ImageFont.truetype(f_reg, 40)
-    draw.text((width/2, 115), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill=(5, 150, 105), font=sub_title_font, anchor="mm")
-    draw.line((margin, 165, width-margin, 165), fill=(226, 232, 240), width=3)
-
-    # 3. ส่วนรูปถ่ายนักเรียน (Lock ตำแหน่งซ้ายมือ)
-    try:
-        face_url = get_img_link(v[14])
-        res = requests.get(face_url, timeout=5)
-        student_img = Image.open(io.BytesIO(res.content)).convert("RGB")
-        student_img = ImageOps.fit(student_img, (180, 240))
-        img.paste(student_img, (margin + 10, 200))
-        draw.rectangle([margin + 10, 200, margin + 190, 440], outline=(203, 213, 225), width=2)
-    except:
-        draw.rectangle([margin + 10, 200, margin + 190, 440], fill=(241, 245, 249))
-
-    # 4. ส่วนข้อมูลนักเรียน (Lock พื้นที่เขียนไว้ที่ความกว้าง 380px)
-    text_x = margin + 210
-    max_text_w = 380  # ล๊อคความกว้างข้อความตรงกลาง ไม่ให้วิ่งไปทับแต้มวินัย
-
-    # ชื่อ-นามสกุล (Auto-Scale)
-    name_txt = f"ชื่อ: {v[1]}"
-    name_font = get_fitting_font(name_txt, max_text_w, f_bold, 55)
-    draw.text((text_x, 200), name_txt, fill=(15, 23, 42), font=name_font)
-
-    # ข้อมูลอื่นๆ
-    reg_font = ImageFont.truetype(f_reg, 38)
-    draw.text((text_x, 260), f"รหัสประจำตัว: {v[2]}", fill=(51, 65, 85), font=reg_font)
-    draw.text((text_x, 310), f"ระดับชั้น: {v[3]}", fill=(51, 65, 85), font=reg_font)
-    
-    # ทะเบียนรถ (Auto-Scale เฉพาะทะเบียน)
-    draw.text((text_x, 370), "ทะเบียนรถ:", fill=(100, 116, 139), font=ImageFont.truetype(f_reg, 36))
-    plate_val = str(v[6])
-    plate_font = get_fitting_font(plate_val, 250, f_bold, 55) # ล็อคความกว้างทะเบียนไว้ 250px
-    draw.text((text_x + 140, 370), plate_val, fill=(30, 41, 59), font=plate_font)
-
-    # 5. แต้มวินัย (Lock ชิดขวาเสมอ - Right Anchor)
-    score_x = width - margin - 10
-    draw.text((score_x, 230), "แต้มวินัยจราจร", fill=(100, 116, 139), font=ImageFont.truetype(f_reg, 32), anchor="rm")
-    
-    score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
-    s_color = (22, 163, 74) if score >= 80 else ((202, 138, 4) if score >= 50 else (220, 38, 38))
-    score_font = ImageFont.truetype(f_bold, 140)
-    draw.text((score_x, 320), str(score), fill=s_color, font=score_font, anchor="rm")
-
-    # 6. คำเตือน (Lock กึ่งกลางด้านล่าง)
-    draw.text((width/2, 490), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill=(220, 38, 38), font=ImageFont.truetype(f_reg, 30), anchor="mm")
-
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue()
     
     def draw_img_func(url, x, y, w, h):
         try:
@@ -313,34 +237,26 @@ st.markdown("""
             margin-bottom: 10px;
         }
         .atm-card {
-            width: 92vw; /* ใช้ความกว้าง 92% ของหน้าจอมือถือ */
-            max-width: 480px; /* แต่ไม่เกิน 480px บนจอคอม */
-            aspect-ratio: 1.6 / 1; /* ล็อคสัดส่วนบัตรให้เหมือนบัตรแข็ง */
-            background: #ffffff; 
-            border: 2px solid #cbd5e1;
-            border-radius: 15px; 
-            padding: 15px;
-            box-sizing: border-box; /* สำคัญ: กัน padding ดันบัตรบวม */
-            position: relative;
-            margin: 10px auto;
-            overflow: hidden; /* กันตัวอักษรหลุดขอบ */
+            width: 100%; max-width: 450px; aspect-ratio: 1.586;
+            background: #ffffff; border-radius: 15px; border: 2px solid #cbd5e1;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 20px; position: relative; font-family: 'Sarabun', sans-serif;
+            color: #334155; margin: auto;
         }
+        .atm-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; }
+        .atm-logo { height: 55px; width: auto; }
+        .atm-title { text-align: right; }
+        .atm-school-name { font-size: 16px; font-weight: bold; color: #1e293b; }
+        .atm-card-name { font-size: 14px; color: #059669; font-weight: bold; }
+        .atm-body { display: flex; gap: 15px; }
+        .atm-photo { width: 100px; height: 125px; border-radius: 8px; object-fit: cover; border: 1px solid #cbd5e1; background-color: #f1f5f9; }
+        .atm-info { font-size: 14px; line-height: 1.5; flex: 1; color: #334155; }
+        .atm-score-box { position: absolute; bottom: 35px; right: 20px; text-align: right; }
+        .atm-score-label { font-size: 12px; color: #64748b; }
+        .atm-score-val { font-size: 32px; font-weight: 800; line-height: 1; }
+        .atm-disclaimer { position: absolute; bottom: 8px; right: 15px; font-size: 9px; color: #ef4444; opacity: 0.8; font-style: italic; }
         
-        /* แก้ไขส่วน Photo ให้ยืดหยุ่น */
-        .atm-photo { 
-            width: 25%; 
-            height: auto; 
-            aspect-ratio: 3/4; 
-            object-fit: cover; 
-            border-radius: 8px; 
-        }
-        
-        /* ปรับฟอนต์ให้เล็กลงอัตโนมัติถ้าดูในมือถือที่จอเล็กมากๆ */
-        @media (max-width: 400px) {
-            .atm-info { font-size: 11px !important; }
-            .atm-school-name { font-size: 14px !important; }
-            .atm-score-val { font-size: 28px !important; }
-        }
+        div[data-testid="stForm"] { border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -520,8 +436,6 @@ elif st.session_state['page'] == 'portal':
             face_url = get_img_link(v[14]) if len(v) > 14 and v[14] else "https://via.placeholder.com/100"
             score = int(v[13]) if len(v) > 13 and str(v[13]).isdigit() else 100
             score_color = "#16a34a" if score >= 80 else ("#ca8a04" if score >= 50 else "#dc2626")
-            
-            # --- 1. แสดงผลบนเว็บ (HTML) ---
             card_html = f"""
             <div class="atm-card">
                 <div class="atm-header">
@@ -549,77 +463,8 @@ elif st.session_state['page'] == 'portal':
             </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
+            st.write(""); st.info("💡 ปรับเป็นแนวนอนเพื่อให้นักเรียนบันทึกหน้าจอนี้(Capture) ไว้ให้ตรวจสอบ")
 
-            # --- 2. ฟังก์ชันสร้างรูปภาพเพื่อดาวน์โหลด (ใช้ Pillow) ---
-            from PIL import Image, ImageDraw, ImageFont, ImageOps
-
-            def create_card_image(data, score_val, score_col_hex):
-                # สร้างพื้นหลังขนาด 600x380 (สัดส่วนบัตร ATM)
-                card_img = Image.new('RGB', (600, 380), color='white')
-                draw = ImageDraw.Draw(card_img)
-                
-                # โหลดฟอนต์ (ถ้าไม่มีในระบบจะใช้ฟอนต์พื้นฐาน)
-                try:
-                    font_bold = ImageFont.truetype("THSarabunNewBold.ttf", 40)
-                    font_reg = ImageFont.truetype("THSarabunNew.ttf", 30)
-                except:
-                    font_bold = font_reg = ImageFont.load_default()
-
-                # วาดโลโก้ (ถ้ามี)
-                if logo_path and os.path.exists(logo_path):
-                    logo = Image.open(logo_path).convert("RGBA")
-                    logo.thumbnail((80, 80))
-                    card_img.paste(logo, (30, 20), logo)
-
-                # ข้อความหัวบัตร
-                draw.text((120, 20), "โรงเรียนโพนทองพัฒนาวิทยา", fill="#1e293b", font=font_bold)
-                draw.text((120, 65), "บัตรอนุญาตนำรถเข้าสถานศึกษา", fill="#059669", font=font_reg)
-                draw.line((20, 110, 580, 110), fill="#cbd5e1", width=2)
-
-                # รูปนักเรียน (ดึงจากลิงก์)
-                try:
-                    resp = requests.get(get_img_link(data[14]), timeout=5)
-                    p_img = Image.open(io.BytesIO(resp.content)).convert("RGB")
-                    p_img = ImageOps.fit(p_img, (120, 150))
-                    card_img.paste(p_img, (30, 130))
-                except:
-                    draw.rectangle([30, 130, 150, 280], outline="#cbd5e1")
-
-                # ข้อมูลนักเรียน
-                draw.text((170, 130), f"{data[1]}", fill="black", font=font_bold)
-                draw.text((170, 175), f"รหัสประจำตัว: {data[2]}", fill="#334155", font=font_reg)
-                draw.text((170, 210), f"ระดับชั้น: {data[3]}", fill="#334155", font=font_reg)
-                draw.text((170, 260), f"ทะเบียน: {data[6]}", fill="#1e293b", font=font_bold)
-
-                # กล่องคะแนน
-                draw.text((450, 230), "แต้มวินัย", fill="#64748b", font=font_reg)
-                draw.text((450, 260), f"{score_val}", fill=score_col_hex, font=font_bold)
-                
-                # คำเตือน
-                draw.text((320, 340), "*ไม่อาจใช้ทดแทนใบขับขี่ได้ตามกฎหมาย", fill="#ef4444", font=font_reg)
-
-                # แปลงเป็น Bytes
-                img_byte_arr = io.BytesIO()
-                card_img.save(img_byte_arr, format='PNG')
-                return img_byte_arr.getvalue()
-
-            # --- 3. ปุ่มดาวน์โหลด ---
-            st.write("")
-            with st.spinner("⏳ กำลังเตรียมไฟล์รูปภาพ..."):
-                try:
-                    img_bytes = create_card_image(v, score, score_color)
-                    st.download_button(
-                        label="📥 ดาวน์โหลดบัตรอนุญาต (PNG)",
-                        data=img_bytes,
-                        file_name=f"Permit_{v[2]}.png",
-                        mime="image/png",
-                        use_container_width=True,
-                        type="primary"
-                    )
-                except Exception as e:
-                    st.error(f"สร้างรูปภาพไม่สำเร็จ: {e}")
-            
-            st.write(""); st.info("💡 ท่านสามารถบันทึกรูปภาพนี้ไว้ในโทรศัพท์เพื่อแสดงต่อเจ้าหน้าที่ได้ทันที")
 elif st.session_state['page'] == 'dashboard':
     if st.button("⬅️ กลับหน้าจัดการ", use_container_width=True): go_to_page('teacher')
     st.subheader("📊 สถิติจราจร")
