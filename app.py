@@ -307,10 +307,10 @@ if st.session_state['page'] == 'student':
         hs = doc_cols[2].radio("หมวกกันน็อค", ["✅ มี", "❌ ไม่มี"], horizontal=True)
         st.write("📸 **อัปโหลดภาพ (จำเป็น)**")
         up1, up2, up3 = st.columns(3)
-        p_face = up1.file_uploader("1. รูปเจ้าของรถ", type=['jpg','png','jpeg'])
-        p_back = up2.file_uploader("2. รูปด้านหลังรถจักรยานยนต์(เห็นป้าย)", type=['jpg','png','jpeg'])
-        p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นเต็มคัน)", type=['jpg','png','jpeg'])
-        pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจร")
+        p_face = up1.file_uploader("1. รูปถ่ายเจ้าของรถ", type=['jpg','png','jpeg'])
+        p_back = up2.file_uploader("2. รูปด้านหลังรถจักรยานยนต์(เห็นป้ายทะเบียน)", type=['jpg','png','jpeg'])
+        p_side = up3.file_uploader("3. รูปด้านข้างรถจักรยานยนต์(เห็นรถเต็มคัน)", type=['jpg','png','jpeg'])
+        pdpa = st.checkbox("ข้าพเจ้ายินยอมให้โรงเรียนเก็บข้อมูลและรูปภาพเพื่อใช้ในระบบรักษาความปลอดภัยจราจรและงานอื่นๆ")
 
         # --- แก้ไขปุ่มส่งข้อมูลและการเช็ค Lock ---
         # 🚩 เพิ่มวงเล็บปิด ) หลัง st.session_state.is_loading
